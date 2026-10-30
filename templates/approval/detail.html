@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}Request #{{ item.id }} | Dereje Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Approvals</span>
+      <h1>{{ item.title }}</h1>
+      <p>Request #{{ item.id }} · {{ item.request_type }} · raised by {{ item.created_by_name }}</p>
+    </div>
+    <nav class="stock-actions" aria-label="Approval actions">
+      <a class="btn btn-outline btn-sm" href="{{ url_for('approvals.dashboard') }}">Back to queue</a>
+      {% if 'approvals' in permissions %}
+      <a class="btn btn-sm" href="{{ url_for('approvals.new_request') }}">New request</a>
+      {% endif %}
+    </nav>
+  </div>
+</section>
+
+<section class="container finance-page">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="finance-alert {{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <div class="dash-grid">
+    <div class="dash-panel">
+      <h2>The request</h2>
+      <dl class="detail-list">
+        <dt>Status</dt>
+        <dd>
+          <span class="status-badge {{ 'active' if item.status == 'Approved' else 'off' if item.status in ('Rejected', 'Returned') else 'neutral' }}">
+            {{ item.status }}
+          </span>
+        </dd>
+
+        <dt>Department</dt><dd>{{ item.department | title }}</dd>
+        <dt>Amount</dt>
+        <dd>{{ "{:,.2f} ETB".format(item.amount | float) if item.amount else 'No amount' }}</dd>
+        <dt>Current step</dt>
+        <dd>{{ step_label.get(item.current_approver_step, item.current_approver_step) }}</dd>
+        <dt>Raised by</dt><dd>{{ item.created_by_name or '—' }}</dd>
+        <dt>Raised on</dt><dd>{{ item.created_at | audit_time }}</dd>
+        <dt>Last updated</dt><dd>{{ item.updated_by_name or '—' }} · {{ item.updated_at | audit_time }}</dd>
+
+        <dt>Reason</dt>
+        <dd class="wrap-cell">{{ item.description }}</dd>
+      </dl>
+    </div>
+
+    <div class="dash-panel">
+      <h2>Approval chain</h2>
+      <ol class="approval-chain">
+        {% for step in path %}
+        <li class="{{ 'current' if step == item.current_approver_step and item.status == 'Pending' }}">
+          <span class="chain-step">{{ loop.index }}</span>
+          <div>
+            <strong>{{ step_label.get(step, step) }}</strong>
+            <p>{{ 'Answering now' if step == item.current_approver_step and item.status == 'Pending'
+                  else 'Next in line' if item.status == 'Pending'
+                  else 'Closed' }}</p>
+          </div>
+        </li>
+        {% endfor %}
+      </ol>
+      <p class="panel-note">
+        Chain length is set by the amount when the request was raised:
+        over {{ "{:,.0f}".format(two_step) }} ETB adds Finance, over
+        {{ "{:,.0f}".format(three_step) }} ETB adds management sign-off.
+      </p>
+
+      {% if can_decide %}
+      <form method="post" class="finance-form decision-form"
+            action="{{ url_for('approvals.decide', request_id=item.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label for="decision-comments">Your comment (required to reject or return)</label>
+        <textarea id="decision-comments" name="comments" rows="3" maxlength="1000"></textarea>
+        <div class="finance-form-actions">
+          <button class="finance-btn primary" type="submit" name="decision" value="approve">Approve</button>
+          <button class="finance-btn secondary" type="submit" name="decision" value="return">Return for revision</button>
+          <button class="finance-btn danger" type="submit" name="decision" value="reject">Reject</button>
+        </div>
+      </form>
+      {% elif item.status == 'Pending' %}
+      <p class="panel-note">
+        This request is waiting on the
+        {{ step_label.get(item.current_approver_step, item.current_approver_step) }} step, which
+        your account does not answer.
+      </p>
+      {% endif %}
+
+      {% if can_resubmit %}
+      <form method="post" class="decision-form"
+            action="{{ url_for('approvals.resubmit', request_id=item.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="finance-form-actions">
+          <button class="finance-btn primary" type="submit">Resubmit after edits</button>
+        </div>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="dash-panel hr-table-panel">
+    <h2>Decision history</h2>
+    <div class="hr-table-wrap table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>When</th>
+            <th>Account</th>
+            <th>Role</th>
+            <th>Action</th>
+            <th>Comment</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in actions %}
+          <tr>
+            <td class="nowrap">{{ row.action_at | audit_time }}</td>
+            <td>{{ row.actor_name }}</td>
+            <td>{{ row.actor_role | title }}</td>
+            <td class="nowrap">{{ row.action }}</td>
+            <td class="wrap-cell">{{ row.comments or '—' }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="employee-empty">Nothing recorded on this request yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+{% endblock %}

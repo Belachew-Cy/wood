@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi with context %}
+
+{% block title %}Requisitions | Dereje Wood &amp; Kitchen{% endblock %}
+
+{% macro requisition_table(rows, show_owner, states, editable, csrf) %}
+  <div class="hr-table-wrap table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Reference</th>
+          <th>Department</th>
+          <th>Items</th>
+          <th>Total (ETB)</th>
+          <th>Supplier</th>
+          {% if show_owner %}<th>Raised by</th>{% endif %}
+          <th>Submitted</th>
+          <th>Last modified</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td class="nowrap">
+            <a href="{{ url_for('procurement.requisition_detail', request_id=row.id) }}">{{ row.request_number }}</a>
+          </td>
+          <td>{{ row.department | title }}</td>
+          <td class="nowrap">{{ row.line_count }} line{{ '' if row.line_count == 1 else 's' }}</td>
+          <td>{{ "{:,.2f}".format(row.estimated_cost | float) }}</td>
+          <td class="wrap-cell">{{ row.supplier_name or '—' }}</td>
+          {% if show_owner %}<td>{{ row.requested_by_name }}</td>{% endif %}
+          <td class="nowrap">{{ (row.submitted_at or row.created_at or '—')[:10] }}</td>
+          <td class="nowrap">
+            {{ row.updated_by_name or '—' }}
+            {% if row.updated_at %}
+            <br><span class="feed-meta">{{ row.updated_at | audit_time }}</span>
+            {% endif %}
+          </td>
+          <td>
+            <span class="status-badge {{ 'active' if row.status == 'Approved' else 'off' if row.status == 'Rejected' else 'neutral' }}">
+              {{ states[row['id']] }}
+            </span>
+          </td>
+          <td>
+            <div class="status-form">
+              {% if editable[row['id']] %}
+              <a class="finance-btn secondary"
+                 href="{{ url_for('procurement.requisition_edit', request_id=row.id) }}">Revise</a>
+              {% endif %}
+              {% if row.status == 'Draft' %}
+              <form method="post"
+                    action="{{ url_for('procurement.requisition_submit', request_id=row.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf }}">
+                <button class="finance-btn primary" type="submit">Submit</button>
+              </form>
+              <form method="post"
+                    action="{{ url_for('procurement.requisition_discard', request_id=row.id) }}"
+                    onsubmit="return confirm('Discard this draft requisition?')">
+                <input type="hidden" name="csrf_token" value="{{ csrf }}">
+                <button class="finance-btn secondary" type="submit">Discard</button>
+              </form>
+              {% elif row.approval_id %}
+              <a class="finance-btn secondary"
+                 href="{{ url_for('approvals.detail', request_id=row.approval_id) }}">Approval trail</a>
+              {% else %}
+              <span class="feed-meta">Closed</span>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="{{ 11 if show_owner else 10 }}" class="employee-empty">
+            {% if show_owner %}No requisition has been raised by another department yet.{% else %}You have not raised a requisition yet.{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endmacro %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Purchasing</span>
+      <h1>Purchase Requisitions</h1>
+      <p>Prepare what your department needs, line by line, and send it to the approvers.
+        A draft stays yours until you submit it.</p>
+    </div>
+    <nav class="stock-actions" aria-label="Requisition actions">
+      <a class="btn btn-outline btn-sm" href="{{ url_for('procurement.requisition_new') }}">New requisition</a>
+      {% if 'procurement' in permissions %}
+      <a class="btn btn-outline btn-sm" href="{{ url_for('procurement.dashboard') }}">Procurement</a>
+      {% endif %}
+    </nav>
+  </div>
+</section>
+
+<section class="container finance-page">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="finance-alert {{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <div class="hr-stats">
+    {{ kpi('Requisitions', counts.total, 'Raised by you') }}
+    {{ kpi('Drafts', counts.drafts, 'Not sent yet') }}
+    {{ kpi('Awaiting a decision', counts.waiting,
+           'With an approver', 'down' if counts.waiting else 'flat') }}
+    {{ kpi('Sent back', counts.returned, 'Revise and resubmit',
+           'down' if counts.returned else 'flat') }}
+    {{ kpi('Approved', counts.approved,
+           '{:,.2f} ETB requested'.format(counts.value | float)) }}
+  </div>
+
+  <div class="dash-panel hr-table-panel">
+    <h2>My requisitions</h2>
+    {{ requisition_table(mine, False, states, editable, csrf_token()) }}
+  </div>
+
+  {% if desk %}
+  <div class="dash-panel hr-table-panel">
+    <h2>Every department</h2>
+    {{ requisition_table(desk, True, states, editable, csrf_token()) }}
+  </div>
+  {% endif %}
+
+  <div class="finance-panel">
+    <h2>Who signs</h2>
+    <p class="panel-note">
+      {% if pr_route_mode == 'sequential' %}
+      This organisation has chosen the policy where <strong>every requisition</strong>
+      passes through the Manager, then the Director, then the CEO, whatever its value.
+      {% else %}
+      A requisition below ETB {{ "{:,.0f}".format(pr_manager_limit | float) }} is signed by
+      a <strong>Manager</strong>; from there up to ETB
+      {{ "{:,.0f}".format(pr_director_limit | float) }} inclusive by a
+      <strong>Manager</strong> and then a <strong>Director</strong>; above that by the
+      <strong>CEO</strong>.
+      {% endif %}
+      The figures are set on Approval Settings, and a requisition keeps the chain it was
+      submitted with even if the limits are retuned afterwards.
+    </p>
+  </div>
+</section>
+{% endblock %}

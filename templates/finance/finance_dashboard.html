@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi, bars, columns, feed with context %}
+
+{% block title %}Finance Dashboard | Dereje Wood & Kitchen Cabinet{% endblock %}
+
+{% block content %}
+{% set flow_rows = [
+  {'label': 'Income', 'value': income, 'display': "{:,.2f}".format(income)},
+  {'label': 'Expenses', 'value': expenses, 'display': "{:,.2f}".format(expenses)},
+  {'label': 'Net result', 'value': net if net > 0 else 0, 'display': "{:,.2f}".format(net)}
+] %}
+{% set balance_rows = [
+  {'label': 'Receivables', 'value': receivables, 'display': "{:,.2f}".format(receivables)},
+  {'label': 'Payables', 'value': payables, 'display': "{:,.2f}".format(payables)}
+] %}
+
+{% set flow_cols = [] %}
+{% for item in recent[:10] | reverse %}
+  {% set _ = flow_cols.append({
+    'label': item.transaction_date[8:10] if item.transaction_date and item.transaction_date | length >= 10 else '',
+    'value': item.amount_etb if item.amount_etb > 0 else 0,
+    'display': "{} {:,.2f} ETB".format(item.transaction_type | title, item.amount_etb)
+  }) %}
+{% endfor %}
+
+{% set unpaid = invoices | selectattr('status', 'equalto', 'Unpaid') | list %}
+{% set attention = [] %}
+{% if net < 0 %}
+  {% set _ = attention.append({
+    'icon': 'cash', 'tone': 'bad',
+    'title': 'Expenses are ahead of income',
+    'meta': "Net operating result is {:,.2f} ETB.".format(net),
+    'time': 'Review'
+  }) %}
+{% endif %}
+{% if receivables > 0 %}
+  {% set _ = attention.append({
+    'icon': 'file', 'tone': 'warn',
+    'title': "{:,.2f} ETB still to collect".format(receivables),
+    'meta': 'Outstanding customer invoice balances.',
+    'href': url_for('finance.invoices'), 'time': 'Chase up'
+  }) %}
+{% endif %}
+{% if payables > 0 %}
+  {% set _ = attention.append({
+    'icon': 'cash', 'tone': 'warn',
+    'title': "{:,.2f} ETB owed to suppliers".format(payables),
+    'meta': 'Outstanding supplier invoice balances.',
+    'href': url_for('finance.invoices'), 'time': 'Settle'
+  }) %}
+{% endif %}
+{% if unpaid %}
+  {% set _ = attention.append({
+    'icon': 'warn', 'tone': 'bad',
+    'title': "{} of the latest {} invoices are unpaid".format(unpaid | length, invoices | length),
+    'meta': 'Invoice amounts are recorded but no payment has been booked.',
+    'href': url_for('finance.invoices'), 'time': 'Follow up'
+  }) %}
+{% endif %}
+{% if not recent %}
+  {% set _ = attention.append({
+    'icon': 'inbox', 'tone': '',
+    'title': 'No transactions recorded yet',
+    'meta': 'Book your first income or expense entry and the figures will appear here.',
+    'href': url_for('finance.transactions'), 'time': 'Start'
+  }) %}
+{% endif %}
+
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Finance Management</span>
+      <h1>Finance Dashboard</h1>
+      <p>Income, expenses, invoices and payments in one view.</p>
+    </div>
+    <nav class="stock-actions" aria-label="Finance sections">
+      <a class="btn btn-sm" href="{{ url_for('finance.dashboard') }}">Overview</a>
+      <a class="btn btn-outline btn-sm" href="{{ url_for('finance.transactions') }}">Income &amp; Expenses</a>
+      <a class="btn btn-outline btn-sm" href="{{ url_for('finance.invoices') }}">Invoices &amp; Payments</a>
+      <a class="btn btn-outline btn-sm" href="{{ url_for('reports_centre') }}">Reports</a>
+    </nav>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="hr-stats">
+      {{ kpi('Total Income (ETB)', "{:,.2f}".format(income)) }}
+      {{ kpi('Total Expenses (ETB)', "{:,.2f}".format(expenses)) }}
+      {{ kpi('Net Operating Result (ETB)', "{:,.2f}".format(net),
+             'Surplus' if net > 0 else ('Deficit' if net < 0 else 'Break even'),
+             'up' if net > 0 else ('down' if net < 0 else 'flat')) }}
+      {{ kpi('Customer Balances (ETB)', "{:,.2f}".format(receivables)) }}
+      {{ kpi('Supplier Balances (ETB)', "{:,.2f}".format(payables)) }}
+    </div>
+
+    <div class="chart-grid">
+      {{ bars('Cash flow', flow_rows, 'ETB, all time') }}
+      {{ bars('Outstanding balances', balance_rows, 'ETB') }}
+      {{ columns('Latest entries', flow_cols, 'ETB per entry') }}
+      {{ feed('Needs attention', attention, 'Signals from the figures above') }}
+    </div>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>Recent Transactions</h2>
+
+      <div class="hr-table-wrap table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Category</th>
+              <th>Description</th>
+              <th>Currency</th>
+              <th>Amount</th>
+              <th>ETB Equivalent</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in recent %}
+            <tr>
+              <td>{{ item.transaction_date }}</td>
+              <td>
+                <span class="status-badge {{ 'active' if item.transaction_type == 'income' else 'neutral' }}">
+                  {{ item.transaction_type | title }}
+                </span>
+              </td>
+              <td>{{ item.category }}</td>
+              <td>{{ item.description }}</td>
+              <td>{{ item.currency }}</td>
+              <td>{{ "{:,.2f}".format(item.amount) }}</td>
+              <td>{{ "{:,.2f}".format(item.amount_etb) }}</td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="7" class="employee-empty">No transactions recorded yet.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>Recent Invoices</h2>
+
+      <div class="hr-table-wrap table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Invoice</th>
+              <th>Type</th>
+              <th>Customer / Supplier</th>
+              <th>Date</th>
+              <th>Amount</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in invoices %}
+            <tr>
+              <td>{{ item.invoice_number }}</td>
+              <td>{{ item.invoice_type | title }}</td>
+              <td>{{ item.party_name }}</td>
+              <td>{{ item.issue_date }}</td>
+              <td>
+                {{ item.currency }}
+                {{ "{:,.2f}".format(item.total_amount) }}
+              </td>
+              <td>
+                <span class="status-badge {{ 'active' if item.status == 'Paid' else ('off' if item.status == 'Cancelled' else 'neutral') }}">
+                  {{ item.status }}
+                </span>
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="6" class="employee-empty">No invoices recorded yet.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

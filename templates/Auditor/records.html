@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block title %}{{ label }} records | Dereje Wood &amp; Kitchen{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* Department tables are wide; a landscape sheet keeps all their columns
+     readable instead of squeezing headings into broken words. */
+  @media print { @page { size: landscape; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Audit records</span>
+      <h1>{{ label }}</h1>
+      <p>Read exactly as the department holds it. Nothing here can be edited.</p>
+      {% if date_column %}
+      <p class="print-only">Date window: {{ start_date or 'Earliest' }} to {{ end_date or 'Today' }}</p>
+      {% endif %}
+    </div>
+    <nav class="stock-actions" aria-label="Record actions">
+      <a class="btn btn-outline btn-sm" href="{{ back_url }}">Console</a>
+      <a class="btn btn-outline btn-sm"
+         href="{{ csv_url }}">Export CSV</a>
+      <button class="btn btn-sm" type="button" data-print>Print</button>
+    </nav>
+  </div>
+</section>
+
+<section class="container finance-page">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="finance-alert {{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <div class="dash-panel hr-table-panel" data-filter>
+    <h2>{{ total }} record{{ '' if total == 1 else 's' }} · {{ rows | length }} shown</h2>
+
+    {% if date_column %}
+    <form method="GET" action="{{ filters_url }}" class="report-filters no-print">
+      <div>
+        <label for="startDate">From ({{ date_column | replace('_', ' ') }})</label>
+        <input id="startDate" type="date" name="start_date" value="{{ start_date }}">
+      </div>
+      <div>
+        <label for="endDate">To</label>
+        <input id="endDate" type="date" name="end_date" value="{{ end_date }}">
+      </div>
+      <div>
+        <button class="report-btn" type="submit">Apply dates</button>
+      </div>
+      <div>
+        <a class="btn btn-outline btn-sm" href="{{ filters_url }}">Clear dates</a>
+      </div>
+    </form>
+    {% endif %}
+
+    <div class="report-filters no-print">
+      <div>
+        <label for="recordSearch">Search these records</label>
+        <input id="recordSearch" type="search" data-filter-search
+               placeholder="Any value in the rows shown">
+      </div>
+    </div>
+
+    <div class="hr-table-wrap table-scroll">
+      <table class="report-table">
+        <thead>
+          <tr>
+            {% for _name, heading in table_columns %}<th>{{ heading }}</th>{% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr>
+            {% for cell in row %}<td>{{ cell }}</td>{% endfor %}
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="{{ table_columns | length }}" class="report-empty">
+              This dataset has no records in this window.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <p class="report-empty" data-filter-empty hidden>
+      No record on this page matches that search.
+    </p>
+    <p class="report-note no-print"><span data-filter-count></span></p>
+
+    {% if capped %}
+    <p class="report-note">
+      Showing the newest {{ rows | length }} of {{ total }} records. Narrow the date
+      window or export the CSV for the rest.
+    </p>
+    {% endif %}
+
+    <p class="report-note">
+      Columns that could hold a password, a hash or a token are never read out of the
+      database, so they cannot appear here or in the export.
+    </p>
+  </div>
+</section>
+{% endblock %}

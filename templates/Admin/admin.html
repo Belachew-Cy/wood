@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% from "base.html" import bars, feed with context %}
+{% block title %}Admin Dashboard | Dereje Belay Wood &amp; Kitchen Cabinet Finishing{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Admin</span>
+      <h1>Portfolio &amp; workforce</h1>
+      <p>Signed in as {{ user.full_name }} · {{ user.email }} · {{ role_label }}</p>
+    </div>
+    <div class="dash-stats">
+      <div class="stat"><strong>{{ projects | length }}</strong><span>Projects</span></div>
+      <div class="stat"><strong>{{ employees | length }}</strong><span>Employees</span></div>
+      <div class="stat"><strong>{{ projects | map(attribute='category') | unique | list | length }}</strong><span>Categories</span></div>
+    </div>
+  </div>
+</section>
+
+{% set dept_rows = [] %}
+{% for name, rows in employees | groupby('department') %}
+  {% set _ = dept_rows.append({'label': name or 'Unassigned', 'value': rows | length}) %}
+{% endfor %}
+{% set dept_rows = dept_rows | sort(reverse=true, attribute='value') %}
+
+{% set cat_rows = [] %}
+{% for name, rows in projects | groupby('category') %}
+  {% set _ = cat_rows.append({'label': name or 'Uncategorised', 'value': rows | length}) %}
+{% endfor %}
+{% set cat_rows = cat_rows | sort(reverse=true, attribute='value') %}
+
+{% set attention = [] %}
+{% set no_salary = [] %}
+{% for e in employees %}
+  {% if not e.salary %}{% set _ = no_salary.append(e) %}{% endif %}
+{% endfor %}
+{% if no_salary %}
+  {% set _ = attention.append({
+    'icon': 'cash', 'tone': 'warn',
+    'title': "{} employee{} have no salary recorded".format(no_salary | length, '' if no_salary | length == 1 else 's'),
+    'meta': 'Payroll cannot be run for them until a monthly salary is set.',
+    'time': 'Payroll'
+  }) %}
+{% endif %}
+{% if not employees %}
+  {% set _ = attention.append({
+    'icon': 'users', 'tone': '',
+    'title': 'No employees registered yet',
+    'meta': 'Add the workforce under Human Resources → Employees.',
+    'time': 'Start'
+  }) %}
+{% endif %}
+{% if not projects %}
+  {% set _ = attention.append({
+    'icon': 'file', 'tone': '',
+    'title': 'The portfolio is empty',
+    'meta': 'Add your first finished project in the panel below.',
+    'time': 'Projects'
+  }) %}
+{% endif %}
+
+
+<section class="section bg-white">
+  <div class="container">
+    <div class="chart-grid">
+      {{ bars('Team by department', dept_rows, 'employees') }}
+      {{ bars('Portfolio by category', cat_rows, 'projects') }}
+      {{ feed('Needs attention', attention, 'Workforce and portfolio') }}
+    </div>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    <div class="dash-grid">
+      <div class="dash-panel">
+        <h2>Manage Projects</h2>
+        <div class="dash-table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Title</th><th>Category</th><th>Image</th><th></th></tr></thead>
+          <tbody>
+            {% for p in projects %}
+            <tr>
+              <td>{{ p.id }}</td>
+              <td>{{ p.title }}</td>
+              <td>{{ p.category }}</td>
+              <td class="cell-img"><img src="{{ p.image }}" alt="{{ p.title }}" loading="lazy" /></td>
+              <td>
+                <form method="POST" onsubmit="return confirm('Delete this project?');">
+                  {{ csrf_field() }}
+                  <input type="hidden" name="action" value="delete" />
+                  <input type="hidden" name="id" value="{{ p.id }}" />
+                  <button class="btn-danger" type="submit">Delete</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+      </div>
+
+      <div class="dash-panel">
+        <h2>Add Project</h2>
+        <form method="POST" class="dash-form">
+          {{ csrf_field() }}
+          <input type="hidden" name="action" value="add" />
+          <label>Title</label>
+          <input type="text" name="title" placeholder="e.g. Oak Library Shelving" required />
+          <label>Category</label>
+          <select name="category" required>
+            <option>Kitchen</option>
+            <option>Wardrobe</option>
+            <option>Doors</option>
+            <option>Interior</option>
+          </select>
+          <label>Image path</label>
+          <input type="text" name="image" placeholder="/static/img/your-photo.jpg" required />
+          <button type="submit" class="btn">Add Project <span class="arrow">→</span></button>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow">Workforce</span>
+        <h2>Employee records</h2>
+      </div>
+      <p>Staff records now live in one place. Register, edit and keep every detail current in
+        Employee Management under HR; the directory below is the same data.</p>
+    </div>
+
+    <div class="account-card">
+      <div class="account-head">
+        <div>
+          <h3 class="account-name">Directory</h3>
+          <span class="cell-note">{{ employees | length }} registered</span>
+        </div>
+        <a class="btn" href="{{ url_for('employees') }}">Open Employee Management <span class="arrow">→</span></a>
+      </div>
+      <div class="dash-table-wrap">
+        <table>
+          <thead>
+            <tr><th>ID</th><th>Name</th><th>Department</th><th>Position</th><th>Status</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for e in employees %}
+            <tr>
+              <td>{{ e.employee_code }}</td>
+              <td>{{ e.full_name }}</td>
+              <td>{{ e.department }}</td>
+              <td>{{ e.position }}</td>
+              <td><span class="status-badge {{ 'active' if e.employment_status == 'Active' else ('off' if e.employment_status == 'Inactive' else 'neutral') }}">{{ e.employment_status }}</span></td>
+              <td>
+                <div class="row-actions">
+                  <a class="btn btn-outline-dark" href="{{ url_for('edit_employee', employee_id=e.id) }}">Edit</a>
+                </div>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" class="cell-note">No employees registered yet. Register the first one in Employee Management.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% endblock %}

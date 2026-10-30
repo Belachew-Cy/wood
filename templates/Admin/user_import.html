@@ -1,0 +1,297 @@
+{% extends "base.html" %}
+
+{% block title %}Import Users | Dereje Belay Wood &amp; Kitchen{% endblock %}
+
+{% macro ui(name) -%}
+  {%- set paths = {
+    'download': '<path d="M12 4v12"/><path d="m7 11 5 5 5-5"/><path d="M4 20h16"/>',
+    'upload': '<path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M4 20h16"/>',
+    'users': '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+    'back': '<path d="M19 12H5"/><path d="m12 19-7-7 7-7"/>'
+  } -%}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ paths.get(name, paths['download']) | safe }}</svg>
+{%- endmacro %}
+
+{% block content %}
+<style>
+  .import-file {
+    width: 100%;
+    padding: 0.55rem 0.7rem;
+    border: 1px dashed var(--line-strong);
+    border-radius: var(--radius-sm);
+    background: var(--ivory-2);
+    color: var(--text);
+    font-size: 0.8rem;
+  }
+  .import-file::file-selector-button {
+    margin-right: 0.7rem;
+    padding: 0.35rem 0.7rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--white);
+    color: var(--text);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .import-file::file-selector-button:hover { border-color: var(--line-strong); }
+  .import-scroll { overflow-x: auto; }
+  .import-table td { font-size: 0.8rem; }
+  .import-table th:nth-child(1) { width: 54px; }
+  .import-mono {
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 0.78rem;
+    color: var(--text-strong);
+  }
+  .import-password {
+    padding: 0.12rem 0.4rem;
+    border: 1px solid var(--warning-border);
+    border-radius: var(--radius-sm);
+    background: var(--warning-bg);
+    color: var(--warning-ink);
+    font-weight: 600;
+  }
+  .import-account { display: grid; gap: 0.1rem; min-width: 0; }
+  .import-account strong { color: var(--text-strong); font-weight: 600; }
+  .import-account span { color: var(--muted); font-size: 0.74rem; overflow-wrap: anywhere; }
+  .import-guide td { vertical-align: top; }
+  .import-guide code { margin-right: 0.2rem; }
+  .import-roles { margin: 0.2rem 0 0; color: var(--muted); font-size: 0.75rem; line-height: 1.6; }
+  @media (max-width: 900px) {
+    .import-table th:nth-child(5),
+    .import-table td:nth-child(5),
+    .import-table th:nth-child(6),
+    .import-table td:nth-child(6) { display: table-cell; }
+  }
+</style>
+
+<section class="dir-page">
+  <div class="container">
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <header class="dir-head">
+      <div class="dir-head-copy">
+        <span class="dir-eyebrow">Directory</span>
+        <h1>Import users</h1>
+        <p class="dir-sub">Create sign-in accounts in bulk from one CSV file. Every row
+          becomes the same gated account the Add user form creates: an initial password
+          to hand over, a welcome notification and, when the sheet names a staff code,
+          the matching HR link.</p>
+        {% if result %}
+        {% set created_count = result.created | length %}
+        {% set rejected_count = result.rejected | length %}
+        {% set read_count = created_count + rejected_count %}
+        <p class="dir-summary">
+          <span><span class="dir-swatch success"></span><strong>{{ created_count }}</strong>
+            created</span>
+          <span><span class="dir-swatch warning"></span><strong>{{ rejected_count }}</strong>
+            rejected</span>
+          <span><span class="dir-swatch muted"></span><strong>{{ read_count }}</strong>
+            row{{ '' if read_count == 1 else 's' }} read</span>
+        </p>
+        {% endif %}
+      </div>
+      <div class="dir-head-actions">
+        <a class="dir-quiet-link" href="{{ url_for('admin_users') }}">{{ ui('back') }} All Users</a>
+        <a class="dir-quiet-link" href="{{ url_for('admin_user_import_template') }}">{{ ui('download') }} CSV template</a>
+      </div>
+    </header>
+
+    {% if result %}
+    <div class="dir-stack">
+      <div class="dir-card">
+        <div class="dir-card-head">
+          <div>
+            <span class="dir-eyebrow">Import result</span>
+            <h2>{{ result.created | length }} created, {{ result.rejected | length }} rejected</h2>
+            <p>From <strong>{{ result.file }}</strong>. The initial passwords below are shown
+              once: they are not stored anywhere, so write them down before leaving this
+              page. Each new account must choose a password of its own at first sign-in.</p>
+          </div>
+          <a class="btn btn-sm btn-outline" href="{{ url_for('admin_user_import') }}">
+            {{ ui('upload') }} Import another file
+          </a>
+        </div>
+
+        {% if result.created %}
+        <div class="import-scroll">
+          <table class="dir-table import-table">
+            <thead>
+              <tr>
+                <th scope="col">Line</th>
+                <th scope="col">Account</th>
+                <th scope="col">Username</th>
+                <th scope="col">Initial password</th>
+                <th scope="col">Role</th>
+                <th scope="col">Staff record</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in result.created %}
+              {% set pill = row.role_key if row.role_key in ('admin', 'hr', 'finance', 'payroll', 'inventory', 'member') else 'other' %}
+              <tr>
+                <td class="dir-cell-muted">{{ row.line }}</td>
+                <td>
+                  <div class="import-account">
+                    <strong>{{ row.full_name }}</strong>
+                    <span>{{ row.email }}</span>
+                  </div>
+                </td>
+                <td><code class="import-mono">{{ row.username }}</code></td>
+                <td><code class="import-mono import-password">{{ row.password }}</code></td>
+                <td><span class="dir-pill role-{{ pill }}">{{ row.role }}</span></td>
+                <td class="dir-cell-muted">{{ row.staff or '—' }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% endif %}
+
+        {% if result.rejected %}
+        <div class="dir-card-head">
+          <div>
+            <span class="dir-eyebrow">Rejected rows</span>
+            <h2>Nothing was created for these</h2>
+            <p>Fix each row in the file and upload it again. Rows already created are
+              left out of the fix so their emails are not imported twice.</p>
+          </div>
+        </div>
+        <div class="import-scroll">
+          <table class="dir-table import-table">
+            <thead>
+              <tr>
+                <th scope="col">Line</th>
+                <th scope="col">Name</th>
+                <th scope="col">Email</th>
+                <th scope="col">Why it was rejected</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in result.rejected %}
+              <tr>
+                <td class="dir-cell-muted">{{ row.line }}</td>
+                <td>{{ row.name or '—' }}</td>
+                <td class="dir-cell-muted">{{ row.email or '—' }}</td>
+                <td>{{ row.reason }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="dir-stack">
+
+      <div class="dir-card">
+        <div class="dir-card-head">
+          <div>
+            <span class="dir-eyebrow">Step 1</span>
+            <h2>Download the template</h2>
+            <p>The sheet carries one account per row. Replace both example rows with real
+              people and delete any row you do not need before uploading.</p>
+          </div>
+          <a class="btn btn-sm" href="{{ url_for('admin_user_import_template') }}">
+            {{ ui('download') }} Download CSV template
+          </a>
+        </div>
+        <div class="import-scroll">
+          <table class="dir-table import-guide">
+            <thead>
+              <tr>
+                <th scope="col">Column</th>
+                <th scope="col">Required</th>
+                <th scope="col">What to put in it</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code class="import-mono">full_name</code></td>
+                <td>Yes</td>
+                <td>The person's name as it should read on the account, up to 120
+                  characters.</td>
+              </tr>
+              <tr>
+                <td><code class="import-mono">email</code></td>
+                <td>Yes</td>
+                <td>The sign-in address. Each email can hold only one account.</td>
+              </tr>
+              <tr>
+                <td><code class="import-mono">phone</code></td>
+                <td>No</td>
+                <td>Contact number, up to 30 characters.</td>
+              </tr>
+              <tr>
+                <td><code class="import-mono">role</code></td>
+                <td>No</td>
+                <td>A role key from the list below, or its label. Blank starts the
+                  account as an employee.</td>
+              </tr>
+              <tr>
+                <td><code class="import-mono">status</code></td>
+                <td>No</td>
+                <td>{{ statuses | join(' or ') }}. Blank starts the account Active.</td>
+              </tr>
+              <tr>
+                <td><code class="import-mono">employee_code</code></td>
+                <td>No</td>
+                <td>The HR staff code, for example <code class="import-mono">DB-EMP-001</code>.
+                  Linking gives the staff file ownership of the name, contact details and
+                  employment status; leave it blank to create the account on its own.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="dir-card-body">
+          <p class="import-roles">
+            Roles: {% for r in roles %}<code class="import-mono">{{ r }}</code>
+            {{ role_labels.get(r, r) }}{% if not loop.last %} &middot; {% endif %}{% endfor %}
+          </p>
+        </div>
+      </div>
+
+      <div class="dir-card">
+        <form method="POST" enctype="multipart/form-data">
+          {{ csrf_field() }}
+          <div class="dir-card-head">
+            <div>
+              <span class="dir-eyebrow">Step 2</span>
+              <h2>Upload the filled-in file</h2>
+              <p>A row that fails a check is listed with its reason and creates nothing;
+                the rows around it still import.</p>
+            </div>
+          </div>
+          <div class="dir-card-body">
+            <div class="account-grid">
+              <div class="full">
+                <label for="importFile">CSV file</label>
+                <input id="importFile" class="import-file" type="file" name="file"
+                       accept=".csv,text/csv" required />
+                <p class="cell-note">UTF-8 CSV, up to {{ max_rows }} rows and
+                  {{ max_kb }} KB. In Excel, save with "CSV UTF-8 (Comma delimited)"
+                  and keep the header row as the template has it.</p>
+              </div>
+            </div>
+            <p class="dir-form-note">Accounts are never deleted; import them Active and
+              disable anyone who is not signing in yet, or link an Inactive staff record
+              so HR's status closes the account for you.</p>
+          </div>
+          <div class="dir-card-foot">
+            <span class="cell-note">Nothing is created until you submit this file.</span>
+            <button type="submit" class="btn btn-sm">{{ ui('upload') }} Create accounts</button>
+          </div>
+        </form>
+      </div>
+
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi, bars, donut, feed with context %}
+
+{% block title %}Inventory Dashboard | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+{% set total_items = summary["total_items"] or 0 %}
+{% set low = summary["low_stock"] or 0 %}
+{% set out = summary["out_of_stock"] or 0 %}
+{% set healthy = total_items - low - out if total_items > low + out else 0 %}
+
+{% set health_rows = [
+  {'label': 'Healthy', 'value': healthy, 'display': healthy},
+  {'label': 'At or below minimum', 'value': low, 'display': low},
+  {'label': 'Out of stock', 'value': out, 'display': out}
+] %}
+
+{% set mix_rows = [] %}
+{% set ins = [] %}
+{% set outs = [] %}
+{% for m in recent %}
+  {% if m["movement_type"] == 'IN' %}{% set _ = ins.append(m) %}{% else %}{% set _ = outs.append(m) %}{% endif %}
+{% endfor %}
+{% set mix_rows = [
+  {'label': 'Stock in', 'value': ins | length, 'display': '{} entries'.format(ins | length)},
+  {'label': 'Stock out', 'value': outs | length, 'display': '{} entries'.format(outs | length)}
+] %}
+
+{% set activity = [] %}
+{% for m in recent %}
+  {% set _ = activity.append({
+    'icon': 'box',
+    'tone': 'ok' if m["movement_type"] == 'IN' else 'warn',
+    'title': "{} · {}".format('Stock in' if m["movement_type"] == 'IN' else 'Stock out', m["name"]),
+    'meta': "{} {} · {}{}".format(m["quantity"], m["unit"], m["reference_type"],
+                                  ' · ' ~ m["reference_no"] if m["reference_no"] else ''),
+    'time': (m["created_at"] or '')[:10],
+    'href': url_for('inventory.history')
+  }) %}
+{% endfor %}
+
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Inventory Management</span>
+      <h1>Inventory &amp; Stock</h1>
+      <p>Track timber, plywood, hardware and finishes, and every stock movement.</p>
+    </div>
+    <a class="btn" href="{{ url_for('inventory.items') }}">Inventory items →</a>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="hr-stats">
+      {{ kpi('Active items', total_items,
+             '{} needing attention'.format(low + out),
+             'down' if low + out else 'up') }}
+      {{ kpi('Stock value (ETB)', "{:,.2f}".format(summary["stock_value"] or 0)) }}
+      {{ kpi('Low stock', low, 'at or below minimum', 'down' if low else 'flat') }}
+      {{ kpi('Out of stock', out, 'blocked issues', 'down' if out else 'flat') }}
+    </div>
+
+    <div class="chart-grid">
+      {{ bars('Stock health', health_rows, 'items') }}
+      {{ donut('Shelf readiness', (healthy / total_items) if total_items else 0,
+              '{}%'.format(((healthy / total_items * 100) | round(0, 'common') | int) if total_items else 0),
+              [
+                {'label': 'Healthy', 'color': 'var(--walnut)', 'value': healthy},
+                {'label': 'Low or out', 'color': 'var(--ivory-2)', 'value': low + out}
+              ], 'of active items') }}
+      {{ bars('Movement mix', mix_rows, 'latest {} entries'.format(recent | length)) }}
+      {{ feed('Recent activity', activity, 'Stock in and out',
+              {'href': url_for('inventory.history'), 'label': 'Full movement history'}) }}
+    </div>
+
+    <div class="stock-actions">
+      <a class="btn" href="{{ url_for('inventory.new_item') }}">Register item</a>
+      <a class="btn btn-outline-dark" href="{{ url_for('inventory.stock_movement') }}">Stock in / out</a>
+      <a class="btn btn-outline-dark" href="{{ url_for('inventory.history') }}">Movement history</a>
+    </div>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>Recent stock movements</h2>
+      <div class="hr-table-wrap table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th><th>Item</th><th>Movement</th>
+              <th>Quantity</th><th>Related module</th><th>Reference</th><th>Recorded by</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for m in recent %}
+            <tr>
+              <td>{{ m["created_at"] }}</td>
+              <td>{{ m["sku"] }} — {{ m["name"] }}</td>
+              <td>
+                <span class="status-badge {{ 'active' if m['movement_type'] == 'IN' else 'off' }}">
+                  {{ 'Stock in' if m['movement_type'] == 'IN' else 'Stock out' }}
+                </span>
+              </td>
+              <td>{{ m["quantity"] }} {{ m["unit"] }}</td>
+              <td>{{ m["reference_type"] }}</td>
+              <td>{{ m["reference_no"] or '-' }}</td>
+              <td>{{ m["created_by"] }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7" class="employee-empty">No stock movements have been recorded yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

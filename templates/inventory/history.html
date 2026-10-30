@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi, bars, columns with context %}
+
+{% block title %}Stock History | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">INVENTORY MANAGEMENT</span>
+      <h1>Stock Movement History</h1>
+      <p>Review receipts, issues and approved adjustments.</p>
+    </div>
+    <a class="btn" href="{{ url_for('inventory.stock_movement') }}">New movement →</a>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    {% set ns = namespace(moved_in=0, moved_out=0) %}
+        {% for m in movements %}
+          {% if m['movement_type'] == 'IN' %}
+            {% set ns.moved_in = ns.moved_in + 1 %}
+          {% else %}
+            {% set ns.moved_out = ns.moved_out + 1 %}
+          {% endif %}
+        {% endfor %}
+        {% set ref_rows = [] %}
+        {% for name, rows in movements | groupby('reference_type') %}
+          {% set _ = ref_rows.append({'label': name or 'Unlinked', 'value': rows | length,
+                                      'display': '{} entries'.format(rows | length)}) %}
+        {% endfor %}
+        {% set ref_rows = ref_rows | sort(reverse=true, attribute='value') %}
+        {% set qty_cols = [] %}
+        {% for m in movements[:14] | reverse %}
+          {% set _ = qty_cols.append({
+            'label': (m['created_at'] or '')[8:10],
+            'value': m['quantity'] | float if m['quantity'] | float > 0 else 0,
+            'display': '{} {} · {}'.format(m['quantity'], m['unit'], m['name'])
+          }) %}
+        {% endfor %}
+
+        <div class="hr-stats">
+          {{ kpi('Movements listed', movements | length) }}
+          {{ kpi('Stock in', ns.moved_in, 'receipts', 'up') }}
+          {{ kpi('Stock out', ns.moved_out, 'issues and consumption', 'down') }}
+        </div>
+
+        <div class="chart-grid">
+          {{ bars('Movement mix', [
+            {'label': 'Stock in', 'value': ns.moved_in},
+            {'label': 'Stock out', 'value': ns.moved_out}
+          ], 'entries') }}
+          {{ bars('Linked to which module', ref_rows, 'entries') }}
+          {{ columns('Quantity per movement', qty_cols, 'latest 14 entries') }}
+        </div>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>Latest {{ movements | length }} movement{{ '' if movements | length == 1 else 's' }}</h2>
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th><th>SKU</th><th>Item</th><th>Movement</th>
+              <th>Quantity</th><th>Related module</th><th>Reference</th><th>Recorded by</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for m in movements %}
+            <tr>
+              <td>{{ m["created_at"] }}</td>
+              <td>{{ m["sku"] }}</td>
+              <td>{{ m["name"] }}</td>
+              <td>
+                <span class="status-badge {{ 'active' if m['movement_type'] == 'IN' else 'off' }}">
+                  {{ 'Stock in' if m['movement_type'] == 'IN' else 'Stock out' }}
+                </span>
+              </td>
+              <td>{{ m["quantity"] }} {{ m["unit"] }}</td>
+              <td>{{ m["reference_type"] }}</td>
+              <td>{{ m["reference_no"] or '-' }}</td>
+              <td>{{ m["created_by"] }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="8">No movements have been recorded yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

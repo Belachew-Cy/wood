@@ -1,0 +1,609 @@
+
+{% extends "base.html" %}
+
+{% block title %}Create Budget Plan | Dereje Wood & Kitchen Cabinet{% endblock %}
+
+{% block content %}
+<style>
+    .plan-page {
+        --green: #247653;
+        --green-dark: #18583d;
+        --green-light: #eaf5ee;
+        --text: #25352d;
+        --muted: #748078;
+        --border: #e2eae4;
+        --card: #ffffff;
+        --soft: #f4faf6;
+        --field-line: #dce5de;
+        --bad-ink: #b83232;
+        --notice-line: #dcebe0;
+        --placeholder: #9ba79f;
+        color: var(--text);
+        max-width: 1150px;
+        margin: auto;
+        padding: 25px;
+    }
+
+    .plan-page * {
+        box-sizing: border-box;
+    }
+
+    .plan-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 15px;
+        margin-bottom: 24px;
+    }
+
+    .plan-header h1 {
+        font-size: clamp(25px, 3vw, 32px);
+        margin: 0 0 8px;
+        font-weight: 750;
+        letter-spacing: -.5px;
+    }
+
+    .plan-header p {
+        color: var(--muted);
+        font-size: 14px;
+        margin: 0;
+        line-height: 1.6;
+    }
+
+    .plan-back {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 42px;
+        padding: 10px 15px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        color: var(--text);
+        background: var(--card);
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: 650;
+    }
+
+    .plan-back:hover {
+        background: var(--soft);
+        color: var(--green-dark);
+    }
+
+    .plan-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.5fr) minmax(260px, .75fr);
+        align-items: start;
+        gap: 22px;
+    }
+
+    .plan-card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 17px;
+        box-shadow: 0 6px 22px #173d2710;
+        overflow: hidden;
+        min-width: 0;
+    }
+
+    .plan-card-heading {
+        padding: 22px 24px;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .plan-card-heading h2 {
+        margin: 0 0 7px;
+        font-size: 17px;
+        font-weight: 750;
+        color: var(--text);
+    }
+
+    .plan-card-heading p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.6;
+    }
+
+    .plan-form {
+        padding: 24px;
+    }
+
+    .plan-form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 19px;
+    }
+
+    .plan-field {
+        min-width: 0;
+    }
+
+    .plan-field-full {
+        grid-column: 1 / -1;
+    }
+
+    .plan-field label {
+        display: block;
+        font-size: 13px;
+        font-weight: 700;
+        margin-bottom: 8px;
+    }
+
+    .plan-required {
+        color: var(--bad-ink);
+    }
+
+    .plan-field input,
+    .plan-field select,
+    .plan-field textarea {
+        display: block;
+        width: 100%;
+        min-height: 45px;
+        border: 1px solid var(--field-line);
+        border-radius: 10px;
+        padding: 11px 13px;
+        background: var(--card);
+        color: var(--text);
+        font-family: inherit;
+        font-size: 13px;
+        outline: none;
+        transition: border-color .2s, box-shadow .2s;
+    }
+
+    .plan-field textarea {
+        min-height: 115px;
+        resize: vertical;
+        line-height: 1.6;
+    }
+
+    .plan-field input:focus,
+    .plan-field select:focus,
+    .plan-field textarea:focus {
+        border-color: var(--green);
+        box-shadow: 0 0 0 3px #24765319;
+    }
+
+    .plan-field input::placeholder,
+    .plan-field textarea::placeholder {
+        color: var(--placeholder);
+    }
+
+    .plan-help {
+        margin-top: 7px;
+        font-size: 11px;
+        line-height: 1.6;
+        color: var(--muted);
+    }
+
+    .plan-actions {
+        display: flex;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+        gap: 10px;
+        border-top: 1px solid var(--border);
+        padding-top: 21px;
+        margin-top: 24px;
+    }
+
+    .plan-btn {
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        gap: 8px;
+        min-height: 44px;
+        padding: 11px 17px;
+        border: 1px solid transparent;
+        border-radius: 10px;
+        font-size: 13px;
+        font-weight: 700;
+        text-decoration: none;
+        cursor: pointer;
+        transition: background .2s, transform .2s;
+    }
+
+    .plan-btn:hover {
+        transform: translateY(-1px);
+    }
+
+    .plan-btn-primary {
+        background: var(--green);
+        color: white;
+    }
+
+    .plan-btn-primary:hover {
+        background: var(--green-dark);
+        color: white;
+    }
+
+    .plan-btn-secondary {
+        background: var(--card);
+        border-color: var(--border);
+        color: var(--text);
+    }
+
+    .plan-btn-secondary:hover {
+        background: var(--soft);
+    }
+
+    .plan-preview {
+        padding: 22px;
+        background: linear-gradient(145deg, var(--soft), var(--card));
+    }
+
+    .plan-preview-label {
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--muted);
+        margin-bottom: 13px;
+    }
+
+    .plan-preview-icon {
+        width: 52px;
+        height: 52px;
+        border-radius: 15px;
+        background: var(--green-light);
+        color: var(--green);
+        display: grid;
+        place-items: center;
+        font-size: 25px;
+        margin-bottom: 19px;
+    }
+
+    .plan-preview-name {
+        font-size: 19px;
+        font-weight: 750;
+        overflow-wrap: anywhere;
+        line-height: 1.45;
+    }
+
+    .plan-preview-year {
+        color: var(--muted);
+        font-size: 13px;
+        margin-top: 6px;
+    }
+
+    .plan-preview-divider {
+        border: 0;
+        border-top: 1px solid var(--border);
+        margin: 21px 0;
+    }
+
+    .plan-preview-amount-label {
+        color: var(--muted);
+        font-size: 12px;
+        margin-bottom: 8px;
+    }
+
+    .plan-preview-amount {
+        font-size: clamp(24px, 3vw, 31px);
+        font-weight: 800;
+        color: var(--green-dark);
+        overflow-wrap: anywhere;
+    }
+
+    .plan-preview-currency {
+        color: var(--muted);
+        font-size: 12px;
+        margin-top: 6px;
+    }
+
+    .plan-info {
+        border: 1px solid var(--notice-line);
+        border-radius: 12px;
+        padding: 15px;
+        margin-top: 17px;
+        background: var(--card);
+    }
+
+    .plan-info-title {
+        font-size: 12px;
+        font-weight: 750;
+        margin-bottom: 8px;
+    }
+
+    .plan-info p {
+        font-size: 12px;
+        line-height: 1.7;
+        color: var(--muted);
+        margin: 0;
+    }
+
+    .plan-note {
+        margin-top: 16px;
+        font-size: 11px;
+        line-height: 1.7;
+        color: var(--muted);
+    }
+
+    @media (max-width: 850px) {
+        .plan-layout {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 560px) {
+        .plan-page {
+            padding: 15px 10px;
+        }
+
+        .plan-form {
+            padding: 18px;
+        }
+
+        .plan-card-heading {
+            padding: 18px;
+        }
+
+        .plan-form-grid {
+            grid-template-columns: 1fr;
+            gap: 16px;
+        }
+
+        .plan-field-full {
+            grid-column: auto;
+        }
+
+        .plan-actions {
+            flex-direction: column-reverse;
+        }
+
+        .plan-actions .plan-btn {
+            width: 100%;
+        }
+    }
+
+    /* Dark theme: swap this page's palette for the shared slate surfaces. */
+    [data-theme="dark"] .plan-page {
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+        --border: #263449;
+        --card: var(--white);
+        --soft: var(--table-hover-bg);
+        --field-line: var(--line-strong);
+        --bad-ink: var(--danger-ink);
+        --notice-line: #2f5e34;
+        --placeholder: var(--muted-2);
+        --green-light: #16233c;
+        color-scheme: dark;
+    }
+
+</style>
+
+<div class="plan-page">
+
+    <header class="plan-header">
+        <div>
+            <h1>Create Budget Plan</h1>
+            <p>Establish a budget plan for a fiscal year and define its funding limit.</p>
+        </div>
+
+        <a class="plan-back" href="{{ url_for('dashboard') }}">
+            ← Back to Dashboard
+        </a>
+    </header>
+
+    <div class="plan-layout">
+
+        <section class="plan-card">
+            <div class="plan-card-heading">
+                <h2>Budget Plan Information</h2>
+                <p>Enter the details below. Required fields are marked with an asterisk.</p>
+            </div>
+
+            <form class="plan-form"
+                  method="POST"
+                  action="{{ url_for('budget.create_plan') }}"
+                  id="budgetPlanForm">
+
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <div class="plan-form-grid">
+
+                    <div class="plan-field plan-field-full">
+                        <label for="plan_name">
+                            Budget Plan Name <span class="plan-required">*</span>
+                        </label>
+                        <input
+                            id="plan_name"
+                            name="plan_name"
+                            type="text"
+                            placeholder="e.g. Annual Operating Budget"
+                            maxlength="150"
+                            required
+                        >
+                        <div class="plan-help">
+                            Choose a clear name that identifies this budget plan.
+                        </div>
+                    </div>
+
+                    <div class="plan-field">
+                        <label for="fiscal_year">
+                            Fiscal Year <span class="plan-required">*</span>
+                        </label>
+                        <input
+                            id="fiscal_year"
+                            name="fiscal_year"
+                            type="number"
+                            min="2000"
+                            max="2200"
+                            step="1"
+                            value="{{ request.form.get('fiscal_year', '') }}"
+                            placeholder="e.g. 2027"
+                            required
+                        >
+                        <div class="plan-help">
+                            Enter the fiscal year used by your organization.
+                        </div>
+                    </div>
+
+                    <div class="plan-field">
+                        <label for="currency">
+                            Budget Currency <span class="plan-required">*</span>
+                        </label>
+                        <select id="currency" name="currency" required>
+                            <option value="ETB" selected>ETB — Ethiopian Birr</option>
+                            <option value="USD">USD — US Dollar</option>
+                            <option value="EUR">EUR — Euro</option>
+                            <option value="GBP">GBP — British Pound</option>
+                        </select>
+                        <div class="plan-help">
+                            Select the currency used for this plan.
+                        </div>
+                    </div>
+
+                    <div class="plan-field plan-field-full">
+                        <label for="total_budget">
+                            Total Budget Amount <span class="plan-required">*</span>
+                        </label>
+                        <input
+                            id="total_budget"
+                            name="total_budget"
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            placeholder="Enter total approved planning amount"
+                            required
+                        >
+                        <div class="plan-help">
+                            Enter a non-negative amount. This form creates a draft plan;
+                            it does not authorize spending by itself.
+                        </div>
+                    </div>
+
+                    <div class="plan-field plan-field-full">
+                        <label for="description">Description and Objectives</label>
+                        <textarea
+                            id="description"
+                            name="description"
+                            maxlength="2000"
+                            placeholder="Describe the purpose, priorities, departments covered, and expected outcomes..."
+                        ></textarea>
+                        <div class="plan-help">
+                            Explain what this plan is intended to fund.
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="plan-actions">
+                    <a class="plan-btn plan-btn-secondary"
+                       href="{{ url_for('dashboard') }}">
+                        Cancel
+                    </a>
+
+                    <button class="plan-btn plan-btn-primary"
+                            type="submit"
+                            id="submitPlan">
+                        ✓ Create Budget Plan
+                    </button>
+                </div>
+
+            </form>
+        </section>
+
+        <aside>
+            <section class="plan-card">
+                <div class="plan-card-heading">
+                    <h2>Live Preview</h2>
+                    <p>Your plan summary updates as you type.</p>
+                </div>
+
+                <div class="plan-preview">
+                    <div class="plan-preview-label">NEW BUDGET PLAN</div>
+
+                    <div class="plan-preview-icon">▤</div>
+
+                    <div class="plan-preview-name" id="previewName">
+                        Your budget plan
+                    </div>
+
+                    <div class="plan-preview-year">
+                        Fiscal year:
+                        <strong id="previewYear">Not selected</strong>
+                    </div>
+
+                    <hr class="plan-preview-divider">
+
+                    <div class="plan-preview-amount-label">Planning amount</div>
+
+                    <div class="plan-preview-amount" id="previewAmount">
+                        0.00
+                    </div>
+
+                    <div class="plan-preview-currency" id="previewCurrency">
+                        Ethiopian Birr (ETB)
+                    </div>
+
+                    <div class="plan-info">
+                        <div class="plan-info-title">Before you submit</div>
+                        <p>
+                            Check the fiscal year, currency, and amount.
+                            Follow your organization's approval process before
+                            treating the plan as an authorized budget.
+                        </p>
+                    </div>
+
+                    <div class="plan-note">
+                        <strong>Note:</strong> The live preview is for convenience.
+                        The server remains responsible for validating and saving
+                        all submitted information.
+                    </div>
+                </div>
+            </section>
+        </aside>
+
+    </div>
+</div>
+
+<script>
+(() => {
+    const nameInput = document.getElementById("plan_name");
+    const yearInput = document.getElementById("fiscal_year");
+    const amountInput = document.getElementById("total_budget");
+    const currencyInput = document.getElementById("currency");
+
+    const previewName = document.getElementById("previewName");
+    const previewYear = document.getElementById("previewYear");
+    const previewAmount = document.getElementById("previewAmount");
+    const previewCurrency = document.getElementById("previewCurrency");
+
+    const currencyNames = {
+        ETB: "Ethiopian Birr (ETB)",
+        USD: "US Dollar (USD)",
+        EUR: "Euro (EUR)",
+        GBP: "British Pound (GBP)"
+    };
+
+    function updatePreview() {
+        previewName.textContent =
+            nameInput.value.trim() || "Your budget plan";
+
+        previewYear.textContent =
+            yearInput.value || "Not selected";
+
+        const rawAmount = amountInput.value;
+        const amount = Number(rawAmount);
+
+        previewAmount.textContent =
+            rawAmount !== "" && Number.isFinite(amount) && amount >= 0
+                ? amount.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                })
+                : "0.00";
+
+        previewCurrency.textContent =
+            currencyNames[currencyInput.value] || currencyInput.value;
+    }
+
+    [nameInput, yearInput, amountInput, currencyInput].forEach(element => {
+        element.addEventListener("input", updatePreview);
+        element.addEventListener("change", updatePreview);
+    });
+
+    updatePreview();
+})();
+</script>
+{% endblock %}

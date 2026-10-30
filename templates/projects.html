@@ -1,0 +1,136 @@
+{% extends "public_base.html" %}
+{% block title %}Projects | Dereje Belay Wood &amp; Kitchen Cabinet Finishing{% endblock %}
+
+{% block content %}
+<section class="page-hero">
+  <div class="container">
+    <span class="eyebrow">Our Projects</span>
+    <h1>Completed Work</h1>
+    <p>Browse our portfolio of kitchens, wardrobes, doors and interior woodwork.</p>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    <div class="filters" id="filters">
+      <button class="filter-btn active" type="button" data-filter="all" aria-pressed="true">All</button>
+      <button class="filter-btn" type="button" data-filter="Kitchen" aria-pressed="false">Kitchen</button>
+      <button class="filter-btn" type="button" data-filter="Wardrobe" aria-pressed="false">Wardrobe</button>
+      <button class="filter-btn" type="button" data-filter="Doors" aria-pressed="false">Doors</button>
+      <button class="filter-btn" type="button" data-filter="Interior" aria-pressed="false">Interior</button>
+    </div>
+    <p class="gallery-count" id="galleryCount" aria-live="polite">Loading our project gallery…</p>
+    <div class="gallery-grid" id="galleryGrid" aria-busy="true" data-source="{{ url_for('projects_api') }}">
+      <!-- Filled by the script below: the placeholders are the loading state. -->
+      <div class="gallery-item skeleton" aria-hidden="true"></div>
+      <div class="gallery-item skeleton" aria-hidden="true"></div>
+      <div class="gallery-item skeleton" aria-hidden="true"></div>
+      <div class="gallery-item skeleton" aria-hidden="true"></div>
+      <div class="gallery-item skeleton" aria-hidden="true"></div>
+      <div class="gallery-item skeleton" aria-hidden="true"></div>
+      <div class="gallery-item skeleton" aria-hidden="true"></div>
+      <div class="gallery-item skeleton" aria-hidden="true"></div>
+    </div>
+    <noscript>
+      <style>#galleryGrid .gallery-item.skeleton { display: none; }</style>
+      <p class="empty-state"><strong>Our work is shown as a photo gallery.</strong> Enable JavaScript, or ask us to send recent project photos directly.</p>
+    </noscript>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    'use strict';
+    const grid = document.getElementById('galleryGrid');
+    const count = document.getElementById('galleryCount');
+    const filters = document.getElementById('filters');
+    const source = grid.dataset.source || '/project.json';
+    let all = [];
+
+    function note(lead, text) {
+      grid.innerHTML = '';
+      const p = document.createElement('p');
+      p.className = 'empty-state';
+      const strong = document.createElement('strong');
+      strong.textContent = lead;
+      p.appendChild(strong);
+      p.appendChild(document.createTextNode(' ' + text));
+      grid.appendChild(p);
+    }
+
+    // Titles and categories are typed in through the admin project form, so
+    // every value goes in as a text node rather than as markup.
+    function card(p) {
+      const item = document.createElement('div');
+      item.className = 'gallery-item';
+      const img = document.createElement('img');
+      img.src = p.image;
+      img.alt = p.title;
+      img.loading = 'lazy';
+      const overlay = document.createElement('div');
+      overlay.className = 'overlay';
+      const title = document.createElement('h4');
+      title.textContent = p.title;
+      const category = document.createElement('span');
+      category.textContent = p.category;
+      overlay.append(title, category);
+      item.append(img, overlay);
+      return item;
+    }
+
+    function render(list, filtered) {
+      grid.removeAttribute('aria-busy');
+      if (!list.length) {
+        note('Nothing in this category yet.', 'Try another filter — new work is added as projects are handed over.');
+        count.textContent = '0 of ' + all.length + ' projects shown';
+        return;
+      }
+      grid.innerHTML = '';
+      list.forEach(p => grid.appendChild(card(p)));
+      count.textContent = filtered
+        ? list.length + ' of ' + all.length + ' projects shown'
+        : all.length + ' projects';
+      if (window.dwEnhance) window.dwEnhance(grid);
+    }
+
+    async function init() {
+      let data;
+      try {
+        const res = await fetch(source);
+        if (!res.ok) throw new Error('status ' + res.status);
+        data = await res.json();
+      } catch (err) {
+        console.warn('project.json unavailable', err);
+        grid.removeAttribute('aria-busy');
+        note('The gallery could not be loaded.', 'Please reload in a moment, or call us and we will send recent photos.');
+        count.textContent = '';
+        return;
+      }
+      all = Array.isArray(data) ? data : [];
+      if (!all.length) {
+        grid.removeAttribute('aria-busy');
+        note('Latest projects', '— our newest work is being photographed, check back soon.');
+        count.textContent = '';
+        return;
+      }
+      render(all, false);
+
+      filters.addEventListener('click', (e) => {
+        const btn = e.target.closest('.filter-btn');
+        if (!btn) return;
+        filters.querySelectorAll('.filter-btn').forEach(b => {
+          const on = b === btn;
+          b.classList.toggle('active', on);
+          b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
+        const f = btn.dataset.filter;
+        render(f === 'all' ? all : all.filter(p => p.category === f), f !== 'all');
+      });
+    }
+
+    init();
+  })();
+</script>
+{% endblock %}

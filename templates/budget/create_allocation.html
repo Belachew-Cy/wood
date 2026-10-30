@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}Create Budget Allocation | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Budget Management</span>
+      <h1>Create an allocation</h1>
+      <p>Divide an active budget plan between departments. Money is only spendable
+        once it sits in an allocation.</p>
+    </div>
+    <nav class="stock-actions" aria-label="Allocation actions">
+      <a class="btn btn-outline btn-sm" href="{{ url_for('budget.allocations') }}">Allocations</a>
+      <a class="btn btn-outline btn-sm" href="{{ url_for('dashboard') }}">Budget dashboard</a>
+    </nav>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    {% if not plans %}
+    <div class="finance-alert info">
+      There is no active budget plan yet. Create a plan and activate it before
+      allocating money.
+      <a href="{{ url_for('budget.create_plan') }}">Create a budget plan</a>.
+    </div>
+    {% endif %}
+
+    <div class="finance-panel">
+      <h2>Allocation details</h2>
+      <form method="post" action="{{ url_for('budget.create_allocation') }}" class="finance-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="finance-grid">
+          <div>
+            <label for="allocation_name">Allocation name *</label>
+            <input id="allocation_name" name="allocation_name" maxlength="150"
+                   placeholder="e.g. Workshop materials — Q4" required>
+          </div>
+          <div>
+            <label for="plan_id">Budget plan *</label>
+            <select id="plan_id" name="plan_id" required>
+              <option value="">Select the plan</option>
+              {% for plan in plans %}
+              <option value="{{ plan.id }}" data-currency="{{ plan.currency }}">
+                {{ plan.plan_name }} — {{ plan.fiscal_year }} ({{ plan.currency }})
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label for="department">Department *</label>
+            <select id="department" name="department" required>
+              <option value="">Select the department</option>
+              {% for department in departments %}
+              <option value="{{ department }}">{{ department }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label for="currency">Currency *</label>
+            <select id="currency" name="currency" required>
+              {% for currency in budget_currencies %}
+              <option value="{{ currency }}">{{ currency }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label for="allocated_amount">Allocated amount *</label>
+            <input id="allocated_amount" name="allocated_amount" type="number"
+                   min="0.01" step="0.01" required>
+          </div>
+          <div class="full">
+            <label for="notes">Notes</label>
+            <textarea id="notes" name="notes" rows="3" maxlength="1000"
+                      placeholder="What this allocation is expected to cover."></textarea>
+          </div>
+        </div>
+        <p class="panel-note">The sum of a plan's allocations cannot exceed its total budget.
+          Requisitions, purchase orders and supplier invoices are checked against the
+          allocation before money is committed.</p>
+        <div class="finance-form-actions">
+          <a class="finance-btn secondary" href="{{ url_for('budget.allocations') }}">Cancel</a>
+          <button class="finance-btn primary" type="submit">Create allocation</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+{% endblock %}

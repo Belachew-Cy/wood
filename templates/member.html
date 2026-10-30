@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi_head, bars, feed with context %}
+
+{% block title %}My Account | Dereje Belay Wood &amp; Kitchen Cabinet Finishing{% endblock %}
+
+{% block content %}
+{% set cat_rows = [] %}
+{% for name, rows in projects | groupby('category') %}
+  {% set _ = cat_rows.append({'label': name or 'Uncategorised', 'value': rows | length}) %}
+{% endfor %}
+{% set cat_rows = cat_rows | sort(reverse=true, attribute='value') %}
+
+{% set steps = [] %}
+{% set _ = steps.append({
+  'icon': 'mail', 'tone': '',
+  'title': 'Request a quote',
+  'meta': 'Tell us about the room, the timber and the finish you want.',
+  'href': url_for('contact'), 'time': 'Start'
+}) %}
+{% set _ = steps.append({
+  'icon': 'file', 'tone': '',
+  'title': 'Browse the full portfolio',
+  'meta': 'Kitchens, wardrobes, doors and interior joinery we have finished.',
+  'href': url_for('projects'), 'time': 'Explore'
+}) %}
+{% if user.phone %}
+  {% set _ = steps.append({
+    'icon': 'phone', 'tone': 'ok',
+    'title': 'Phone number on file',
+    'meta': user.phone,
+    'time': 'Profile'
+  }) %}
+{% else %}
+  {% set _ = steps.append({
+    'icon': 'phone', 'tone': 'warn',
+    'title': 'No phone number on your profile',
+    'meta': 'Add one so we can call you back about a running order.',
+    'href': url_for('contact'), 'time': 'Update'
+  }) %}
+{% endif %}
+
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Member</span>
+      <h1>Welcome, {{ user.full_name.split(' ')[0] }}</h1>
+      <p>Manage your profile and track your woodwork requests.</p>
+    </div>
+    <nav class="stock-actions" aria-label="Member actions">
+      <a class="btn" href="{{ url_for('index') }}">Back to Home <span class="arrow">→</span></a>
+      {% if employee %}
+      <a class="btn btn-outline btn-sm" href="{{ url_for('reports_centre') }}">My reports</a>
+      {% endif %}
+      <a class="btn btn-outline btn-sm" href="{{ url_for('contact') }}">Request a quote</a>
+    </nav>
+    <div class="dash-stats">
+      {{ kpi_head('Recent Projects', projects | length) }}
+      {{ kpi_head('Open Requests', 0) }}
+      {{ kpi_head('Project Types', cat_rows | length) }}
+    </div>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    <div class="chart-grid">
+      {{ bars('Latest work by category', cat_rows, 'projects') }}
+      {{ feed('What you can do here', steps, 'Your account') }}
+    </div>
+
+    <div class="dash-grid">
+      <div class="dash-panel">
+        <h2>My Profile</h2>
+        <table>
+          <tbody>
+            <tr><td><strong>Full name</strong></td><td>{{ user.full_name }}</td></tr>
+            <tr><td><strong>Email</strong></td><td>{{ user.email }}</td></tr>
+            <tr><td><strong>Phone</strong></td><td>{{ user.phone or '—' }}</td></tr>
+            <tr><td><strong>Role</strong></td><td><span class="role-badge member">member</span></td></tr>
+          </tbody>
+        </table>
+        <a href="{{ url_for('contact') }}" class="btn" style="margin-top:1.5rem;">Request a Quote <span class="arrow">→</span></a>
+      </div>
+      <div class="dash-panel">
+        <h2>Latest Work</h2>
+        <div class="projects-cards is-pair">
+          {% for p in projects %}
+          <div class="project-card">
+            <img src="{{ p.image }}" alt="{{ p.title }}" loading="lazy" />
+            <div class="label"><span>{{ p.title }}</span><span class="arrow">→</span></div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

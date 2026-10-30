@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}{{ report.title if report else 'Audit reports' }} | Dereje Wood &amp; Kitchen{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* These tables carry up to a dozen columns; landscape keeps every heading
+     on one line instead of breaking it inside a portrait column. */
+  @media print { @page { size: landscape; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Audit &amp; Oversight</span>
+      <h1>{{ report.title if report else 'Audit reports' }}</h1>
+      <p>{{ report.subtitle if report else 'Every report is read from the module tables as they stand.' }}</p>
+      {% if start_date or end_date %}
+      <p class="print-only">Date window: {{ start_date or 'Earliest' }} to {{ end_date or 'Today' }}</p>
+      {% endif %}
+    </div>
+    <nav class="stock-actions" aria-label="Report actions">
+      <a class="btn btn-outline btn-sm" href="{{ back_url }}">Console</a>
+      {% if report %}
+      <a class="btn btn-outline btn-sm" href="{{ csv_url }}">Export CSV</a>
+      <button class="btn btn-sm" type="button" data-print>Print / save PDF</button>
+      {% endif %}
+    </nav>
+  </div>
+</section>
+
+<section class="container finance-page">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="finance-alert {{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <nav class="filters no-print" aria-label="Reports">
+    {% for tab in tabs %}
+      {% if tab.available %}
+      <a class="filter-btn{{ ' active' if report and tab.key == report.key }}"
+         href="{{ tab.href }}">{{ tab.label }}
+        <span class="cell-note">{{ tab.count }}</span></a>
+      {% else %}
+      <span class="filter-btn" aria-disabled="true"
+            title="This database holds no {{ tab.label }} records yet">{{ tab.label }}</span>
+      {% endif %}
+    {% endfor %}
+  </nav>
+
+  {% if report %}
+  <div class="dash-panel hr-table-panel" data-filter>
+    <h2>{{ count }} row{{ '' if count == 1 else 's' }}
+      {%- if count != total %} of {{ total }} in total{% endif -%}
+    </h2>
+
+    <form method="GET" action="{{ tabs_url }}" class="report-filters no-print">
+      <input type="hidden" name="report" value="{{ report.key }}">
+      <div>
+        <label for="startDate">From date</label>
+        <input id="startDate" type="date" name="start_date" value="{{ start_date }}">
+      </div>
+      <div>
+        <label for="endDate">To date</label>
+        <input id="endDate" type="date" name="end_date" value="{{ end_date }}">
+      </div>
+      <div>
+        <button class="report-btn" type="submit">Apply dates</button>
+      </div>
+      <div>
+        <a class="btn btn-outline btn-sm"
+           href="{{ url_for('auditor_reports', report=report.key) }}">Clear</a>
+      </div>
+    </form>
+
+    <div class="report-filters no-print">
+      <div>
+        <label for="reportSearch">Search these rows</label>
+        <input id="reportSearch" type="search" data-filter-search
+               placeholder="Any value in the rows shown">
+      </div>
+    </div>
+
+    <div class="hr-table-wrap table-scroll">
+      <table class="report-table">
+        <thead>
+          <tr>
+            {% for _key, heading in table_columns %}<th>{{ heading }}</th>{% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr>
+            {% for cell in row %}<td>{{ cell }}</td>{% endfor %}
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="{{ table_columns | length }}" class="report-empty">
+              No {{ report.label }} rows fall inside this date window.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <p class="report-empty" data-filter-empty hidden>
+      No row on this report matches that search.
+    </p>
+    <p class="report-note no-print"><span data-filter-count></span></p>
+
+    <p class="report-note">{{ report.note }}</p>
+    <p class="reports-footer">
+      Figures are the module's own records; the export is the same rows, in full.
+    </p>
+  </div>
+  {% else %}
+  <div class="dash-panel">
+    <h2>No module data to report on yet</h2>
+    <p class="report-empty">
+      A tab appears here as soon as its module has records. Finance, Inventory,
+      Procurement, HR and Payroll all feed this centre directly.
+    </p>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

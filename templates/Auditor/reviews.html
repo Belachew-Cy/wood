@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+
+{% block title %}Audit Reviews | Dereje Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Audit &amp; Oversight</span>
+      <h1>Audit Reviews</h1>
+      <p>Each review states what was examined, over which period, and what it concluded.</p>
+    </div>
+    <nav class="stock-actions" aria-label="Audit sections">
+      <a class="btn btn-outline btn-sm" href="{{ url_for('auditor_dashboard') }}">Console</a>
+      <a class="btn btn-outline btn-sm" href="{{ url_for('reports_centre') }}">Reports</a>
+      <a class="btn btn-sm" href="{{ url_for('audit.audit_dashboard') }}">Audit Trail</a>
+    </nav>
+  </div>
+</section>
+
+<section class="container finance-page">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="finance-alert {{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  {% if departments %}
+  <div class="finance-panel">
+    <h2>Open a review</h2>
+    <form method="post" action="{{ url_for('auditor_reviews') }}" class="finance-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div class="finance-grid">
+        <div class="full">
+          <label>Title *</label>
+          <input name="title" maxlength="200" required
+                 value="{{ values.title if values else '' }}"
+                 placeholder="What is being reviewed?">
+        </div>
+
+        <div>
+          <label>Department *</label>
+          <select name="department" required>
+            <option value="">Choose a department</option>
+            {% for value in departments %}
+            <option value="{{ value }}"
+                    {% if values and values.get('department') == value %}selected{% endif %}>
+              {{ value }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label>Period start</label>
+          <input type="date" name="period_start"
+                 value="{{ values.period_start if values else '' }}">
+        </div>
+
+        <div>
+          <label>Period end</label>
+          <input type="date" name="period_end"
+                 value="{{ values.period_end if values else '' }}">
+        </div>
+
+        <div class="full">
+          <label>Scope and method</label>
+          <textarea name="summary" rows="4" maxlength="2000"
+                    placeholder="Which records were examined, how, and what the review concluded.">{{ values.summary if values else '' }}</textarea>
+        </div>
+      </div>
+
+      <p class="panel-note">
+        A review is the auditor's own record. Opening one changes nothing in the
+        department it covers.
+      </p>
+
+      <div class="finance-form-actions">
+        <button class="finance-btn primary" type="submit">Open review</button>
+        <a class="finance-btn secondary" href="{{ url_for('auditor_dashboard') }}">Cancel</a>
+      </div>
+    </form>
+  </div>
+
+  <div class="dash-panel hr-table-panel">
+    <h2>{{ reviews | length }} review{{ '' if reviews | length == 1 else 's' }} on record</h2>
+    <div class="hr-table-wrap table-scroll">
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th>Ref</th><th>Review</th><th>Department</th><th>Period</th>
+            <th>Findings</th><th>Status</th><th>Raised</th><th>Last modified</th>
+            <th>Mark</th><th><span class="sr-only">Open</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for review in reviews %}
+          <tr>
+            <td class="nowrap">#{{ review.id }}</td>
+            <td class="wrap-cell">{{ review.title }}</td>
+            <td>{{ review.department }}</td>
+            <td class="nowrap">
+              {{ review.review_period_start or '—' }}
+              {%- if review.review_period_end %} → {{ review.review_period_end }}{% endif -%}
+            </td>
+            <td>{{ review.finding_count }}</td>
+            <td>
+              <span class="status-badge {{ 'active' if review.status == 'Completed' else 'neutral' }}">
+                {{ review.status }}
+              </span>
+            </td>
+            <td class="nowrap">{{ review.created_at | audit_time }}</td>
+            <td class="nowrap">
+              {{ review.updated_by_name or '—' }}
+              {% if review.updated_at %}
+              <br><span class="feed-meta">{{ review.updated_at | audit_time }}</span>
+              {% endif %}
+            </td>
+            <td>
+              <form method="post" class="status-form"
+                    action="{{ url_for('auditor_review_status', review_id=review.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <select name="status" aria-label="Status of review #{{ review.id }}">
+                  {% for value in statuses %}
+                  <option value="{{ value }}"
+                          {% if review.status == value %}selected{% endif %}>{{ value }}</option>
+                  {% endfor %}
+                </select>
+                <button class="finance-btn secondary" type="submit">Save</button>
+              </form>
+            </td>
+            <td>
+              <a class="btn btn-outline btn-sm"
+                 href="{{ url_for('auditor_findings', review_id=review.id) }}">Findings</a>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="10" class="report-empty">No review has been opened yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <div class="dash-panel">
+    <h2>Nothing to review yet</h2>
+    <p class="report-empty">
+      The audit review tables are created when the application next starts. Until then
+      the record browser and the report centre still work.
+    </p>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

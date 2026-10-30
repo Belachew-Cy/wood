@@ -1,0 +1,311 @@
+
+{% extends "base.html" %}
+{% from "base.html" import kpi, bars, donut with context %}
+
+{% block title %}Invoices & Payments | Finance{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+    <div class="container">
+        <span class="eyebrow">FINANCE</span>
+        <h1>Invoices & Payments</h1>
+        <p>Manage customer invoices and supplier bills.</p>
+    </div>
+</section>
+
+<section class="container finance-page">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+            <div class="finance-alert {{ category }}">{{ message }}</div>
+        {% endfor %}
+    {% endwith %}
+
+    {% set invoice_count = invoices | length %}
+        {% set invoiced_total = invoices | map(attribute='total_etb') | map('float') | sum %}
+        {% set collected_total = invoices | map(attribute='paid_etb') | map('float') | sum %}
+        {% set owed_total = invoices | map(attribute='balance_etb') | map('float') | sum %}
+        {% set receivable = invoices | selectattr('invoice_type', 'equalto', 'customer')
+                                 | map(attribute='balance_etb') | map('float') | sum %}
+        {% set payable = invoices | selectattr('invoice_type', 'equalto', 'supplier')
+                                | map(attribute='balance_etb') | map('float') | sum %}
+        {% set status_rows = [] %}
+        {% for name, rows in invoices | groupby('status') %}
+          {% set _ = status_rows.append({
+            'label': name or 'Unknown',
+            'value': rows | map(attribute='balance_etb') | map('float') | sum,
+            'display': '{} invoice{} · {:,.0f} ETB open'.format(rows | length, '' if rows | length == 1 else 's',
+                                                                rows | map(attribute='balance_etb') | map('float') | sum)
+          }) %}
+        {% endfor %}
+        {% set status_rows = status_rows | sort(reverse=true, attribute='value') %}
+        {% set collected_share = (collected_total / invoiced_total) if invoiced_total and collected_total <= invoiced_total else (1 if invoiced_total else 0) %}
+
+        <div class="hr-stats">
+          {{ kpi('Invoices listed', invoice_count) }}
+          {{ kpi('Invoiced value (ETB)', "{:,.2f}".format(invoiced_total)) }}
+          {{ kpi('Collected (ETB)', "{:,.2f}".format(collected_total), '', 'up') }}
+          {{ kpi('Still owed (ETB)', "{:,.2f}".format(owed_total), 'open balance', 'down' if owed_total else 'flat') }}
+        </div>
+
+        <div class="chart-grid">
+          {{ bars('Open balance by status', status_rows, 'ETB') }}
+          {{ bars('Who owes whom', [
+            {'label': 'Customers owe', 'value': receivable, 'display': '{:,.0f} ETB'.format(receivable)},
+            {'label': 'Suppliers owed', 'value': payable, 'display': '{:,.0f} ETB'.format(payable)}
+          ], 'ETB') }}
+          {{ donut('Value collected', collected_share,
+                  '{}%'.format((collected_share * 100) | round(0, 'common') | int),
+                  [
+                    {'label': 'Paid', 'color': 'var(--walnut)', 'value': collected_total},
+                    {'label': 'Outstanding', 'color': 'var(--ivory-2)', 'value': invoiced_total - collected_total}
+                  ], 'of invoiced ETB') }}
+        </div>
+
+    <div class="finance-panel">
+        <h2>Create Invoice or Supplier Bill</h2>
+
+        <form method="post"
+              action="{{ url_for('finance.invoices') }}"
+              class="finance-form">
+          {{ csrf_field() }}
+
+            <div class="finance-grid">
+                <div>
+                    <label>Invoice Number *</label>
+                    <input name="invoice_number" maxlength="60" required>
+                </div>
+
+                <div>
+                    <label>Invoice Type *</label>
+                    <select name="invoice_type" id="invoice_type" required>
+                        <option value="customer">Customer Invoice</option>
+                        <option value="supplier">Supplier Bill</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label>Customer / Supplier *</label>
+                    <input name="party_name" maxlength="150" required>
+                </div>
+
+                <div>
+                    <label>Contact Details</label>
+                    <input name="party_contact" maxlength="120">
+                </div>
+
+                <div>
+                    <label>Issue Date *</label>
+                    <input type="date" name="issue_date"
+                           value="{{ today }}" required>
+                </div>
+
+                <div>
+                    <label>Due Date</label>
+                    <input type="date" name="due_date">
+                </div>
+
+                <div>
+                    <label>Currency *</label>
+                    <select name="currency" id="invoice_currency" required>
+                        <option value="ETB">ETB</option>
+                        <option value="USD">USD</option>
+                        <option value="EUR">EUR</option>
+                        <option value="GBP">GBP</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label>Total Amount *</label>
+                    <input type="number" name="total_amount"
+                           min="0.01" step="0.01" required>
+                </div>
+
+                <div>
+                    <label>Exchange Rate to ETB *</label>
+                    <input type="number" name="exchange_rate"
+                           min="0.000001" step="0.000001"
+                           value="1" required>
+                </div>
+
+                <div id="allocationField" class="full">
+                    <label for="budget_allocation_id">Budget allocation</label>
+                    <select id="budget_allocation_id" name="budget_allocation_id">
+                        <option value="">No allocation (unbudgeted supplier bill)</option>
+                        {% for allocation in allocations %}
+                        <option value="{{ allocation.id }}"
+                                data-currency="{{ allocation.currency }}">
+                            {{ allocation.allocation_name }} ·
+                            {{ allocation.department }} ·
+                            {{ allocation.currency }}
+                            ({{ "{:,.2f}".format(allocation.available_amount | float) }}
+                            available)
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <small>
+                        Supplier bills only. Saving against an allocation books
+                        the bill in the Budget module.
+                    </small>
+                </div>
+
+                <div class="full">
+                    <label>Notes</label>
+                    <textarea name="notes" rows="3"
+                              maxlength="1000"></textarea>
+                </div>
+            </div>
+
+            <div class="finance-form-actions">
+                <button type="submit" class="finance-btn primary">
+                    Save Invoice
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div class="finance-panel">
+        <h2>Invoice Register</h2>
+
+        <div class="finance-table-wrap">
+            <table class="finance-table">
+                <thead>
+                    <tr>
+                        <th>Invoice</th>
+                        <th>Type</th>
+                        <th>Source</th>
+                        <th>Customer / Supplier</th>
+                        <th>Issue Date</th>
+                        <th>Due Date</th>
+                        <th>Total</th>
+                        <th>Paid (ETB)</th>
+                        <th>Balance (ETB)</th>
+                        <th>Last modified</th>
+                        <th>Payment</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in invoices %}
+                    <tr>
+                        <td>{{ item.invoice_number }}</td>
+                        <td>{{ item.invoice_type|title }}</td>
+                        <td class="wrap-cell">
+                            {% if item.procurement_order_id %}
+                            <a href="{{ url_for('procurement.order_detail', order_id=item.procurement_order_id) }}">{{ item.procurement_order_number }}</a>
+                            {% endif %}
+                            {% if item.budget_allocation_name %}<div class="feed-meta">{{ item.budget_allocation_name }}</div>{% endif %}
+                            {% if not item.procurement_order_id and not item.budget_allocation_name %}—{% endif %}
+                        </td>
+                        <td>{{ item.party_name }}</td>
+                        <td>{{ item.issue_date }}</td>
+                        <td>{{ item.due_date or "-" }}</td>
+                        <td>
+                            {{ item.currency }}
+                            {{ "{:,.2f}".format(item.total_amount) }}
+                        </td>
+                        <td>{{ "{:,.2f}".format(item.paid_etb) }}</td>
+                        <td>{{ "{:,.2f}".format(item.balance_etb) }}</td>
+                        <td>
+                            {{ item.updated_by_name or "—" }}
+                            {% if item.updated_at %}
+                            <br><span class="feed-meta">{{ item.updated_at | audit_time }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <strong>{{ item.status }}</strong>
+
+                            {% if item.status not in ["Paid", "Cancelled"] %}
+                            <details class="payment-details">
+                                <summary>Record Payment</summary>
+
+                                <form method="post"
+                                      action="{{ url_for(
+                                          'finance.add_payment',
+                                          invoice_id=item.id
+                                      ) }}"
+                                      class="payment-form">
+                                  {{ csrf_field() }}
+
+                                    <label>Payment Date</label>
+                                    <input type="date" name="payment_date"
+                                           value="{{ today }}" required>
+
+                                    <label>
+                                        Amount ({{ item.currency }})
+                                    </label>
+                                    <input type="number" name="amount"
+                                           min="0.01"
+                                           max="{{ item.total_amount - (item.paid_etb / item.exchange_rate) }}"
+                                           step="0.01" required>
+
+                                    <label>Payment Method</label>
+                                    <select name="payment_method">
+                                        <option>Cash</option>
+                                        <option>Bank Transfer</option>
+                                        <option>Card</option>
+                                        <option>Mobile Money</option>
+                                        <option>Other</option>
+                                    </select>
+
+                                    <label>Reference</label>
+                                    <input name="reference" maxlength="100">
+
+                                    <button class="finance-btn primary"
+                                            type="submit">
+                                        Save Payment
+                                    </button>
+                                </form>
+                            </details>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="11" class="empty">
+                            No invoices created yet.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<script>
+const invoiceTypeField = document.getElementById("invoice_type");
+const invoiceCurrencyField = document.getElementById("invoice_currency");
+const allocationField = document.getElementById("allocationField");
+const allocationSelect = document.getElementById("budget_allocation_id");
+
+function updateAllocationField() {
+    const isSupplier = invoiceTypeField.value === "supplier";
+    allocationField.style.display = isSupplier ? "" : "none";
+    if (!isSupplier) {
+        allocationSelect.value = "";
+        return;
+    }
+    const currency = invoiceCurrencyField.value;
+    Array.from(allocationSelect.options).forEach(option => {
+        if (!option.value) {
+            return;
+        }
+        const matches = option.dataset.currency === currency;
+        option.hidden = !matches;
+        option.disabled = !matches;
+    });
+    if (allocationSelect.selectedOptions[0]?.disabled) {
+        allocationSelect.value = "";
+    }
+}
+
+invoiceTypeField.addEventListener("change", updateAllocationField);
+invoiceCurrencyField.addEventListener("change", updateAllocationField);
+allocationSelect.addEventListener("change", () => {
+    const option = allocationSelect.selectedOptions[0];
+    if (option && option.dataset.currency) {
+        invoiceCurrencyField.value = option.dataset.currency;
+    }
+});
+updateAllocationField();
+</script>
+{% endblock %}

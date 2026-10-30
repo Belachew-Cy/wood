@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi with context %}
+
+{% block title %}Letter Audit | Dereje Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Audit &amp; Oversight</span>
+      <h1>Letter Audit</h1>
+      <p>Every letter in the register, its approval state and every action taken on
+         one. Read-only.</p>
+      <p class="print-only">
+        Date window: {{ start_date or 'Earliest' }} to {{ end_date or 'Today' }}
+      </p>
+    </div>
+    <nav class="stock-actions" aria-label="Letter audit actions">
+      <a class="btn btn-outline btn-sm" href="{{ url_for('auditor_dashboard') }}">Console</a>
+      <a class="btn btn-outline btn-sm" href="{{ trail_url }}">Audit Trail</a>
+      <a class="btn btn-outline btn-sm" href="{{ raw_url }}">Raw table</a>
+      <button class="btn btn-sm" type="button" data-print>Print</button>
+    </nav>
+  </div>
+</section>
+
+<section class="container finance-page">
+  <div class="hr-stats">
+    {{ kpi('Letters', counts.total or 0, '', 'flat', 'file', raw_url) }}
+    {{ kpi('Approved', counts.approved, 'Signed off' if counts.approved else '',
+           'flat', 'check') }}
+    {{ kpi('Incoming', counts.incoming, 'Addressed to us' if counts.incoming else '',
+           'flat', 'arrow') }}
+    {{ kpi('Outgoing', counts.outgoing, 'Addressed outside' if counts.outgoing else '',
+           'flat', 'arrow') }}
+    {{ kpi('Sent', counts.sent, '', 'flat', 'check') }}
+    {{ kpi('Logged actions', events | length,
+           'Newest 60' if events | length >= 60 else '',
+           'flat', 'chart', trail_url) }}
+  </div>
+
+  {% if active_letter %}
+  <div class="dash-panel hr-table-panel">
+    <h2>Document history · {{ active_letter['reference_no'] }}</h2>
+    <p class="panel-note">
+      {{ letter_type_label(active_letter['letter_type']) }}{% if active_letter['letter_kind'] %} · {{ letter_kind_label(active_letter['letter_type'], active_letter['letter_kind']) }}{% endif %}
+      · {{ active_letter['status'] }}
+      {% if active_letter['approved_at'] %}
+      · approved by {{ active_letter['approved_by_name'] or '—' }} on {{ active_letter['approved_at'] | audit_time }}
+      {% endif %}
+      <br />
+      <a class="btn btn-outline btn-sm" href="{{ url_for('auditor_letters', q=term, type=selected_type, status=selected_status, start_date=start_date, end_date=end_date) }}">Clear the letter filter</a>
+    </p>
+  </div>
+  {% endif %}
+
+  <div class="dash-panel hr-table-panel">
+    <h2>{{ total }} letter{{ '' if total == 1 else 's' }} in the register · {{ letters | length }} shown</h2>
+
+    <form method="GET" action="{{ url_for('auditor_letters') }}" class="report-filters no-print">
+      <div>
+        <label for="letterSearch">Search</label>
+        <input id="letterSearch" type="search" name="q" value="{{ term }}" maxlength="120"
+               placeholder="Reference, subject, sender or recipient" />
+      </div>
+      <div>
+        <label for="letterType">Category</label>
+        <select id="letterType" name="type">
+          <option value="">All letter categories</option>
+          {% for value in letter_types %}
+          <option value="{{ value }}"{% if selected_type == value %} selected{% endif %}>{{ letter_type_labels[value] }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="letterStatus">Status</label>
+        <select id="letterStatus" name="status">
+          <option value="">All statuses</option>
+          {% for value in letter_statuses %}
+          <option value="{{ value }}"{% if selected_status == value %} selected{% endif %}>{{ value }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="letterStart">From (letter date)</label>
+        <input id="letterStart" type="date" name="start_date" value="{{ start_date }}">
+      </div>
+      <div>
+        <label for="letterEnd">To</label>
+        <input id="letterEnd" type="date" name="end_date" value="{{ end_date }}">
+      </div>
+      <div>
+        <button class="report-btn" type="submit">Apply</button>
+      </div>
+      <div>
+        <a class="btn btn-outline btn-sm" href="{{ url_for('auditor_letters') }}">Reset</a>
+      </div>
+    </form>
+
+    <div class="hr-table-wrap table-scroll">
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th>Reference</th><th>Category</th><th>Subject</th><th>Sender</th>
+            <th>Recipient</th><th>Date</th><th>Status</th><th>Approved by</th>
+            <th>Created by</th><th>Last modified</th><th>History</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for letter in letters %}
+          <tr>
+            <td class="nowrap">{{ letter['reference_no'] }}</td>
+            <td>
+              {{ letter_type_label(letter['letter_type']) }}
+              {% if letter['letter_kind'] %}
+              <em class="letter-kind">{{ letter_kind_label(letter['letter_type'], letter['letter_kind']) }}</em>
+              {% endif %}
+            </td>
+            <td class="wrap-cell">{{ letter['subject'] }}</td>
+            <td>{{ letter['sender'] or '—' }}</td>
+            <td>{{ letter['recipient'] or '—' }}</td>
+            <td class="nowrap">{{ letter['letter_date'] | friendly_date }}</td>
+            <td>
+              {% if letter['status'] in ('Sent', 'Received') %}
+              <span class="status-badge active">{{ letter['status'] }}</span>
+              {% elif letter['status'] == 'Archived' %}
+              <span class="status-badge off">{{ letter['status'] }}</span>
+              {% else %}
+              <span class="status-badge neutral">{{ letter['status'] }}</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if letter['approved_by_name'] %}
+              {{ letter['approved_by_name'] }}
+              <em class="letter-kind">{{ letter['approved_at'] | audit_time if letter['approved_at'] else '' }}</em>
+              {% else %}
+              <span class="feed-meta">—</span>
+              {% endif %}
+            </td>
+            <td>{{ letter['created_by_name'] or letter['created_by_username'] or '—' }}</td>
+            <td class="nowrap">
+              {{ letter['updated_by_name'] or '—' }}
+              {% if letter['updated_at'] %}
+              <br><span class="feed-meta">{{ letter['updated_at'] | audit_time }}</span>
+              {% endif %}
+            </td>
+            <td class="nowrap">
+              <a class="btn btn-outline btn-sm"
+                 href="{{ url_for('auditor_letters', letter=letter['id'], q=term, type=selected_type, status=selected_status, start_date=start_date, end_date=end_date) }}">History</a>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="11" class="report-empty">No letter matches this window.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if capped %}
+    <p class="report-note">
+      Showing the newest {{ letters | length }} of {{ total }} letters. Narrow the date
+      window or open the raw table for the rest.
+    </p>
+    {% endif %}
+  </div>
+
+  <div class="dash-panel hr-table-panel">
+    <h2>
+      {% if active_letter %}Document history · {{ active_letter['reference_no'] }}{% else %}Letter activity{% endif %}
+      · {{ events | length }} logged action{{ '' if events | length == 1 else 's' }}
+    </h2>
+    <div class="hr-table-wrap table-scroll">
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th>When</th><th>Action</th><th>Reference</th><th>Category</th>
+            <th>Subject</th><th>User</th><th>Role</th><th>Outcome</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for event in events %}
+          <tr>
+            <td class="nowrap">{{ event.time }}</td>
+            <td>
+              <span class="status-badge {{ 'off' if event.outcome in ('DENIED', 'FAILURE') else 'neutral' }}">
+                {{ event.action }}
+              </span>
+            </td>
+            <td class="nowrap">{{ event.reference or '—' }}</td>
+            <td>
+              {{ event.letter_type_label or '—' }}
+              {% if event.kind_label %}
+              <em class="letter-kind">{{ event.kind_label }}</em>
+              {% endif %}
+            </td>
+            <td class="wrap-cell">
+              {{ event.subject or event.description }}
+              {% if event.subject and event.description %}
+              <em class="letter-kind">{{ event.description }}</em>
+              {% endif %}
+            </td>
+            <td>{{ event.username }}</td>
+            <td>{{ event.role }}</td>
+            <td>
+              <span class="status-badge {{ 'active' if event.outcome == 'SUCCESS' else ('off' if event.outcome == 'DENIED' else 'neutral') }}">
+                {{ event.outcome }}
+              </span>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="8" class="report-empty">No letter action has been logged in this window.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="report-note">
+      Creation, approval, sending, first receipt, printing, downloading, edits and
+      deletions all land in the central audit trail, with refused attempts kept
+      beside them. Open the
+      <a href="{{ trail_url }}">Audit Trail</a> for the full filterable log.
+    </p>
+  </div>
+</section>
+{% endblock %}

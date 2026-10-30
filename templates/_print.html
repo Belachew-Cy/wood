@@ -1,0 +1,42 @@
+{# Shared print header and footer.
+
+   base.html renders both for every page, so public pages, dashboards and every
+   department screen print with the same company letterhead and running footer.
+   The footer is a fixed element in print CSS: Chromium and Firefox repeat a
+   fixed element on each printed sheet, which the @page margin boxes used before
+   did not do in those browsers. A module template that needs a different
+   heading can override the print_department context value. #}
+
+{% macro print_letterhead() -%}
+  {% set account_name = user['username'] if user and user['username'] else (user['full_name'] if user else '') %}
+  {% set sheet_department = (print_department or 'Website')|replace('\\', '')|replace('"', '')|replace('\n', ' ') %}
+  <div class="print-letterhead">
+    <div class="print-letterhead-brand">
+      <span class="print-letterhead-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9V21h13V9"/><path d="M10 21v-6h4v6"/></svg></span>
+      <span class="print-letterhead-name">
+        <strong>Dereje Belay</strong>
+        <span>Wood &amp; Kitchen Cabinet Finishing</span>
+      </span>
+    </div>
+    <div class="print-letterhead-meta">
+      <span><small>{{ 'Department' if user else 'Page' }}</small><b>{{ sheet_department }}</b></span>
+      {% if user %}
+      <span><small>Username</small><b>{{ account_name or '—' }}</b></span>
+      {% endif %}
+    </div>
+    <div class="print-letterhead-qr">
+      {{ print_qr(request.url) }}
+      <span>Scan to open this page</span>
+    </div>
+  </div>
+{%- endmacro %}
+
+{% macro print_footer() -%}
+  {% set account_name = user['username'] if user and user['username'] else (user['full_name'] if user else '') %}
+  {% set sheet_department = (print_department or 'Website')|replace('\\', '')|replace('"', '')|replace('\n', ' ') %}
+  <div class="print-footer" aria-hidden="true">
+    <span class="print-footer-brand">Dereje Belay · Wood &amp; Kitchen Cabinet Finishing</span>
+    <span class="print-footer-meta">{{ 'Department' if user else 'Page' }}: {{ sheet_department }}{% if user %} · Username: {{ account_name or '—' }}{% endif %}</span>
+    <span class="print-footer-date">Printed {{ print_date|default('') }}</span>
+  </div>
+{%- endmacro %}

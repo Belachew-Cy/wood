@@ -1,0 +1,626 @@
+
+{% extends "base.html" %}
+
+{% block title %}Budget Plans | Dereje Wood & Kitchen Cabinet{% endblock %}
+
+{% block content %}
+<style>
+    .plans-page {
+        --green: #247653;
+        --green-dark: #18583d;
+        --green-soft: #eaf5ee;
+        --text: #25352d;
+        --muted: #718078;
+        --border: #e2eae4;
+        --card: #fff;
+        --card-soft: #fbfdfb;
+        --card-head: #f8fbf9;
+        --soft: #f4faf6;
+        --row-line: #edf1ee;
+        --row-hover: #f9fcfa;
+        --field-line: #dce5de;
+        --pill-bg: #f0f2f1;
+        --pill-ink: #59635d;
+        --ok-bg: #e4f5e9;
+        --ok-ink: #17623c;
+        --warn-bg: #fff3d9;
+        --warn-ink: #875c0c;
+        --bad-bg: #ffebeb;
+        --bad-ink: #a13232;
+        --flash-bg: #eaf5ee;
+        --flash-ink: #18583d;
+        --notice-ink: #285c3e;
+        --notice-line: #d7eadc;
+        max-width: 1500px;
+        margin: auto;
+        padding: 25px;
+        color: var(--text);
+    }
+
+    .plans-page * { box-sizing: border-box; }
+
+    .plans-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .plans-header h1 {
+        margin: 0 0 8px;
+        font-size: clamp(25px, 3vw, 32px);
+        font-weight: 800;
+    }
+
+    .plans-header p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.6;
+    }
+
+    .plans-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .plans-btn {
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 42px;
+        padding: 10px 15px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: var(--card);
+        color: var(--text);
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: .2s ease;
+    }
+
+    .plans-btn:hover {
+        transform: translateY(-1px);
+        background: var(--soft);
+    }
+
+    .plans-btn-primary {
+        background: var(--green);
+        border-color: var(--green);
+        color: white;
+    }
+
+    .plans-btn-primary:hover {
+        background: var(--green-dark);
+        color: white;
+    }
+
+    .plans-stats {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 15px;
+        margin-bottom: 23px;
+    }
+
+    .plans-stat {
+        padding: 20px;
+        border: 1px solid var(--border);
+        border-radius: 15px;
+        background: var(--card);
+        box-shadow: 0 5px 18px #173d2709;
+    }
+
+    .plans-stat-label {
+        margin-bottom: 12px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 650;
+    }
+
+    .plans-stat-value {
+        font-size: clamp(24px, 2.5vw, 30px);
+        font-weight: 800;
+        overflow-wrap: anywhere;
+    }
+
+    .plans-stat-note {
+        margin-top: 7px;
+        color: var(--muted);
+        font-size: 11px;
+    }
+
+    .plans-panel {
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: 17px;
+        background: var(--card);
+        box-shadow: 0 5px 22px #173d270a;
+    }
+
+    .plans-panel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        padding: 21px 23px;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .plans-panel-header h2 {
+        margin: 0 0 6px;
+        font-size: 17px;
+        font-weight: 750;
+        color: var(--text);
+    }
+
+    .plans-panel-header p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 12px;
+    }
+
+    .plans-filters {
+        display: grid;
+        grid-template-columns: minmax(220px, 1fr) minmax(150px, 200px);
+        gap: 12px;
+        padding: 17px 23px;
+        border-bottom: 1px solid var(--border);
+        background: var(--card-soft);
+    }
+
+    .plans-input,
+    .plans-select {
+        width: 100%;
+        min-height: 43px;
+        padding: 10px 13px;
+        border: 1px solid var(--field-line);
+        border-radius: 10px;
+        background: var(--card);
+        color: var(--text);
+        font: inherit;
+        font-size: 13px;
+        outline: none;
+    }
+
+    .plans-input:focus,
+    .plans-select:focus {
+        border-color: var(--green);
+        box-shadow: 0 0 0 3px #24765319;
+    }
+
+    .plans-table-wrap { overflow-x: auto; }
+
+    .plans-table {
+        width: 100%;
+        min-width: 850px;
+        border-collapse: collapse;
+        text-align: left;
+    }
+
+    .plans-table th {
+        padding: 14px 18px;
+        background: var(--card-head);
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 750;
+        letter-spacing: .4px;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .plans-table td {
+        padding: 17px 18px;
+        border-top: 1px solid var(--row-line);
+        font-size: 13px;
+        vertical-align: middle;
+    }
+
+    .plans-table tbody tr:hover { background: var(--row-hover); }
+
+    .plan-name {
+        font-weight: 750;
+        line-height: 1.5;
+    }
+
+    .plan-description {
+        max-width: 310px;
+        margin-top: 5px;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.5;
+        overflow-wrap: anywhere;
+    }
+
+    .plan-id {
+        color: var(--muted);
+        font-size: 11px;
+        margin-top: 4px;
+    }
+
+    .plan-amount {
+        font-weight: 800;
+        white-space: nowrap;
+    }
+
+    .plan-status {
+        display: inline-flex;
+        align-items: center;
+        padding: 6px 10px;
+        border-radius: 20px;
+        background: var(--pill-bg);
+        color: var(--pill-ink);
+        font-size: 11px;
+        font-weight: 750;
+        white-space: nowrap;
+    }
+
+    .plan-status.draft {
+        background: var(--pill-bg);
+        color: var(--pill-ink);
+    }
+
+    .plan-status.pending,
+    .plan-status.review {
+        background: var(--warn-bg);
+        color: var(--warn-ink);
+    }
+
+    .plan-status.approved,
+    .plan-status.active {
+        background: var(--ok-bg);
+        color: var(--ok-ink);
+    }
+
+    .plan-status.closed,
+    .plan-status.rejected,
+    .plan-status.cancelled {
+        background: var(--bad-bg);
+        color: var(--bad-ink);
+    }
+
+    .plans-empty {
+        display: none;
+        padding: 40px 20px;
+        color: var(--muted);
+        text-align: center;
+        font-size: 13px;
+    }
+
+    .plans-empty strong {
+        display: block;
+        margin-bottom: 8px;
+        color: var(--text);
+        font-size: 15px;
+    }
+
+    .plans-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        padding: 16px 23px;
+        border-top: 1px solid var(--border);
+        color: var(--muted);
+        font-size: 12px;
+    }
+
+    .plans-flash {
+        margin-bottom: 15px;
+        padding: 13px 16px;
+        border-radius: 10px;
+        background: var(--flash-bg);
+        color: var(--flash-ink);
+        font-size: 13px;
+    }
+
+    .plans-flash.error,
+    .plans-flash.danger {
+        background: var(--bad-bg);
+        color: var(--bad-ink);
+    }
+
+    .plans-note {
+        margin-top: 17px;
+        padding: 14px 16px;
+        border: 1px solid var(--notice-line);
+        border-radius: 12px;
+        background: var(--green-soft);
+        color: var(--notice-ink);
+        font-size: 12px;
+        line-height: 1.7;
+    }
+
+    @media (max-width: 800px) {
+        .plans-stats { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 560px) {
+        .plans-page { padding: 15px 10px; }
+        .plans-panel-header,
+        .plans-filters { padding: 15px; }
+        .plans-filters { grid-template-columns: 1fr; }
+        .plans-stat { padding: 16px; }
+    }
+
+    /* Dark theme: swap this page's palette for the shared slate surfaces. */
+    [data-theme="dark"] .plans-page {
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+        --border: #263449;
+        --card: var(--white);
+        --card-soft: var(--charcoal-2);
+        --card-head: var(--thead-bg);
+        --soft: var(--table-hover-bg);
+        --row-line: var(--line);
+        --row-hover: var(--table-hover-bg);
+        --field-line: var(--line-strong);
+        --pill-bg: var(--charcoal-3);
+        --pill-ink: #cbd5e1;
+        --ok-bg: var(--success-bg);
+        --ok-ink: var(--success-ink);
+        --warn-bg: var(--warning-bg);
+        --warn-ink: var(--warning-ink);
+        --bad-bg: var(--danger-bg);
+        --bad-ink: var(--danger-ink);
+        --flash-bg: var(--success-bg);
+        --flash-ink: var(--success-ink);
+        --notice-ink: #9fe0bd;
+        --notice-line: #2f5e34;
+        --green-soft: #16233c;
+        color-scheme: dark;
+    }
+
+</style>
+
+<div class="plans-page">
+    <header class="plans-header">
+        <div>
+            <h1>Budget Plans</h1>
+            <p>Review annual budgets, fiscal years, planned amounts, and plan statuses.</p>
+        </div>
+
+        <div class="plans-actions">
+            <a class="plans-btn" href="{{ url_for('dashboard') }}">
+                ← Dashboard
+            </a>
+
+            <a class="plans-btn plans-btn-primary"
+               href="{{ url_for('budget.create_plan') }}">
+                + Create Budget Plan
+            </a>
+        </div>
+    </header>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="plans-flash {{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    {% set ns = namespace(total=0, draft=0, approved=0, active=0) %}
+    {% for plan in plans %}
+        {% set ns.total = ns.total + 1 %}
+        {% set status = (plan.status or 'Draft')|lower %}
+        {% if status == 'draft' %}
+            {% set ns.draft = ns.draft + 1 %}
+        {% elif status == 'approved' %}
+            {% set ns.approved = ns.approved + 1 %}
+        {% elif status == 'active' %}
+            {% set ns.active = ns.active + 1 %}
+        {% endif %}
+    {% endfor %}
+
+    <section class="plans-stats">
+        <article class="plans-stat">
+            <div class="plans-stat-label">Total Budget Plans</div>
+            <div class="plans-stat-value">{{ ns.total }}</div>
+            <div class="plans-stat-note">Plans returned by the server</div>
+        </article>
+
+        <article class="plans-stat">
+            <div class="plans-stat-label">Draft Plans</div>
+            <div class="plans-stat-value">{{ ns.draft }}</div>
+            <div class="plans-stat-note">Plans still in draft status</div>
+        </article>
+
+        <article class="plans-stat">
+            <div class="plans-stat-label">Approved / Active Plans</div>
+            <div class="plans-stat-value">{{ ns.approved + ns.active }}</div>
+            <div class="plans-stat-note">Approved or active plans</div>
+        </article>
+    </section>
+
+    <section class="plans-panel">
+        <div class="plans-panel-header">
+            <div>
+                <h2>All Budget Plans</h2>
+                <p>Search by plan name, fiscal year, amount, or status.</p>
+            </div>
+        </div>
+
+        <div class="plans-filters">
+            <input
+                type="search"
+                id="planSearch"
+                class="plans-input"
+                placeholder="Search budget plans..."
+                aria-label="Search budget plans"
+            >
+
+            <select id="planStatusFilter"
+                    class="plans-select"
+                    aria-label="Filter plans by status">
+                <option value="all">All statuses</option>
+                <option value="draft">Draft</option>
+                <option value="pending">Pending</option>
+                <option value="review">Review</option>
+                <option value="approved">Approved</option>
+                <option value="active">Active</option>
+                <option value="closed">Closed</option>
+                <option value="rejected">Rejected</option>
+                <option value="cancelled">Cancelled</option>
+            </select>
+        </div>
+
+        <div class="plans-table-wrap">
+            <table class="plans-table">
+                <thead>
+                    <tr>
+                        <th>Budget Plan</th>
+                        <th>Fiscal Year</th>
+                        <th>Total Budget</th>
+                        <th>Currency</th>
+                        <th>Status</th>
+                        <th>Last modified</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+
+                <tbody id="plansTableBody">
+                    {% for plan in plans %}
+                    {% set status = (plan.status or 'Draft')|lower %}
+
+                    <tr class="plan-row"
+                        data-status="{{ status }}"
+                        data-search="{{ (plan.id|string ~ ' ' ~ plan.plan_name ~ ' ' ~ plan.fiscal_year|string ~ ' ' ~ plan.total_budget|string ~ ' ' ~ (plan.currency or 'ETB') ~ ' ' ~ status ~ ' ' ~ (plan.description or ''))|lower }}">
+                        <td>
+                            <div class="plan-name">{{ plan.plan_name }}</div>
+                            <div class="plan-id">Plan #{{ plan.id }}</div>
+
+                            {% if plan.description is defined and plan.description %}
+                                <div class="plan-description">
+                                    {{ plan.description }}
+                                </div>
+                            {% endif %}
+                        </td>
+
+                        <td>{{ plan.fiscal_year }}</td>
+
+                        <td class="plan-amount">
+                            {{ "{:,.2f}".format(plan.total_budget|float) }}
+                        </td>
+
+                        <td>{{ plan.currency or 'ETB' }}</td>
+
+                        <td>
+                            <span class="plan-status {{ status }}">
+                                {{ plan.status or 'Draft' }}
+                            </span>
+                        </td>
+
+                        <td>
+                            <div class="plan-id">{{ plan.updated_by_name or '—' }}</div>
+                            {% if plan.updated_at %}
+                            <div class="plan-id">{{ plan.updated_at | audit_time }}</div>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if status != 'closed' %}
+                            <form method="post"
+                                  action="{{ url_for('budget.set_plan_status', plan_id=plan.id) }}"
+                                  class="status-form">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                {% if status in ('draft', 'approved') %}
+                                <button class="plans-btn" type="submit" name="status"
+                                        value="Active">Activate</button>
+                                {% endif %}
+                                <button class="plans-btn" type="submit" name="status"
+                                        value="Closed"
+                                        onclick="return confirm('Closing a plan is permanent. Close it?');">Close</button>
+                            </form>
+                            {% else %}
+                            <span class="plan-id">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7">
+                            <div class="plans-empty" style="display:block">
+                                <strong>No budget plans found</strong>
+                                Create a budget plan to begin organizing your department's budget.
+                                <p>
+                                    <a href="{{ url_for('budget.create_plan') }}">
+                                        Create your first budget plan
+                                    </a>
+                                </p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="plans-empty" id="noMatchingPlans">
+            <strong>No matching budget plans</strong>
+            Try a different search term or status.
+        </div>
+
+        <footer class="plans-footer">
+            <span id="planVisibleCount">
+                Showing {{ plans|length }} plan(s)
+            </span>
+            <span>Plan statuses reflect the values saved in the database.</span>
+        </footer>
+    </section>
+
+    <div class="plans-note">
+        <strong>Budget control:</strong>
+        A new plan starts as a draft and authorizes nothing by itself. Activate it,
+        then divide it into departmental allocations. Spending screens refuse any
+        amount above the allocation's available balance.
+    </div>
+</div>
+
+<script>
+(() => {
+    const searchInput = document.getElementById("planSearch");
+    const statusFilter = document.getElementById("planStatusFilter");
+    const rows = Array.from(document.querySelectorAll(".plan-row"));
+    const noMatching = document.getElementById("noMatchingPlans");
+    const visibleCount = document.getElementById("planVisibleCount");
+
+    function filterPlans() {
+        const query = searchInput.value.trim().toLowerCase();
+        const selectedStatus = statusFilter.value;
+        let visible = 0;
+
+        rows.forEach(row => {
+            const matchesSearch =
+                (row.dataset.search || "").includes(query);
+
+            const matchesStatus =
+                selectedStatus === "all" ||
+                row.dataset.status === selectedStatus;
+
+            const show = matchesSearch && matchesStatus;
+            row.style.display = show ? "" : "none";
+
+            if (show) visible++;
+        });
+
+        noMatching.style.display =
+            rows.length > 0 && visible === 0 ? "block" : "none";
+
+        visibleCount.textContent =
+            `Showing ${visible} of ${rows.length} plan(s)`;
+    }
+
+    searchInput.addEventListener("input", filterPlans);
+    statusFilter.addEventListener("change", filterPlans);
+
+    filterPlans();
+})();
+</script>
+{% endblock %}

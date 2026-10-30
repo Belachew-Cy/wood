@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi, dash_icon with context %}
+
+{% block title %}Settings | Dereje Belay Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Configuration</span>
+      <h1>Settings</h1>
+      <p>The company identity printed on reports and invoices, and the rules the system
+        enforces on every account.</p>
+    </div>
+    <nav class="stock-actions" aria-label="Settings actions">
+      <a class="btn btn-outline btn-sm" href="{{ url_for('hr_settings.index') }}">Working hours</a>
+      <a class="btn btn-outline btn-sm" href="{{ url_for('admin_password_security') }}">Password audit</a>
+    </nav>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="hr-stats">
+      {{ kpi('Company', stored.get('company_name', defaults['company_name']), 'Printed on reports') }}
+      {{ kpi('Currency', stored.get('currency', defaults['currency']), 'Amounts are stored in ETB regardless') }}
+      {{ kpi('Modules you open', permissions | length, 'This account&rsquo;s access, set on Role Management') }}
+    </div>
+  </div>
+</section>
+
+<section class="section bg-white">
+  <div class="container">
+    <div class="emp-panel">
+      <div class="account-card">
+        <header class="account-head">
+          <span class="role-badge admin">Company identity</span>
+          <span class="cell-note">Saved to the same settings table the HR module uses</span>
+        </header>
+
+        <form method="POST" class="dash-form account-form">
+          {{ csrf_field() }}
+          <div class="account-grid">
+            <div>
+              <label for="company_name">Company name</label>
+              <input id="company_name" type="text" name="company_name" required maxlength="120"
+                     value="{{ stored.get('company_name', defaults['company_name']) }}" />
+            </div>
+            <div>
+              <label for="company_email">Company email</label>
+              <input id="company_email" type="email" name="company_email" maxlength="254"
+                     value="{{ stored.get('company_email', '') }}" placeholder="info@derejebelay.com" />
+            </div>
+            <div>
+              <label for="company_phone">Company phone</label>
+              <input id="company_phone" type="text" name="company_phone" maxlength="30"
+                     value="{{ stored.get('company_phone', '') }}" placeholder="+251 911 123 456" />
+            </div>
+            <div>
+              <label for="company_address">Address</label>
+              <input id="company_address" type="text" name="company_address" maxlength="200"
+                     value="{{ stored.get('company_address', '') }}" placeholder="Addis Ababa, Ethiopia" />
+            </div>
+            <div>
+              <label for="currency">Display currency</label>
+              <select id="currency" name="currency">
+                {% for code in ["ETB", "USD", "EUR"] %}
+                <option value="{{ code }}" {% if stored.get('currency', defaults['currency']) == code %}selected{% endif %}>{{ code }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+
+          <p class="perm-note">Working hours, break, grace minutes and the payroll day live on
+            the HR settings screen; this form leaves those keys alone.</p>
+
+          <div class="finance-form-actions">
+            <button type="submit" class="btn">Save settings <span class="arrow">→</span></button>
+          </div>
+        </form>
+      </div>
+
+      <div class="account-card">
+        <header class="account-head">
+          <span class="role-badge finance">System rules</span>
+          <a class="btn btn-outline btn-sm" href="{{ url_for('management_approval_settings') }}">Edit the approval limits</a>
+        </header>
+        <ul class="rule-list">
+          {% for label, value in rules.items() %}
+          <li>
+            <span class="rule-label">{{ label }}</span>
+            <span class="rule-value">{{ value }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <div class="account-card">
+        <header class="account-head">
+          <span class="role-badge {{ 'finance' if mail.ready else 'payroll' }}">Email delivery</span>
+          {% if mail.ready %}
+          <span class="cell-note">Approvals, letters, purchase orders and reset links</span>
+          {% else %}
+          <span class="cell-note">Not configured — messages are logged but not sent</span>
+          {% endif %}
+        </header>
+        <ul class="rule-list">
+          <li>
+            <span class="rule-label">Sender</span>
+            <span class="rule-value">{{ mail.sender or 'Not set' }}</span>
+          </li>
+          <li>
+            <span class="rule-label">Connection</span>
+            <span class="rule-value">{{ mail.security | upper }} · {{ mail.host or 'no host' }}:{{ mail.port }}</span>
+          </li>
+          {% if not mail.ready %}
+          <li>
+            <span class="rule-label">Still needed</span>
+            <span class="rule-value">{{ mail.missing | join(', ') }} in the environment</span>
+          </li>
+          {% endif %}
+          <li>
+            <span class="rule-label">Last 30 days</span>
+            <span class="rule-value">{{ mail_counts.Sent }} sent · {{ mail_counts.Failed }} failed · {{ mail_counts.Skipped }} skipped</span>
+          </li>
+        </ul>
+        {% if deliveries %}
+        <ul class="rule-list">
+          {% for item in deliveries %}
+          <li>
+            <span class="rule-label">{{ item.subject }} → {{ item.recipient or 'no address' }}</span>
+            <span class="rule-value">{{ item.status }} · {{ item.finished_at | audit_time }}{% if item.error %} · {{ item.error }}{% endif %}</span>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="cell-note">No message has been logged yet.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

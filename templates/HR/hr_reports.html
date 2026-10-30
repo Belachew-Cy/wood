@@ -1,0 +1,280 @@
+
+{% extends "base.html" %}
+{% from "base.html" import bars, columns, donut with context %}
+
+{% block title %}HR Reports{% endblock %}
+
+{% block content %}
+
+<div class="hr-reports">
+    <header class="reports-header">
+        <div>
+            <h1>HR Reports & Analytics</h1>
+            <p>Workforce, attendance, payroll, and recruitment overview.</p>
+            <p class="print-only">Reporting period: {{ start_date }} to {{ end_date }}</p>
+        </div>
+        <button class="report-btn" type="button"
+                onclick="window.print()">
+            Print / Save PDF
+        </button>
+    </header>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+            <div class="report-alert">{{ message }}</div>
+        {% endfor %}
+    {% endwith %}
+
+    <section class="report-panel filter-panel">
+        <h2>Report Period</h2>
+        <form method="GET" class="report-filters">
+            <div>
+                <label for="start_date">From</label>
+                <input type="date" id="start_date" name="start_date"
+                       value="{{ start_date }}" required>
+            </div>
+            <div>
+                <label for="end_date">To</label>
+                <input type="date" id="end_date" name="end_date"
+                       value="{{ end_date }}" required>
+            </div>
+            <button class="report-btn" type="submit">
+                Generate Reports
+            </button>
+        </form>
+        <p class="report-note">
+            Attendance, new hires, and recruitment use the selected dates.
+            Payroll uses the months overlapping that date range.
+        </p>
+    </section>
+
+    <h2 class="section-heading">Workforce Overview</h2>
+    <section class="report-cards">
+        <article class="report-card">
+            <span>Total Employees</span>
+            <strong>{{ employee_stats['total'] or 0 }}</strong>
+        </article>
+        <article class="report-card">
+            <span>Active Employees</span>
+            <strong>{{ employee_stats['active'] or 0 }}</strong>
+        </article>
+        <article class="report-card">
+            <span>New Hires</span>
+            <strong>{{ new_hires|length }}</strong>
+        </article>
+        <article class="report-card">
+            <span>Open Vacancies</span>
+            <strong>{{ recruitment_stats['open_vacancies'] or 0 }}</strong>
+        </article>
+    </section>
+
+    {% set att_dept_rows = [] %}
+        {% for r in attendance_by_department %}
+          {% set _ = att_dept_rows.append({
+            'label': r['department'] or 'Unassigned',
+            'value': r['present'] or 0,
+            'display': '{} present of {}'.format(r['present'] or 0, r['total_records'])
+          }) %}
+        {% endfor %}
+        {% set att_dept_rows = att_dept_rows | sort(reverse=true, attribute='value') %}
+        {% set pay_cols = [] %}
+        {% for m in payroll_by_month | sort(attribute='payroll_month') %}
+          {% set _ = pay_cols.append({
+            'label': m['payroll_month'][5:7],
+            'value': m['total_net'] or 0,
+            'display': '{} · {:,.0f} ETB'.format(m['payroll_month'], m['total_net'] or 0)
+          }) %}
+        {% endfor %}
+        {% set settled = payroll_stats['paid_amount'] or 0 %}
+        {% set owed = payroll_stats['pending_amount'] or 0 %}
+        {% set payroll_total = payroll_stats['total_net'] or 0 %}
+        {% set attendance_total = attendance_stats['total_records'] or 0 %}
+
+        <div class="chart-grid">
+          {{ columns('Net payroll by month', pay_cols, 'ETB') }}
+          {{ bars('Present days by department', att_dept_rows, 'records') }}
+          {{ bars('Payroll split', [
+            {'label': 'Paid', 'value': settled, 'display': '{:,.0f} ETB'.format(settled)},
+            {'label': 'Pending', 'value': owed, 'display': '{:,.0f} ETB'.format(owed)}
+          ], 'ETB in range') }}
+          {{ donut('Attendance present rate', (attendance_stats['present'] or 0) / attendance_total if attendance_total else 0,
+                  '{}%'.format((((attendance_stats['present'] or 0) / attendance_total) * 100 | round(0, 'common') | int) if attendance_total else 0),
+                  [
+                    {'label': 'Present', 'color': 'var(--walnut)', 'value': attendance_stats['present'] or 0},
+                    {'label': 'Absent or late', 'color': 'var(--ivory-2)', 'value': attendance_total - (attendance_stats['present'] or 0)}
+                  ], 'of records in range') }}
+          {% if payroll_total %}
+          {{ donut('Payroll released', (settled / payroll_total) if settled <= payroll_total else 1,
+                  '{}%'.format((((settled / payroll_total) * 100) | round(0, 'common') | int) if settled <= payroll_total else 100),
+                  [
+                    {'label': 'Paid', 'color': 'var(--walnut)', 'value': settled},
+                    {'label': 'Outstanding', 'color': 'var(--ivory-2)', 'value': owed}
+                  ], 'of net cost in range') }}
+          {% endif %}
+        </div>
+    <section class="report-panel">
+        <h2>Attendance Summary</h2>
+        <div class="report-cards attendance-cards">
+            <article class="report-card">
+                <span>Total Records</span>
+                <strong>{{ attendance_stats['total_records'] or 0 }}</strong>
+            </article>
+            <article class="report-card">
+                <span>Present</span>
+                <strong>{{ attendance_stats['present'] or 0 }}</strong>
+            </article>
+            <article class="report-card">
+                <span>Absent</span>
+                <strong>{{ attendance_stats['absent'] or 0 }}</strong>
+            </article>
+            <article class="report-card">
+                <span>Late</span>
+                <strong>{{ attendance_stats['late'] or 0 }}</strong>
+            </article>
+            <article class="report-card">
+                <span>Half Day</span>
+                <strong>{{ attendance_stats['half_day'] or 0 }}</strong>
+            </article>
+        </div>
+
+        <h3>Attendance by Department</h3>
+        {% if attendance_by_department %}
+        <div class="report-table-wrap">
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>Department</th>
+                        <th>Records</th>
+                        <th>Present</th>
+                        <th>Absent</th>
+                        <th>Late</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in attendance_by_department %}
+                    <tr>
+                        <td>{{ row['department'] or 'Unassigned' }}</td>
+                        <td>{{ row['total_records'] or 0 }}</td>
+                        <td>{{ row['present'] or 0 }}</td>
+                        <td>{{ row['absent'] or 0 }}</td>
+                        <td>{{ row['late'] or 0 }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="report-empty">No attendance records for this period.</p>
+        {% endif %}
+    </section>
+
+    <section class="report-panel">
+        <h2>Payroll Summary <small>(ETB)</small></h2>
+        <div class="report-cards">
+            <article class="report-card">
+                <span>Net Payroll</span>
+                <strong>{{ "%.2f"|format(payroll_stats['total_net'] or 0) }}</strong>
+            </article>
+            <article class="report-card">
+                <span>Paid Amount</span>
+                <strong>{{ "%.2f"|format(payroll_stats['paid_amount'] or 0) }}</strong>
+            </article>
+            <article class="report-card">
+                <span>Pending Amount</span>
+                <strong>{{ "%.2f"|format(payroll_stats['pending_amount'] or 0) }}</strong>
+            </article>
+            <article class="report-card">
+                <span>Payroll Records</span>
+                <strong>{{ payroll_stats['records'] or 0 }}</strong>
+            </article>
+        </div>
+
+        {% if payroll_by_month %}
+        <div class="report-table-wrap">
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>Payroll Month</th>
+                        <th>Employees</th>
+                        <th>Net Payroll (ETB)</th>
+                        <th>Paid (ETB)</th>
+                        <th>Pending (ETB)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in payroll_by_month %}
+                    <tr>
+                        <td>{{ row['payroll_month'] }}</td>
+                        <td>{{ row['employee_count'] }}</td>
+                        <td>{{ "%.2f"|format(row['total_net'] or 0) }}</td>
+                        <td>{{ "%.2f"|format(row['paid_amount'] or 0) }}</td>
+                        <td>{{ "%.2f"|format(row['pending_amount'] or 0) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="report-empty">No payroll records for these months.</p>
+        {% endif %}
+    </section>
+
+    <section class="report-panel">
+        <h2>Recruitment Summary</h2>
+        <div class="report-cards">
+            <article class="report-card">
+                <span>Applicants in Period</span>
+                <strong>{{ recruitment_stats['applicants'] or 0 }}</strong>
+            </article>
+            <article class="report-card">
+                <span>Shortlisted</span>
+                <strong>{{ recruitment_stats['shortlisted'] or 0 }}</strong>
+            </article>
+            <article class="report-card">
+                <span>Hired in Period</span>
+                <strong>{{ recruitment_stats['hired'] or 0 }}</strong>
+            </article>
+        </div>
+    </section>
+
+    <section class="report-panel">
+        <h2>New Employees</h2>
+        {% if new_hires %}
+        <div class="report-table-wrap">
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>Employee Code</th>
+                        <th>Name</th>
+                        <th>Department</th>
+                        <th>Job Title</th>
+                        <th>Hire Date</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for employee in new_hires %}
+                    <tr>
+                        <td>{{ employee['employee_code'] or '-' }}</td>
+                        <td>{{ employee['full_name'] }}</td>
+                        <td>{{ employee['department'] or '-' }}</td>
+                        <td>{{ employee['job_title'] or '-' }}</td>
+                        <td>{{ employee['hire_date'] or '-' }}</td>
+                        <td>{{ employee['employment_status'] or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="report-empty">
+            No new employees were recorded in this period.
+        </p>
+        {% endif %}
+    </section>
+
+    <footer class="reports-footer">
+        Report period: {{ start_date }} to {{ end_date }}
+    </footer>
+</div>
+{% endblock %}

@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}{{ code }} | Dereje Belay Wood &amp; Kitchen Cabinet Finishing{% endblock %}
+
+{% block content %}
+<section class="auth-section">
+  <div class="auth-card" style="max-width:560px;margin:0 auto;text-align:center;">
+    <div class="auth-brand">
+      <span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9V21h13V9"/><path d="M10 21v-6h4v6"/></svg></span>
+      <h1>{{ code }} — {{ heading }}</h1>
+      <p>{{ message }}</p>
+    </div>
+
+    <div class="hero-actions" style="justify-content:center;">
+      {% if user and dashboard_home %}
+      <a class="btn" href="{{ dashboard_home }}">Go to my dashboard <span class="arrow" aria-hidden="true">→</span></a>
+      {% endif %}
+      <a class="btn btn-outline-dark" href="{{ url_for('index') }}">Back to Home</a>
+    </div>
+
+    {% if code == 400 %}
+    <p class="auth-hint">Nothing was changed. Reload the page you came from and submit the form again.</p>
+    {% elif code == 500 %}
+    <p class="auth-hint">If this keeps happening, quote the time of the attempt to your administrator.</p>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

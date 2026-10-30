@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi, dash_icon with context %}
+
+{% block title %}Notifications | Dereje Belay Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Your inbox</span>
+      <h1>Notifications</h1>
+      <p>Approval requests, status changes and announcements routed to your role and
+        permissions. Opening one marks it read; the bell carries the same count.</p>
+    </div>
+    <nav class="stock-actions" aria-label="Notification actions">
+      <a class="btn btn-outline btn-sm" href="{{ dashboard_home }}">Dashboard</a>
+      {% if 'accounts' in permissions %}
+      <a class="btn btn-outline btn-sm" href="{{ url_for('admin_notifications') }}">Send announcement</a>
+      {% endif %}
+    </nav>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    <div class="hr-stats">
+      {{ kpi('Unread', unread, 'Still waiting on you', 'warn' if unread else 'flat') }}
+      {{ kpi('Total', total, 'Kept on this account') }}
+    </div>
+
+    <div class="dash-panel note-panel">
+      <div class="note-toolbar">
+        <div class="note-tabs">
+          <a class="note-tab{% if not unread_only %} active{% endif %}"
+             href="{{ url_for('notification_center') }}">All <span>{{ total }}</span></a>
+          <a class="note-tab{% if unread_only %} active{% endif %}"
+             href="{{ url_for('notification_center', filter='unread') }}">Unread <span>{{ unread }}</span></a>
+        </div>
+        {% if unread %}
+        <form method="POST" action="{{ url_for('read_all_notifications') }}">
+          {{ csrf_field() }}
+          <input type="hidden" name="next" value="{{ request.full_path }}" />
+          <button type="submit" class="btn btn-outline-dark btn-sm">Mark all read</button>
+        </form>
+        {% endif %}
+      </div>
+
+      {% if rows %}
+      <ul class="note-list">
+        {% for row in rows %}
+        <li class="note-item{% if not row.read_at %} is-unread{% endif %}">
+          <span class="note-icon {{ row.tone }}">{{ dash_icon(row.icon or 'bell') }}</span>
+          <div class="note-body">
+            <div class="note-title-row">
+              <strong>{{ row.title }}</strong>
+              <span class="note-cat">{{ row.category | title }}</span>
+            </div>
+            {% if row.body %}<p>{{ row.body }}</p>{% endif %}
+            <span class="note-meta">{{ row.created_at | audit_time }}{% if row.read_at %} · read{% endif %}</span>
+          </div>
+          <a class="btn btn-outline-dark btn-sm note-open"
+             href="{{ url_for('open_notification', notification_id=row.id) }}">
+            {% if row.href %}Open{% else %}Mark read{% endif %}
+          </a>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="empty-state"><strong>Nothing here yet.</strong> Work routed to your role
+        and announcements addressed to it will arrive here.</p>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}

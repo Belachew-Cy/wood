@@ -1,0 +1,664 @@
+
+{% extends "base.html" %}
+
+{% block title %}Submit Budget Request | Dereje Wood & Kitchen Cabinet{% endblock %}
+
+{% block content %}
+<style>
+    .request-page {
+        --green: #247653;
+        --green-dark: #18583d;
+        --green-soft: #eaf5ee;
+        --text: #25352d;
+        --muted: #728078;
+        --border: #e2eae4;
+        --card: #fff;
+        --soft: #f4faf6;
+        --field-line: #dce5de;
+        --warn-bg: #fff3d9;
+        --warn-ink: #875c0c;
+        --bad-bg: #ffebeb;
+        --bad-ink: #b83232;
+        --flash-bg: #eaf5ee;
+        --flash-ink: #18583d;
+        --notice-ink: #365443;
+        --notice-line: #d8e9de;
+        max-width: 1150px;
+        padding: 25px;
+        margin: auto;
+        color: var(--text);
+    }
+
+    .request-page * {
+        box-sizing: border-box;
+    }
+
+    .request-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 15px;
+        margin-bottom: 25px;
+    }
+
+    .request-header h1 {
+        margin: 0 0 8px;
+        font-size: clamp(25px, 3vw, 32px);
+        letter-spacing: -.5px;
+        font-weight: 750;
+    }
+
+    .request-header p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.6;
+    }
+
+    .request-back {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 42px;
+        padding: 10px 15px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        color: var(--text);
+        background: var(--card);
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: 650;
+    }
+
+    .request-back:hover {
+        background: var(--soft);
+        color: var(--green-dark);
+    }
+
+    .request-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.5fr) minmax(270px, .75fr);
+        gap: 22px;
+        align-items: start;
+    }
+
+    .request-card {
+        min-width: 0;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 17px;
+        overflow: hidden;
+        box-shadow: 0 6px 22px #173d2710;
+    }
+
+    .request-card-heading {
+        padding: 22px 24px;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .request-card-heading h2 {
+        margin: 0 0 7px;
+        font-size: 17px;
+        font-weight: 750;
+        color: var(--text);
+    }
+
+    .request-card-heading p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.6;
+    }
+
+    .request-form {
+        padding: 24px;
+    }
+
+    .request-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 19px;
+    }
+
+    .request-field {
+        min-width: 0;
+    }
+
+    .request-full {
+        grid-column: 1 / -1;
+    }
+
+    .request-field label {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 13px;
+        font-weight: 700;
+    }
+
+    .request-required {
+        color: var(--bad-ink);
+    }
+
+    .request-field input,
+    .request-field select,
+    .request-field textarea {
+        display: block;
+        width: 100%;
+        min-height: 45px;
+        padding: 11px 13px;
+        border: 1px solid var(--field-line);
+        border-radius: 10px;
+        background: var(--card);
+        color: var(--text);
+        font: inherit;
+        font-size: 13px;
+        outline: none;
+        transition: border-color .2s, box-shadow .2s;
+    }
+
+    .request-field textarea {
+        min-height: 125px;
+        line-height: 1.6;
+        resize: vertical;
+    }
+
+    .request-field input:focus,
+    .request-field select:focus,
+    .request-field textarea:focus {
+        border-color: var(--green);
+        box-shadow: 0 0 0 3px #24765319;
+    }
+
+    .request-help {
+        margin-top: 7px;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.6;
+    }
+
+    .request-notice {
+        display: flex;
+        gap: 11px;
+        align-items: flex-start;
+        padding: 14px;
+        margin-top: 21px;
+        border: 1px solid var(--notice-line);
+        border-radius: 11px;
+        background: var(--soft);
+        font-size: 12px;
+        line-height: 1.7;
+        color: var(--notice-ink);
+    }
+
+    .request-notice-icon {
+        font-size: 18px;
+        flex-shrink: 0;
+    }
+
+    .request-actions {
+        display: flex;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+        gap: 10px;
+        padding-top: 22px;
+        margin-top: 23px;
+        border-top: 1px solid var(--border);
+    }
+
+    .request-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 44px;
+        padding: 11px 17px;
+        border: 1px solid transparent;
+        border-radius: 10px;
+        font-size: 13px;
+        font-weight: 700;
+        text-decoration: none;
+        cursor: pointer;
+        transition: background .2s, transform .2s;
+    }
+
+    .request-btn:hover {
+        transform: translateY(-1px);
+    }
+
+    .request-btn-primary {
+        background: var(--green);
+        color: #fff;
+    }
+
+    .request-btn-primary:hover {
+        background: var(--green-dark);
+        color: #fff;
+    }
+
+    .request-btn-secondary {
+        background: var(--card);
+        border-color: var(--border);
+        color: var(--text);
+    }
+
+    .request-btn-secondary:hover {
+        background: var(--soft);
+    }
+
+    .request-preview {
+        padding: 22px;
+        background: linear-gradient(145deg, var(--soft), var(--card));
+    }
+
+    .request-preview-label {
+        margin-bottom: 16px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .request-preview-icon {
+        display: grid;
+        place-items: center;
+        width: 52px;
+        height: 52px;
+        margin-bottom: 18px;
+        border-radius: 15px;
+        background: var(--green-soft);
+        color: var(--green);
+        font-size: 24px;
+    }
+
+    .request-preview-title {
+        overflow-wrap: anywhere;
+        font-size: 19px;
+        font-weight: 750;
+        line-height: 1.45;
+    }
+
+    .request-preview-department {
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 13px;
+    }
+
+    .request-divider {
+        margin: 21px 0;
+        border: 0;
+        border-top: 1px solid var(--border);
+    }
+
+    .request-amount-label {
+        color: var(--muted);
+        font-size: 12px;
+        margin-bottom: 8px;
+    }
+
+    .request-amount {
+        overflow-wrap: anywhere;
+        color: var(--green-dark);
+        font-size: clamp(24px, 3vw, 31px);
+        font-weight: 800;
+    }
+
+    .request-currency {
+        color: var(--muted);
+        font-size: 12px;
+        margin-top: 6px;
+    }
+
+    .request-status {
+        display: inline-flex;
+        padding: 6px 11px;
+        margin-top: 17px;
+        border-radius: 20px;
+        background: var(--warn-bg);
+        color: var(--warn-ink);
+        font-size: 11px;
+        font-weight: 750;
+    }
+
+    .request-preview-note {
+        margin-top: 17px;
+        padding: 15px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--card);
+        font-size: 12px;
+        color: var(--muted);
+        line-height: 1.7;
+    }
+
+    .request-flash {
+        margin-bottom: 15px;
+        padding: 12px 15px;
+        border-radius: 10px;
+        background: var(--flash-bg);
+        color: var(--flash-ink);
+        font-size: 13px;
+    }
+
+    .request-flash.error,
+    .request-flash.danger {
+        background: var(--bad-bg);
+        color: var(--bad-ink);
+    }
+
+    @media (max-width: 850px) {
+        .request-layout {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 560px) {
+        .request-page {
+            padding: 15px 10px;
+        }
+
+        .request-form {
+            padding: 18px;
+        }
+
+        .request-card-heading {
+            padding: 18px;
+        }
+
+        .request-grid {
+            grid-template-columns: 1fr;
+            gap: 16px;
+        }
+
+        .request-full {
+            grid-column: auto;
+        }
+
+        .request-actions {
+            flex-direction: column-reverse;
+        }
+
+        .request-actions .request-btn {
+            width: 100%;
+        }
+    }
+
+    /* Dark theme: swap this page's palette for the shared slate surfaces. */
+    [data-theme="dark"] .request-page {
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+        --border: #263449;
+        --card: var(--white);
+        --soft: var(--table-hover-bg);
+        --field-line: var(--line-strong);
+        --warn-bg: var(--warning-bg);
+        --warn-ink: var(--warning-ink);
+        --bad-bg: var(--danger-bg);
+        --bad-ink: var(--danger-ink);
+        --flash-bg: var(--success-bg);
+        --flash-ink: var(--success-ink);
+        --notice-ink: #9fe0bd;
+        --notice-line: #2f5e34;
+        --green-soft: #16233c;
+        color-scheme: dark;
+    }
+
+</style>
+
+<div class="request-page">
+
+    <header class="request-header">
+        <div>
+            <h1>Submit Budget Request</h1>
+            <p>Request funding for departmental operations, materials, or projects.</p>
+        </div>
+
+        <a class="request-back" href="{{ url_for('dashboard') }}">
+            ← Back to Dashboard
+        </a>
+    </header>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="request-flash {{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="request-layout">
+
+        <section class="request-card">
+            <div class="request-card-heading">
+                <h2>Request Information</h2>
+                <p>Provide accurate details so the appropriate manager can review your request.</p>
+            </div>
+
+            <form
+                class="request-form"
+                method="POST"
+                action="{{ url_for('budget.create_request') }}"
+                id="budgetRequestForm"
+            >
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <div class="request-grid">
+
+                    <div class="request-field request-full">
+                        <label for="request_title">
+                            Request Title <span class="request-required">*</span>
+                        </label>
+                        <input
+                            id="request_title"
+                            name="request_title"
+                            type="text"
+                            maxlength="180"
+                            placeholder="e.g. Office furniture procurement"
+                            required
+                        >
+                    </div>
+
+                    <div class="request-field">
+                        <label for="department">
+                            Department <span class="request-required">*</span>
+                        </label>
+                        <select id="department" name="department" required>
+                            <option value="">Select the department</option>
+                            {% for department in departments %}
+                                <option value="{{ department }}"
+                                    {% if department == default_department %}selected{% endif %}>
+                                    {{ department }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <div class="request-help">
+                            Department choices come from User Management.
+                        </div>
+                    </div>
+
+                    <div class="request-field">
+                        <label for="plan_id">Related Budget Plan</label>
+                        <select id="plan_id" name="plan_id">
+                            <option value="">Select a plan (optional)</option>
+                            {% for plan in plans %}
+                                <option value="{{ plan.id }}">
+                                    {{ plan.plan_name }} — {{ plan.fiscal_year }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <div class="request-help">
+                            Select the relevant plan if one already exists.
+                        </div>
+                    </div>
+
+                    <div class="request-field">
+                        <label for="requested_amount">
+                            Requested Amount <span class="request-required">*</span>
+                        </label>
+                        <input
+                            id="requested_amount"
+                            name="requested_amount"
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                            placeholder="0.00"
+                            required
+                        >
+                    </div>
+
+                    <div class="request-field">
+                        <label for="currency">
+                            Currency <span class="request-required">*</span>
+                        </label>
+                        <select id="currency" name="currency" required>
+                            <option value="ETB" selected>ETB — Ethiopian Birr</option>
+                            <option value="USD">USD — US Dollar</option>
+                            <option value="EUR">EUR — Euro</option>
+                            <option value="GBP">GBP — British Pound</option>
+                        </select>
+                    </div>
+
+                    <div class="request-field request-full">
+                        <label for="justification">
+                            Business Justification
+                            <span class="request-required">*</span>
+                        </label>
+                        <textarea
+                            id="justification"
+                            name="justification"
+                            minlength="10"
+                            maxlength="3000"
+                            placeholder="Explain why the funds are needed, what they will pay for, the expected benefit, and any relevant deadline..."
+                            required
+                        ></textarea>
+                        <div class="request-help">
+                            Include the business need, expected outcome, and relevant supporting details.
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="request-notice">
+                    <span class="request-notice-icon">ⓘ</span>
+                    <div>
+                        <strong>Approval notice</strong><br>
+                        Submitting a request does not authorize spending.
+                        The request will be marked Pending and must follow your
+                        organization's configured approval workflow.
+                    </div>
+                </div>
+
+                <div class="request-actions">
+                    <a
+                        class="request-btn request-btn-secondary"
+                        href="{{ url_for('dashboard') }}"
+                    >
+                        Cancel
+                    </a>
+
+                    <button
+                        class="request-btn request-btn-primary"
+                        type="submit"
+                        id="submitRequest"
+                    >
+                        Submit for Review →
+                    </button>
+                </div>
+            </form>
+        </section>
+
+        <aside>
+            <section class="request-card">
+                <div class="request-card-heading">
+                    <h2>Live Request Preview</h2>
+                    <p>Review the information before submitting.</p>
+                </div>
+
+                <div class="request-preview">
+                    <div class="request-preview-label">BUDGET REQUEST</div>
+
+                    <div class="request-preview-icon">↗</div>
+
+                    <div class="request-preview-title" id="previewTitle">
+                        Your request title
+                    </div>
+
+                    <div class="request-preview-department">
+                        Department: <strong id="previewDepartment">Not specified</strong>
+                    </div>
+
+                    <hr class="request-divider">
+
+                    <div class="request-amount-label">Requested amount</div>
+
+                    <div class="request-amount" id="previewAmount">0.00</div>
+
+                    <div class="request-currency" id="previewCurrency">
+                        Ethiopian Birr (ETB)
+                    </div>
+
+                    <div class="request-status">● Pending Review</div>
+
+                    <div class="request-preview-note">
+                        <strong>Before submitting</strong>
+                        <p>
+                            Confirm the amount, currency, department, and business
+                            justification. Your authorized reviewers will determine
+                            whether the request can be approved.
+                        </p>
+                    </div>
+                </div>
+            </section>
+        </aside>
+
+    </div>
+</div>
+
+<script>
+(() => {
+    const titleInput = document.getElementById("request_title");
+    const departmentInput = document.getElementById("department");
+    const amountInput = document.getElementById("requested_amount");
+    const currencyInput = document.getElementById("currency");
+
+    const previewTitle = document.getElementById("previewTitle");
+    const previewDepartment = document.getElementById("previewDepartment");
+    const previewAmount = document.getElementById("previewAmount");
+    const previewCurrency = document.getElementById("previewCurrency");
+
+    const currencyNames = {
+        ETB: "Ethiopian Birr (ETB)",
+        USD: "US Dollar (USD)",
+        EUR: "Euro (EUR)",
+        GBP: "British Pound (GBP)"
+    };
+
+    function updatePreview() {
+        previewTitle.textContent =
+            titleInput.value.trim() || "Your request title";
+
+        previewDepartment.textContent =
+            departmentInput.value.trim() || "Not specified";
+
+        const rawAmount = amountInput.value;
+        const amount = Number(rawAmount);
+
+        previewAmount.textContent =
+            rawAmount !== "" && Number.isFinite(amount) && amount >= 0
+                ? amount.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                })
+                : "0.00";
+
+        previewCurrency.textContent =
+            currencyNames[currencyInput.value] || currencyInput.value;
+    }
+
+    [titleInput, departmentInput, amountInput, currencyInput].forEach(field => {
+        field.addEventListener("input", updatePreview);
+        field.addEventListener("change", updatePreview);
+    });
+
+    updatePreview();
+})();
+</script>
+{% endblock %}

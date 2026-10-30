@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit' if item else 'Register' }} Inventory Item | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">INVENTORY MANAGEMENT</span>
+      <h1>{{ 'Edit Inventory Item' if item else 'Register Inventory Item' }}</h1>
+      <p>{{ item["sku"] if item else 'Add a material or finished product to the stock register.' }}</p>
+    </div>
+    <a class="btn btn-outline" href="{{ url_for('inventory.items') }}">Back to items</a>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="dash-panel">
+      <h2>{{ 'Item details' if item else 'New item' }}</h2>
+
+      <form method="POST" class="dash-form stock-grid">
+        {{ csrf_field() }}
+        {% if not item %}
+        <div>
+          <label for="sku">SKU / item code *</label>
+          <input id="sku" name="sku" maxlength="40" required
+                 placeholder="e.g. TIM-OAK-001" />
+        </div>
+        {% endif %}
+
+        <div>
+          <label for="name">Item name *</label>
+          <input id="name" name="name" maxlength="120" required
+                 value="{{ item['name'] if item else '' }}" />
+        </div>
+
+        <div>
+          <label for="category">Category *</label>
+          <select id="category" name="category" required>
+            {% for category in categories %}
+            <option value="{{ category }}"
+              {% if item and item['category'] == category %}selected{% endif %}>{{ category }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label for="unit">Unit *</label>
+          <select id="unit" name="unit" required>
+            {% for unit in units %}
+            <option value="{{ unit }}"
+              {% if item and item['unit'] == unit %}selected{% endif %}>{{ unit }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        {% if not item %}
+        <div>
+          <label for="opening_qty">Opening quantity</label>
+          <input id="opening_qty" type="number" step="0.001" min="0"
+                 name="opening_qty" value="0" />
+        </div>
+        {% endif %}
+
+        <div>
+          <label for="min_stock">Minimum stock level</label>
+          <input id="min_stock" type="number" step="0.001" min="0" name="min_stock"
+                 value="{{ item['min_stock'] if item else 0 }}" />
+        </div>
+
+        <div>
+          <label for="unit_cost">Unit cost (ETB)</label>
+          <input id="unit_cost" type="number" step="0.01" min="0" name="unit_cost"
+                 value="{{ item['unit_cost'] if item else 0 }}" />
+        </div>
+
+        <div>
+          <label for="supplier">Supplier</label>
+          <input id="supplier" name="supplier" maxlength="120"
+                 value="{{ (item['supplier'] or '') if item else '' }}" />
+        </div>
+
+        <div>
+          <label for="location">Warehouse / storage location</label>
+          <input id="location" name="location" maxlength="120"
+                 placeholder="e.g. Main Warehouse, Rack A1"
+                 value="{{ (item['location'] or '') if item else '' }}" />
+        </div>
+
+        <div class="stock-form-actions">
+          <button class="btn" type="submit">Save item</button>
+          <a class="btn btn-outline" href="{{ url_for('inventory.items') }}">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+{% endblock %}

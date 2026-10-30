@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Requisition ' ~ item.request_number if item else 'New requisition' }} | Dereje Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Purchasing</span>
+      <h1>{{ 'Revise requisition ' ~ item.request_number if item else 'New purchase requisition' }}</h1>
+      <p>Add every material the job needs with its quantity and estimated price. The
+        total decides who signs it.</p>
+    </div>
+    <nav class="stock-actions" aria-label="Requisition actions">
+      <a class="btn btn-outline btn-sm" href="{{ url_for('procurement.requisitions') }}">My requisitions</a>
+    </nav>
+  </div>
+</section>
+
+<section class="container finance-page">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="finance-alert {{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  {% if item %}
+  <div class="finance-alert info">
+    This requisition is a {{ item.status }}. Saving it as a draft keeps it private to
+    you; submitting it starts or restarts its approval chain.
+  </div>
+  {% endif %}
+
+  <div class="finance-panel">
+    <h2>Requisition details</h2>
+    <form method="post" class="finance-form"
+          action="{{ url_for('procurement.requisition_edit', request_id=item.id) if item
+                         else url_for('procurement.requisition_new') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div class="finance-grid">
+        <div>
+          <label for="req-department">Department *</label>
+          <select id="req-department" name="department" required>
+            {% for value in requisition_departments %}
+            <option value="{{ value }}" {% if value == values.department %}selected{% endif %}>
+              {{ value | title }}</option>
+            {% endfor %}
+          </select>
+          <small>Routed to the approvers who answer for this department.</small>
+        </div>
+
+        <div>
+          <label for="req-supplier">Supplier (optional)</label>
+          <select id="req-supplier" name="supplier_id">
+            <option value="">Not chosen yet</option>
+            {% for row in suppliers %}
+            <option value="{{ row.id }}" {% if row.id == values.supplier_id %}selected{% endif %}>
+              {{ row.name }}</option>
+            {% endfor %}
+          </select>
+          <small>Procurement confirms the supplier before the order is issued.</small>
+        </div>
+
+        <div class="full">
+          <label for="req-allocation">Budget allocation</label>
+          <select id="req-allocation" name="budget_allocation_id">
+            <option value="">No allocation selected</option>
+            {% for allocation in budget_allocations %}
+            <option value="{{ allocation.id }}"
+                    data-department="{{ allocation.department }}"
+                    {% if allocation.id|string == values.budget_allocation_id|string %}selected{% endif %}>
+              {{ allocation.department }} — {{ allocation.allocation_name }}
+              ({{ allocation.currency }} {{ "{:,.2f}".format(allocation.available_amount|float) }} available)
+            </option>
+            {% endfor %}
+          </select>
+          <small>
+            {% if budget_required %}
+            This department has a live allocation, so choosing one is required.
+            The amount is reserved when the requisition is submitted.
+            {% else %}
+            No live allocation matches yet; the request can still be routed for approval.
+            {% endif %}
+          </small>
+        </div>
+
+        <div class="full">
+          <label for="req-justification">Why is it needed?</label>
+          <textarea id="req-justification" name="justification" rows="3" maxlength="2000"
+                    placeholder="The job it is for, the stock that has run out, the deadline.">{{ values.justification }}</textarea>
+          <small>Required before the requisition can be submitted.</small>
+        </div>
+
+        <div class="full">
+          <label for="req-notes">Notes for procurement</label>
+          <textarea id="req-notes" name="notes" rows="2" maxlength="600">{{ values.notes }}</textarea>
+        </div>
+      </div>
+
+      <h2>Item lines</h2>
+      <div class="hr-table-wrap table-scroll">
+        <table class="req-lines-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Material or item</th>
+              <th>Quantity</th>
+              <th>Unit</th>
+              <th>Unit price (ETB)</th>
+              <th>Line total (ETB)</th>
+              <th><span class="feed-meta">Remove</span></th>
+            </tr>
+          </thead>
+          <tbody id="req-lines-body">
+            {% for line in lines %}
+            <tr class="req-line">
+              <td class="req-line-number nowrap">{{ loop.index }}</td>
+              <td class="req-line-name"><input type="text" name="line_name[]"
+                    value="{{ line.item_name }}" maxlength="150"
+                    aria-label="Item name" placeholder="e.g. Birch plywood 18mm"></td>
+              <td><input type="number" name="line_quantity[]" value="{{ line.quantity }}"
+                    min="0.01" step="0.01" aria-label="Quantity"></td>
+              <td><select name="line_unit[]" aria-label="Unit">
+                    {% for unit in purchase_units %}
+                    <option value="{{ unit }}" {% if unit == line.unit %}selected{% endif %}>{{ unit }}</option>
+                    {% endfor %}
+                  </select></td>
+              <td><input type="number" name="line_price[]" value="{{ line.unit_price }}"
+                    min="0" step="0.01" aria-label="Unit price in birr"></td>
+              <td class="req-line-total nowrap">{{ "{:,.2f}".format(line.line_total | float) }}</td>
+              <td><button type="button" class="finance-btn secondary req-remove"
+                    aria-label="Remove this line">Remove</button></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th colspan="5">Requisition total</th>
+              <td class="req-total nowrap" id="req-total">{{ "{:,.2f}".format(total | float) }}</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <div class="finance-form-actions">
+        <button type="button" class="finance-btn secondary" id="req-add-line">Add another line</button>
+        <button type="submit" name="action" value="draft" class="finance-btn secondary">Save draft</button>
+        <button type="submit" name="action" value="submit" class="finance-btn primary">Submit for approval</button>
+      </div>
+
+      <p class="panel-note" id="req-band"
+         data-manager="{{ pr_manager_limit }}" data-director="{{ pr_director_limit }}"
+         data-mode="{{ pr_route_mode }}">
+        {% if pr_route_mode == 'sequential' %}
+        Every requisition here is signed by a Manager, then a Director, then the CEO,
+        whatever its value.
+        {% else %}
+        Below ETB {{ "{:,.0f}".format(pr_manager_limit | float) }} a Manager signs; from there
+        up to ETB {{ "{:,.0f}".format(pr_director_limit | float) }} inclusive a Manager and
+        then a Director; above that the CEO.
+        {% endif %}
+      </p>
+    </form>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<template id="req-line-row">
+  <tr class="req-line">
+    <td class="req-line-number nowrap">1</td>
+    <td class="req-line-name"><input type="text" name="line_name[]" value="" maxlength="150"
+          aria-label="Item name" placeholder="e.g. Birch plywood 18mm"></td>
+    <td><input type="number" name="line_quantity[]" value="" min="0.01" step="0.01"
+          aria-label="Quantity"></td>
+    <td><select name="line_unit[]" aria-label="Unit">
+          {% for unit in purchase_units %}<option value="{{ unit }}">{{ unit }}</option>{% endfor %}
+        </select></td>
+    <td><input type="number" name="line_price[]" value="" min="0" step="0.01"
+          aria-label="Unit price in birr"></td>
+    <td class="req-line-total nowrap">0.00</td>
+    <td><button type="button" class="finance-btn secondary req-remove"
+          aria-label="Remove this line">Remove</button></td>
+  </tr>
+</template>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    var body = document.getElementById('req-lines-body');
+    if (!body) return;
+    var tpl = document.getElementById('req-line-row');
+    var totalEl = document.getElementById('req-total');
+    var band = document.getElementById('req-band');
+    var manager = parseFloat(band.dataset.manager) || 0;
+    var director = parseFloat(band.dataset.director) || 0;
+    var sequential = band.dataset.mode === 'sequential';
+    var baseText = band.textContent.replace(/\s+/g, ' ').trim();
+
+    function rows() {
+      return Array.prototype.slice.call(body.querySelectorAll('.req-line'));
+    }
+
+    function number(value) {
+      var p = (String(value).split('.')[1] || '').length;
+      return p > 2 ? Number(value).toFixed(2) : String(value);
+    }
+
+    function refresh() {
+      var total = 0;
+      rows().forEach(function (row, index) {
+        var name = row.querySelector('[name="line_name[]"]').value.trim();
+        var quantity = parseFloat(row.querySelector('[name="line_quantity[]"]').value);
+        var price = parseFloat(row.querySelector('[name="line_price[]"]').value);
+        var line = 0;
+        if (name && quantity > 0 && price >= 0) {
+          line = Math.round(quantity * price * 100) / 100;
+        }
+        row.querySelector('.req-line-total').textContent = line.toLocaleString(
+          undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        row.querySelector('.req-line-number').textContent = index + 1;
+        total += line;
+      });
+      totalEl.textContent = total.toLocaleString(undefined, {
+        minimumFractionDigits: 2, maximumFractionDigits: 2});
+      if (sequential) return;
+      band.textContent = (total > director
+        ? 'At this total the CEO signs it.'
+        : (total >= manager
+          ? 'At this total a Manager signs it, then a Director does.'
+          : 'At this total a Manager signs it.')) + ' ' + baseText;
+    }
+
+    document.getElementById('req-add-line').addEventListener('click', function () {
+      body.appendChild(tpl.content.firstElementChild.cloneNode(true));
+      refresh();
+    });
+
+    body.addEventListener('input', refresh);
+    body.addEventListener('click', function (event) {
+      var button = event.target.closest('.req-remove');
+      if (!button) return;
+      if (rows().length > 1) button.closest('.req-line').remove();
+      else rows()[0].querySelectorAll('input').forEach(function (input) { input.value = ''; });
+      refresh();
+    });
+
+    refresh();
+  });
+</script>
+{% endblock %}

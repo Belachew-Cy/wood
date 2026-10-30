@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block title %}Letter {{ letter['reference_no'] }} | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+<section class="dash-head no-print">
+  <div class="container">
+    <div>
+      <span class="eyebrow">CORRESPONDENCE</span>
+      <h1>Letter {{ letter['reference_no'] }}</h1>
+      <p>{{ letter_type_label(letter['letter_type']) }}{% if letter['letter_kind'] %} · {{ letter_kind_label(letter['letter_type'], letter['letter_kind']) }}{% endif %} · {{ letter['status'] }} · {{ letter['letter_date'] | friendly_date }}</p>
+    </div>
+    <nav class="letter-actions">
+      <a class="btn btn-outline" href="{{ url_for('letters.dashboard') }}">Back to letters</a>
+      <a class="btn btn-outline" href="{{ url_for('letters.inbox') }}">Inbox</a>
+      {% if can_print %}
+      <a class="btn" href="{{ url_for('letters.print_letter', letter_id=letter['id']) }}">Print letter</a>
+      {% endif %}
+      {% if can_download %}
+      <a class="btn btn-outline" href="{{ url_for('letters.download', letter_id=letter['id']) }}">Download PDF</a>
+      {% endif %}
+    </nav>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    <article class="letter-sheet">
+      <header class="letter-sheet-head">
+        <div class="letter-sheet-brand">
+          <strong>Dereje Belay</strong>
+          <span>Wood &amp; Kitchen Cabinet Finishing</span>
+        </div>
+        <dl class="letter-sheet-ref">
+          <div><dt>Reference</dt><dd>{{ letter['reference_no'] }}</dd></div>
+          <div><dt>Date</dt><dd>{{ letter['letter_date'] | friendly_date }}</dd></div>
+        </dl>
+      </header>
+
+      <dl class="letter-meta">
+        <div><dt>From</dt><dd>{{ letter['sender'] or '—' }}</dd></div>
+        <div><dt>To</dt><dd>{{ letter['recipient'] or '—' }}</dd></div>
+        <div><dt>Category</dt><dd>{{ letter_type_label(letter['letter_type']) }}</dd></div>
+        {% if letter['letter_kind'] %}
+        <div><dt>Subject type</dt><dd>{{ letter_kind_label(letter['letter_type'], letter['letter_kind']) }}</dd></div>
+        {% endif %}
+        <div><dt>Status</dt><dd>{{ letter['status'] }}</dd></div>
+        <div><dt>Created by</dt><dd>{{ creator['full_name'] if creator else '—' }}</dd></div>
+        <div><dt>Last modified</dt><dd>{{ letter['updated_by_name'] or '—' }}{% if letter['updated_at'] %} · {{ letter['updated_at'] | audit_time }}{% endif %}</dd></div>
+        {% if letter['approved_at'] %}
+        <div><dt>Approved</dt><dd>{{ approver['full_name'] if approver else '—' }} · {{ letter['approved_at'] | audit_time }}</dd></div>
+        {% endif %}
+        {% if letter['sent_at'] %}
+        <div class="letter-meta-wide"><dt>Sent</dt><dd>{{ letter['sent_at'] | audit_time }}</dd></div>
+        {% endif %}
+        <div class="letter-meta-wide"><dt>Subject</dt><dd>{{ letter['subject'] }}</dd></div>
+      </dl>
+
+      <div class="letter-body">{{ letter['body'] or 'No letter body has been entered.' }}</div>
+
+      <footer class="letter-sign">
+        <p>Authorized signature: ________________________</p>
+        <p>Date: ________________________</p>
+      </footer>
+    </article>
+
+    {% if letter_ladder %}
+    <section class="letter-route no-print">
+      <h2>Approval route</h2>
+      <p>
+        {{ letter_approval_level_label }}. The author files the letter, each
+        level signs in turn, and the letter is released once the last level on
+        this route has signed.
+      </p>
+      <ol class="letter-route-steps">
+        <li class="letter-route-step is-author">
+          <span class="letter-route-level">Author · Employee</span>
+          <strong>{{ letter['sender'] or '—' }}</strong>
+          <em>{{ 'Submitted for approval' if letter['status'] != 'Draft' else 'Draft' }}</em>
+        </li>
+        {% for step in letter_route %}
+        <li class="letter-route-step is-{{ step.status_key }}{% if step.current %} is-current{% endif %}">
+          <span class="letter-route-level">{{ step.label }}</span>
+          <strong>{{ step.status_label }}</strong>
+          <em>
+            {% if step.actor_name %}{{ step.actor_name }}{% if step.decided_at %} · {{ step.decided_at | audit_time }}{% endif %}
+            {% elif step.current %}Waiting for a signature{% if step.holder_names %} · {{ step.holder_names }}{% endif %}
+            {% elif step.holder_names %}Signs at this level: {{ step.holder_names }}
+            {% else %}—{% endif %}
+          </em>
+          {% if step.comments %}<em class="letter-route-comment">{{ step.comments }}</em>{% endif %}
+        </li>
+        {% endfor %}
+      </ol>
+
+      {% if can_sign_here %}
+      <div class="letter-route-sign">
+        <form method="POST" action="{{ url_for('letters.sign', letter_id=letter['id']) }}"
+              onsubmit="return confirm('Sign this letter at the {{ letter_step_labels[current_step] }} level?');">
+          {{ csrf_field() }}
+          <label for="sign-comments">Comment (optional)</label>
+          <input id="sign-comments" name="comments" maxlength="1000"
+                 placeholder="Anything the next level or the author should know" />
+          <button class="btn" type="submit">Sign at this level</button>
+        </form>
+        <form method="POST" action="{{ url_for('letters.return_letter', letter_id=letter['id']) }}">
+          {{ csrf_field() }}
+          <label for="return-comments">Reason for returning *</label>
+          <input id="return-comments" name="comments" maxlength="1000" required
+                 placeholder="Tell the author what to change" />
+          <button class="btn-danger" type="submit">Return to author</button>
+        </form>
+      </div>
+      {% endif %}
+    </section>
+    {% endif %}
+
+    {% if deliveries %}
+    <p class="panel-note no-print letter-delivery-note">
+      Inbox deliveries:
+      {% for delivery in deliveries %}
+      {{ delivery['department_name'] or delivery['full_name'] or '—' }}{% if not loop.last %}, {% endif %}
+      {% endfor %}
+    </p>
+    {% endif %}
+
+    {% if letter['letter_type'] in ('legal', 'confidential') and letter['status'] == 'Draft' %}
+    <p class="panel-note no-print letter-delivery-note">
+      {{ letter_type_label(letter['letter_type']) }} mail is released only after an
+      approver signs it off.
+    </p>
+    {% endif %}
+
+    <div class="letter-actions no-print letter-actions-foot">
+      {% if can_edit_here %}
+      <a class="btn btn-outline" href="{{ url_for('letters.edit', letter_id=letter['id']) }}">Edit letter</a>
+      {% endif %}
+
+      {% if can_submit_here %}
+      <form method="POST" action="{{ url_for('letters.submit', letter_id=letter['id']) }}"
+            onsubmit="return confirm('Send this letter to the Manager for the first signature?');">
+        {{ csrf_field() }}
+        <button class="btn" type="submit">Submit for approval</button>
+      </form>
+      {% endif %}
+
+      {% if can_approve_here %}
+      <form method="POST" action="{{ url_for('letters.approve', letter_id=letter['id']) }}"
+            onsubmit="return confirm('Approve this letter for release?');">
+        {{ csrf_field() }}
+        <button class="btn" type="submit">Approve letter</button>
+      </form>
+      {% endif %}
+
+      {% if can_send_here %}
+      <form method="POST" action="{{ url_for('letters.send', letter_id=letter['id']) }}"
+            {% if not letter_external %}onsubmit="return confirm('Send this letter and deliver it to the recipient inbox?');"{% endif %}>
+        {{ csrf_field() }}
+        <button class="btn" type="submit">
+          {{ 'Mark as sent' if letter_external else 'Send letter' }}
+        </button>
+      </form>
+      {% endif %}
+
+      {% if can_delete %}
+      <form method="POST" action="{{ url_for('letters.delete', letter_id=letter['id']) }}"
+            onsubmit="return confirm('Delete letter {{ letter['reference_no'] }}? The audit trail keeps a record of the deletion.');">
+        {{ csrf_field() }}
+        <button class="btn-danger" type="submit">Delete letter</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,544 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi, org_structure with context %}
+
+{% block title %}Organization &amp; Hierarchy | Dereje Belay Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+{% set unassigned = employees | rejectattr('department') | list %}
+{% set name_by_id = {} %}
+{% for person in directory %}
+  {% set _ = name_by_id.update({person.id: person.full_name}) %}
+{% endfor %}
+
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Human Resources</span>
+      <h1>Organization &amp; Hierarchy</h1>
+      <p>Departments, positions and reporting lines behind approvals, payroll and the
+        company structure.</p>
+    </div>
+    <nav class="stock-actions" aria-label="Hierarchy actions">
+      <a class="btn btn-outline btn-sm" href="{{ url_for('hr_dashboard') }}">Back to HR</a>
+      <a class="btn btn-outline btn-sm" href="{{ url_for('employees') }}">Employee directory</a>
+      <a class="btn btn-outline btn-sm" href="{{ url_for('organization') }}">Organization page</a>
+    </nav>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    <nav class="hr-navigation" aria-label="HR Management">
+      <a class="hr-nav-link" href="{{ url_for('hr_dashboard') }}">Dashboard</a>
+      <a class="hr-nav-link" href="{{ url_for('employees') }}">Employees Managment</a>
+      <a class="hr-nav-link" href="{{ url_for('attendance') }}">Attendance</a>
+      <a class="hr-nav-link" href="{{ url_for('leave_management') }}">Leave</a>
+      <a class="hr-nav-link" href="{{ url_for('training_performance') }}">Training &amp; Performance</a>
+      <a class="hr-nav-link active" href="{{ url_for('manage_hierarchy') }}">Organization</a>
+      <a class="hr-nav-link" href="{{ url_for('reports_centre') }}">Reports</a>
+      <a class="hr-nav-link" href="{{ url_for('hr_settings.index') }}">HR Settings</a>
+    </nav>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="hr-stats">
+      {{ kpi('Active staff', employees | length, 'Listed in the hierarchy') }}
+      {{ kpi('Departments', departments | length, 'Named teams') }}
+      {{ kpi('Positions', positions | length, 'Titles on record') }}
+      {{ kpi('Unassigned', unassigned | length,
+             'Staff without a department', 'warn' if unassigned else 'flat') }}
+    </div>
+
+    <div class="org-panel org-map-panel">
+      <div class="panel-head">
+        <div>
+          <h2>Leadership structure</h2>
+          <p class="cell-note">The same chart published on the Organization page,
+            built from the departments, positions and managers below.</p>
+        </div>
+        <a class="btn btn-outline-dark btn-sm" href="{{ url_for('organization') }}">
+          Full organization page
+        </a>
+      </div>
+      {{ org_structure(org.org_leadership_tiers, footer=False, show_usernames=True) }}
+    </div>
+
+    <div class="dash-panel hr-table-panel" id="accounts">
+      <h2>Account assignments</h2>
+      <p class="perm-note">Place a sign-in account in a department and give it an
+        organizational position. The assignment is published on the Organization page
+        and decides which approval desks the account answers.</p>
+
+      {% if accounts %}
+      <form method="POST" class="dash-form">
+        {{ csrf_field() }}
+        <input type="hidden" name="action" value="assign_account" />
+
+        <div class="account-grid">
+          <div>
+            <label for="assign_account">Account *</label>
+            <select id="assign_account" name="user_id" required>
+              <option value="">Select account</option>
+              {% for account in accounts %}
+              <option value="{{ account.id }}"
+                      data-department="{{ account.department_id or '' }}"
+                      data-position="{{ account.position_id or '' }}">
+                {{ account.full_name }}{% if account.department_name %} — {{ account.department_name }}{% endif %}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label for="account_department">Department</label>
+            <select id="account_department" name="department_id">
+              <option value="">No department</option>
+              {% for department in departments %}
+              <option value="{{ department.id }}">{{ department.name }}{% if not department.is_active %} — inactive{% endif %}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label for="account_position">Position</label>
+            <select id="account_position" name="position_id">
+              <option value="">No position</option>
+              {% for position in positions %}
+              <option value="{{ position.id }}"
+                      data-department="{{ position.department_id or '' }}">
+                {{ position.title }}{% if position.department_name %} ({{ position.department_name }}){% endif %}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <p class="perm-note">{{ unassigned_accounts | length }} account{{ '' if unassigned_accounts | length == 1 else 's' }}
+          without a department. A linked employee record follows the department and
+          position saved here.</p>
+
+        <div class="finance-form-actions">
+          <button type="submit" class="btn">Save assignment <span class="arrow">→</span></button>
+        </div>
+      </form>
+
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Account</th>
+              <th>Role</th>
+              <th>Department</th>
+              <th>Position</th>
+              <th>Employee record</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for account in accounts %}
+            <tr>
+              <td><strong>{{ account.full_name }}</strong>{% if account.username %}<span class="cell-sub">{{ account.username }}</span>{% endif %}</td>
+              <td>{{ role_names.get(account.role, account.role) }}</td>
+              <td>{{ account.department_name or '—' }}</td>
+              <td>
+                {% if account.position_title %}
+                  {{ account.position_title }}
+                  <span class="cell-sub">{{ position_level_label.get(account.position_level, account.position_level) }}</span>
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+              <td>{{ 'Linked' if account.employee_id else 'No employee row' }}</td>
+              <td>
+                <span class="status-badge {{ 'active' if account.status == 'Active' else 'neutral' }}">{{ account.status }}</span>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="perm-note">Positions are the organization-wide ranks: CEO, Executive,
+        Director, Manager and Staff. A department's leadership seat is chosen when the
+        department is created.</p>
+      {% else %}
+      <p class="empty-state">No sign-in accounts yet.</p>
+      {% endif %}
+    </div>
+
+    <div class="dash-grid">
+      <div class="dash-panel" id="department-form">
+        {% if edit_department %}
+        <h2>Edit department</h2>
+        <p class="perm-note">Renaming updates every employee currently placed in this
+          department.</p>
+
+        <form method="POST" class="dash-form">
+          {{ csrf_field() }}
+          <input type="hidden" name="action" value="edit_department" />
+          <input type="hidden" name="department_id" value="{{ edit_department.id }}" />
+
+          <div class="account-grid">
+            <div>
+              <label for="department_name">Department name *</label>
+              <input id="department_name" type="text" name="department_name"
+                     maxlength="120" required value="{{ edit_department.name }}" />
+            </div>
+            <div>
+              <label for="department_position">Leadership position *</label>
+              <select id="department_position" name="leadership_position" required>
+                {% set current_position = edit_department.leadership_position or 'Director' %}
+                {% for position in ['Executive', 'Director', 'Manager'] %}
+                <option value="{{ position }}"{% if current_position == position %} selected{% endif %}>{{ position }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label for="department_description">Description</label>
+              <input id="department_description" type="text" name="description"
+                     maxlength="300" value="{{ edit_department.description or '' }}" />
+            </div>
+          </div>
+
+          <div class="finance-form-actions">
+            <button type="submit" class="btn">Save changes <span class="arrow">→</span></button>
+            <a class="btn btn-outline btn-sm" href="{{ url_for('manage_hierarchy') }}#departments">Cancel</a>
+          </div>
+        </form>
+        {% else %}
+        <h2>Add a department</h2>
+        <p class="perm-note">Departments drive the approval route, headcount charts and
+          HR reports.</p>
+
+        <form method="POST" class="dash-form">
+          {{ csrf_field() }}
+          <input type="hidden" name="action" value="add_department" />
+
+          <div class="account-grid">
+            <div>
+              <label for="department_name">Department name *</label>
+              <input id="department_name" type="text" name="department_name"
+                     maxlength="120" required placeholder="e.g. Production" />
+            </div>
+            <div>
+              <label for="department_position">Leadership position *</label>
+              <select id="department_position" name="leadership_position" required>
+                <option value="" selected disabled>Select a position</option>
+                <option value="Executive">Executive</option>
+                <option value="Director">Director</option>
+                <option value="Manager">Manager</option>
+              </select>
+            </div>
+            <div>
+              <label for="department_description">Description</label>
+              <input id="department_description" type="text" name="description"
+                     maxlength="300" placeholder="What this team does" />
+            </div>
+          </div>
+
+          <div class="finance-form-actions">
+            <button type="submit" class="btn">Add department <span class="arrow">→</span></button>
+          </div>
+        </form>
+        {% endif %}
+      </div>
+
+      <div class="dash-panel">
+        <h2>Add a position</h2>
+        <p class="perm-note">Assigning a position updates the employee&rsquo;s job title and
+          department.</p>
+
+        <form method="POST" class="dash-form">
+          {{ csrf_field() }}
+          <input type="hidden" name="action" value="add_position" />
+
+          <div class="account-grid">
+            <div>
+              <label for="position_title">Position title *</label>
+              <input id="position_title" type="text" name="position_title"
+                     maxlength="120" required placeholder="e.g. Site Supervisor" />
+            </div>
+            <div>
+              <label for="position_department_id">Department</label>
+              <select id="position_department_id" name="position_department_id">
+                <option value="">No department</option>
+                {% for department in departments %}
+                <option value="{{ department.id }}">{{ department.name }}{% if not department.is_active %} — inactive{% endif %}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label for="level">Level</label>
+              <select id="level" name="level">
+                <option value="0">0 &mdash; CEO (company-wide)</option>
+                <option value="1">1 &mdash; Executive (under CEO)</option>
+                <option value="2">2 &mdash; Director (under Executive)</option>
+                <option value="3">3 &mdash; Manager (under Director)</option>
+                <option value="4" selected>4 &mdash; Staff</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="finance-form-actions">
+            <button type="submit" class="btn">Add position <span class="arrow">→</span></button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="dash-panel hr-table-panel" id="departments">
+      <h2>Departments</h2>
+
+      {% if departments %}
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Department</th>
+              <th>Leadership</th>
+              <th>Description</th>
+              <th>Positions</th>
+              <th>Active staff</th>
+              <th>Accounts</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for department in departments %}
+            <tr>
+              <td><strong>{{ department.name }}</strong></td>
+              <td>{{ department.leadership_position or 'Director' }}</td>
+              <td>{{ department.description or '—' }}</td>
+              <td>{{ positions | selectattr('department_id', 'equalto', department.id) | list | length }}</td>
+              <td>{{ employees | selectattr('department', 'equalto', department.name) | list | length }}</td>
+              <td>{{ accounts | selectattr('department_id', 'equalto', department.id) | list | length }}</td>
+              <td>
+                <span class="status-badge {{ 'active' if department.is_active else 'neutral' }}">
+                  {{ 'Active' if department.is_active else 'Inactive' }}
+                </span>
+              </td>
+              <td>
+                <div class="row-actions">
+                  <a class="btn btn-outline btn-sm"
+                     href="{{ url_for('manage_hierarchy', edit_department=department.id) }}#department-form">Edit</a>
+                  {% if 'accounts' in permissions %}
+                  <form method="POST">
+                    {{ csrf_field() }}
+                    <input type="hidden" name="action" value="set_department_status" />
+                    <input type="hidden" name="department_id" value="{{ department.id }}" />
+                    <input type="hidden" name="active" value="{{ 0 if department.is_active else 1 }}" />
+                    <button type="submit" class="btn btn-outline btn-sm">
+                      {{ 'Deactivate' if department.is_active else 'Activate' }}
+                    </button>
+                  </form>
+                  <form method="POST"
+                        onsubmit="return confirm('Remove {{ department.name | e }}? Staff keep their records but lose this department label.');">
+                    {{ csrf_field() }}
+                    <input type="hidden" name="action" value="delete_department" />
+                    <input type="hidden" name="department_id" value="{{ department.id }}" />
+                    <button type="submit" class="btn btn-outline btn-sm">Delete</button>
+                  </form>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="empty-state">No departments yet. Add the first one above.</p>
+      {% endif %}
+    </div>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>Positions</h2>
+
+      {% if positions %}
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Position</th>
+              <th>Department</th>
+              <th>Level</th>
+              <th>Active staff</th>
+              <th>Accounts</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for position in positions %}
+            <tr>
+              <td><strong>{{ position.title }}</strong></td>
+              <td>{{ position.department_name or '—' }}</td>
+              <td>{{ position.level }} &mdash; {{ position_level_label.get(position.level, 'Staff') }}</td>
+              <td>{{ employees | selectattr('position_id', 'equalto', position.id) | list | length }}</td>
+              <td>{{ accounts | selectattr('position_id', 'equalto', position.id) | list | length }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="empty-state">No positions yet. Add titles so staff can be placed on the chart.</p>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="section bg-white">
+  <div class="container">
+    <div class="dash-panel">
+      <h2>Assign an employee</h2>
+      <p class="perm-note">Place a staff member in a department, give them a position and
+        name the supervisor they report to.</p>
+
+      {% if employees %}
+      <form method="POST" class="dash-form">
+        {{ csrf_field() }}
+        <input type="hidden" name="action" value="assign_employee" />
+
+        <div class="account-grid">
+          <div>
+            <label for="assign_employee">Employee *</label>
+            <select id="assign_employee" name="employee_id" required>
+              <option value="">Select employee</option>
+              {% for person in employees %}
+              <option value="{{ person.id }}"
+                      data-department="{{ person.department_id or '' }}"
+                      data-position="{{ person.position_id or '' }}"
+                      data-manager="{{ person.manager_id or '' }}">
+                {{ person.full_name }}{% if person.department %} — {{ person.department }}{% endif %}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label for="assign_department">Department</label>
+            <select id="assign_department" name="department_id">
+              <option value="">No department</option>
+              {% for department in departments %}
+              <option value="{{ department.id }}">{{ department.name }}{% if not department.is_active %} — inactive{% endif %}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label for="assign_position">Position</label>
+            <select id="assign_position" name="position_id">
+              <option value="">No position</option>
+              {% for position in positions %}
+              <option value="{{ position.id }}"
+                      data-department="{{ position.department_id or '' }}">
+                {{ position.title }}{% if position.department_name %} ({{ position.department_name }}){% endif %}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label for="assign_manager">Reports to</label>
+            <select id="assign_manager" name="manager_id">
+              <option value="">No supervisor</option>
+              {% for person in employees %}
+              <option value="{{ person.id }}">{{ person.full_name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <div class="finance-form-actions">
+          <button type="submit" class="btn">Save placement <span class="arrow">→</span></button>
+        </div>
+      </form>
+      {% else %}
+      <p class="empty-state">No active employees yet. Register employees first.</p>
+      {% endif %}
+    </div>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>Reporting lines</h2>
+
+      {% if employees %}
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Employee</th>
+              <th>Username</th>
+              <th>Department</th>
+              <th>Position</th>
+              <th>Reports to</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for person in employees %}
+            <tr>
+              <td><strong>{{ person.full_name }}</strong></td>
+              <td>{{ person.username or '—' }}</td>
+              <td>{{ person.department or '—' }}</td>
+              <td>{{ person.job_title or '—' }}</td>
+              <td>
+                {% if person.manager_id %}
+                  {{ name_by_id.get(person.manager_id, 'Former employee #' ~ person.manager_id) }}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="empty-state">Nothing to show until employees are registered.</p>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    var employee = document.getElementById('assign_employee');
+    var department = document.getElementById('assign_department');
+    var position = document.getElementById('assign_position');
+    var manager = document.getElementById('assign_manager');
+
+    if (employee && department && position && manager) {
+      employee.addEventListener('change', function () {
+        var option = employee.options[employee.selectedIndex];
+        if (!option || !option.value) return;
+        department.value = option.getAttribute('data-department') || '';
+        position.value = option.getAttribute('data-position') || '';
+        manager.value = option.getAttribute('data-manager') || '';
+      });
+
+      position.addEventListener('change', function () {
+        var option = position.options[position.selectedIndex];
+        var dept = option ? option.getAttribute('data-department') : '';
+        if (dept) department.value = dept;
+      });
+    }
+
+    var account = document.getElementById('assign_account');
+    var accountDepartment = document.getElementById('account_department');
+    var accountPosition = document.getElementById('account_position');
+    if (!account || !accountDepartment || !accountPosition) return;
+
+    account.addEventListener('change', function () {
+      var option = account.options[account.selectedIndex];
+      if (!option || !option.value) return;
+      accountDepartment.value = option.getAttribute('data-department') || '';
+      accountPosition.value = option.getAttribute('data-position') || '';
+    });
+
+    accountPosition.addEventListener('change', function () {
+      var option = accountPosition.options[accountPosition.selectedIndex];
+      var dept = option ? option.getAttribute('data-department') : '';
+      if (dept) accountDepartment.value = dept;
+    });
+  })();
+</script>
+{% endblock %}

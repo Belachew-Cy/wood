@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi, bars, feed, dash_icon with context %}
+
+{% block title %}Reports | Dereje Belay Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Reporting</span>
+      <h1>Reports</h1>
+      <p>Every figure is the same query the module itself shows, gathered behind one month
+        filter. Export any section as CSV.</p>
+    </div>
+    <nav class="stock-actions" aria-label="Report exports">
+      <a class="btn btn-outline btn-sm" href="{{ url_for('reports_centre') }}">Reports</a>
+      {% for section in sections %}
+      <a class="btn btn-outline btn-sm"
+         href="{{ url_for('admin_reports', month=month, csv=section) }}">Export {{ section | title }}</a>
+      {% endfor %}
+    </nav>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    <form method="GET" class="report-filter" id="report-filter">
+      <div>
+        <label for="month">Reporting month</label>
+        <select id="month" name="month">
+          {% for key in months | reverse %}
+          <option value="{{ key }}" {% if key == month %}selected{% endif %}>{{ key }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="report-filter-actions">
+        <button type="submit" class="finance-btn">Apply <span class="arrow">→</span></button>
+      </div>
+    </form>
+
+    <div class="hr-stats">
+      {{ kpi('Workforce', summary.workforce, 'Headcount and payroll for ' ~ month) }}
+      {{ kpi('Finance', summary.finance, 'Income less expenses for ' ~ month,
+             'up' if finance.net >= 0 else 'down') }}
+      {{ kpi('Inventory', summary.inventory, 'Active items and their value') }}
+      {{ kpi('Procurement', summary.procurement, 'Orders that are not cancelled') }}
+      {{ kpi('Approvals', summary.approvals, 'Value still awaiting a decision', 'down') }}
+    </div>
+  </div>
+</section>
+
+{% set attendance_items = [] %}
+{% for row in workforce.attendance %}
+  {% set _ = attendance_items.append({
+    'icon': 'calendar', 'tone': 'ok',
+    'title': '{} · {} day(s)'.format(row.status, row.n),
+    'meta': 'Marked in the attendance register',
+    'time': 'Attendance'
+  }) %}
+{% endfor %}
+{% if not attendance_items %}
+  {% set _ = attendance_items.append({
+    'icon': 'calendar', 'tone': '',
+    'title': 'No attendance logged in ' ~ month,
+    'meta': 'The register is filled from the HR module.',
+    'time': 'HR'
+  }) %}
+{% endif %}
+
+<section class="section bg-white">
+  <div class="container">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow">{{ month }}</span>
+        <h2>Workforce</h2>
+      </div>
+      <p>{{ workforce.headcount }} employees on file, {{ workforce.active }} active and
+        {{ workforce.on_leave }} on leave. {{ workforce.payslips }} payslip(s) booked for the
+        month at {{ '%0.2f' | format(workforce.payroll | float) }} ETB.</p>
+    </div>
+
+    <div class="hr-stats">
+      {{ kpi('Headcount', workforce.headcount, 'Employee records') }}
+      {{ kpi('Active', workforce.active, 'Employment status Active', 'up') }}
+      {{ kpi('On leave', workforce.on_leave, 'Employment status On Leave') }}
+      {{ kpi('Payroll (ETB)', '%0.2f' | format(workforce.payroll | float),
+             '{} payslip(s)'.format(workforce.payslips)) }}
+    </div>
+
+    <div class="chart-grid">
+      {{ bars('Headcount by department', workforce.departments, 'All employee records') }}
+      {{ bars('Activity by module', audit, 'Audit trail for ' ~ month) }}
+      {{ feed('Attendance for ' ~ month, attendance_items, 'From the HR register') }}
+    </div>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow">{{ month }}</span>
+        <h2>Finance</h2>
+      </div>
+      <p>{{ '%0.2f' | format(finance.income | float) }} ETB in against
+        {{ '%0.2f' | format(finance.expense | float) }} ETB out.</p>
+    </div>
+
+    <div class="chart-grid">
+      {{ bars('Where the money moved', finance.by_category, 'Top categories for ' ~ month) }}
+    </div>
+
+    <div class="hr-table-panel">
+      <h3 class="panel-title">Invoices issued in {{ month }}</h3>
+      <div class="dash-table-wrap">
+        <table>
+          <thead><tr><th>Invoice</th><th>Party</th><th>Type</th><th>Total (ETB)</th><th>Status</th><th>Due</th></tr></thead>
+          <tbody>
+            {% for row in finance.invoices %}
+            <tr>
+              <td>{{ row.invoice_number }}</td>
+              <td>{{ row.party_name }}</td>
+              <td>{{ row.invoice_type | title }}</td>
+              <td>{{ row.total_etb }}</td>
+              <td><span class="status-badge {{ 'active' if row.status == 'Paid' else 'neutral' }}">{{ row.status }}</span></td>
+              <td>{{ row.due_date or '—' }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" class="cell-note">No invoices issued in this month.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section bg-white">
+  <div class="container">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow">Stock</span>
+        <h2>Inventory</h2>
+      </div>
+      <p>{{ inventory['items'] }} active item(s) worth {{ '%0.2f' | format(inventory.value | float) }} ETB.</p>
+    </div>
+
+    <div class="hr-stats">
+      {{ kpi('Active items', inventory['items'], 'Stock records in play') }}
+      {{ kpi('Stock value (ETB)', '%0.2f' | format(inventory.value | float), 'Quantity × unit cost') }}
+      {{ kpi('Below reorder level', inventory.low | length,
+             'Reorder needed' if inventory.low else 'Levels are healthy',
+             'down' if inventory.low else 'flat') }}
+      {{ kpi('Movements logged', inventory.movements | sum(attribute='n'),
+             'In ' ~ month) }}
+    </div>
+
+    <div class="hr-table-panel">
+      <h3 class="panel-title">Items at or below their reorder level</h3>
+      <div class="dash-table-wrap">
+        <table>
+          <thead><tr><th>Item</th><th>SKU</th><th>Quantity</th><th>Reorder at</th></tr></thead>
+          <tbody>
+            {% for row in inventory.low %}
+            <tr>
+              <td>{{ row.name }}</td>
+              <td>{{ row.sku }}</td>
+              <td><span class="status-badge off">{{ row.quantity }} {{ row.unit }}</span></td>
+              <td>{{ row.min_stock }} {{ row.unit }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="cell-note">Nothing is at or below its reorder level.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow">Buying</span>
+        <h2>Procurement</h2>
+      </div>
+      <p>{{ '%0.2f' | format(procurement.committed | float) }} ETB committed across orders that
+        are not cancelled.</p>
+    </div>
+
+    <div class="dash-grid">
+      <div class="dash-panel">
+        <h2>Purchase requests</h2>
+        <div class="dash-table-wrap">
+          <table>
+            <thead><tr><th>Ref</th><th>Item</th><th>Quantity</th><th>Estimate (ETB)</th><th>Status</th></tr></thead>
+            <tbody>
+              {% for row in procurement.requests %}
+              <tr>
+                <td>{{ row.request_number }}</td>
+                <td>{{ row.item_name }}</td>
+                <td>{{ row.quantity }} {{ row.unit }}</td>
+                <td>{{ row.estimated_cost }}</td>
+                <td><span class="status-badge {{ 'active' if row.status == 'Approved' else ('off' if row.status == 'Rejected' else 'neutral') }}">{{ row.status }}</span></td>
+              </tr>
+              {% else %}
+              <tr><td colspan="5" class="cell-note">No purchase requests raised yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="dash-panel">
+        <h2>Purchase orders</h2>
+        <div class="dash-table-wrap">
+          <table>
+            <thead><tr><th>Ref</th><th>Supplier</th><th>Item</th><th>Total (ETB)</th><th>Status</th></tr></thead>
+            <tbody>
+              {% for row in procurement.orders %}
+              <tr>
+                <td>{{ row.order_number }}</td>
+                <td>{{ row.supplier }}</td>
+                <td>{{ row.item_name }}</td>
+                <td>{{ row.total_cost }}</td>
+                <td><span class="status-badge {{ 'active' if row.status == 'Received' else 'neutral' }}">{{ row.status }}</span></td>
+              </tr>
+              {% else %}
+              <tr><td colspan="5" class="cell-note">No purchase orders raised yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section bg-white">
+  <div class="container">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow">Decisions</span>
+        <h2>Approval workflows</h2>
+      </div>
+      <p>{{ '%0.2f' | format(approvals.value | float) }} ETB is still waiting on a decision.</p>
+    </div>
+
+    <div class="chart-grid">
+      {{ bars('Requests by status', approvals.by_status, 'Every request on file') }}
+    </div>
+
+    <div class="hr-table-panel">
+      <h3 class="panel-title">Latest requests</h3>
+      <div class="dash-table-wrap">
+        <table>
+          <thead><tr><th>Title</th><th>Type</th><th>Amount (ETB)</th><th>Raised by</th><th>Status</th></tr></thead>
+          <tbody>
+            {% for row in approvals.recent %}
+            <tr>
+              <td>{{ row.title }}</td>
+              <td>{{ row.request_type }}</td>
+              <td>{{ row.amount }}</td>
+              <td>{{ row.by }}</td>
+              <td><span class="status-badge {{ 'active' if row.status == 'Approved' else ('off' if row.status == 'Rejected' else 'neutral') }}">{{ row.status }}</span></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="cell-note">No requests raised yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

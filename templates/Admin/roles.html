@@ -1,0 +1,570 @@
+{% extends "base.html" %}
+{% from "base.html" import dash_icon with context %}
+
+{% block title %}Role Management | Dereje Belay Wood &amp; Kitchen{% endblock %}
+
+{% macro ui(name) -%}
+  {%- set paths = {
+    'filter': '<path d="M3 5h18l-7 8v6l-4 2v-8z"/>',
+    'plus': '<path d="M12 5v14"/><path d="M5 12h14"/>',
+    'dots': '<circle cx="5" cy="12" r="1.7" fill="currentColor"/><circle cx="12" cy="12" r="1.7" fill="currentColor"/><circle cx="19" cy="12" r="1.7" fill="currentColor"/>',
+    'edit': '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+    'trash': '<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/>',
+    'person': '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+    'users': '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+    'shield': '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>',
+    'sliders': '<path d="M4 6h10"/><path d="M18 6h2"/><circle cx="16" cy="6" r="2"/><path d="M4 12h2"/><path d="M10 12h10"/><circle cx="8" cy="12" r="2"/><path d="M4 18h10"/><path d="M18 18h2"/><circle cx="16" cy="18" r="2"/>'
+  } -%}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ paths.get(name, paths['person']) | safe }}</svg>
+{%- endmacro %}
+
+{% block content %}
+{% set customised = roles | map(attribute='customised') | sum %}
+{% set extra_total = roles | map(attribute='extras') | map('length') | sum %}
+{% set pill_keys = ('admin', 'hr', 'finance', 'payroll', 'inventory', 'member') %}
+
+<section class="dir-page">
+  <div class="container">
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <header class="dir-head">
+      <div class="dir-head-copy">
+        <span class="dir-eyebrow">Access Control</span>
+        <h1>Role Management</h1>
+        <p class="dir-sub">What each account may open. A role carries default modules,
+          additional roles widen that list, and the ticks stored here are the only
+          per-account deviations.</p>
+        <p class="dir-summary">
+          <span><span class="dir-swatch"></span><strong>{{ roles | length }}</strong>
+            role{{ '' if roles | length == 1 else 's' }}</span>
+          <span><span class="dir-swatch success"></span><strong>{{ accounts | length }}</strong>
+            account{{ '' if accounts | length == 1 else 's' }}</span>
+          <span><span class="dir-swatch muted"></span><strong>{{ extra_total }}</strong>
+            additional role{{ '' if extra_total == 1 else 's' }}</span>
+          <span><span class="dir-swatch warning"></span><strong>{{ customised }}</strong>
+            customised account{{ '' if customised == 1 else 's' }}</span>
+        </p>
+      </div>
+      <div class="dir-head-actions">
+        <a class="dir-quiet-link" href="{{ url_for('admin_users') }}">{{ ui('users') }} User management</a>
+        <a class="dir-quiet-link" href="{{ url_for('admin_settings') }}">{{ ui('sliders') }} Settings</a>
+        <button type="button" class="btn btn-sm dir-add" data-open-dialog="newRoleDialog">
+          {{ ui('plus') }} Create role
+        </button>
+      </div>
+    </header>
+
+    <div class="dir-stack">
+
+      <div class="dir-card">
+        <div class="dir-toolbar">
+          <div class="dir-search">
+            {{ dash_icon('search') }}
+            <label class="sr-only" for="roleSearch">Search roles</label>
+            <input id="roleSearch" type="search" placeholder="Search roles, modules or people…"
+                   autocomplete="off" aria-controls="roleTable" />
+          </div>
+
+          <details class="dir-filter" id="roleFilter">
+            <summary>
+              {{ ui('filter') }} <span>Filter</span>
+              <em class="dir-filter-badge" data-filter-badge hidden></em>
+            </summary>
+            <div class="dir-filter-panel">
+              <label for="roleTypeFilter">Role type</label>
+              <select id="roleTypeFilter">
+                <option value="">All roles</option>
+                <option value="built-in">Built-in</option>
+                <option value="custom">Custom</option>
+              </select>
+
+              <div class="dir-filter-foot">
+                <button type="button" class="dir-text-btn" data-clear-filters>Clear filters</button>
+                <button type="button" class="btn btn-sm" data-close-filter>Done</button>
+              </div>
+            </div>
+          </details>
+        </div>
+
+        <table class="dir-table roles-table" id="roleTable">
+          <thead>
+            <tr>
+              <th scope="col">Role</th>
+              <th scope="col">Default modules</th>
+              <th scope="col">Accounts</th>
+              <th scope="col" class="dir-actions-cell"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody id="roleTableBody">
+            {% for r in roles %}
+            {% set pill = r.role if r.role in pill_keys else 'other' %}
+            <tr data-role-row data-key="{{ r.role }}" data-type="{{ 'built-in' if r.is_system else 'custom' }}"
+                data-search="{{ r.label }} {{ r.description }} {{ r.role }} {{ 'built-in' if r.is_system else 'custom' }} {% for m in r.defaults %}{{ module_label.get(m, m) }} {% endfor %}{% for account in r.members %}{{ account.user.full_name }} {% endfor %}{% for person in r.extras %}{{ person.full_name }} {% endfor %}">
+              <td>
+                <div class="dir-role-cell">
+                  <span class="dir-role-line">
+                    <span class="dir-pill role-{{ pill }}">{{ r.label }}</span>
+                    {% if r.role == 'admin' %}
+                    <span class="dir-flag self">Locked</span>
+                    {% else %}
+                    <span class="dir-flag {{ 'self' if r.is_system }}">{{ 'Built-in' if r.is_system else 'Custom' }}</span>
+                    {% endif %}
+                  </span>
+                  {% if r.description %}
+                  <span class="dir-role-note">{{ r.description }}</span>
+                  {% endif %}
+                  <span class="dir-role-meta">
+                    {{ r.defaults | length }} module{{ '' if r.defaults | length == 1 else 's' }} ·
+                    {{ r.members | length }} primary ·
+                    {{ r.extras | length }} additional
+                  </span>
+                </div>
+              </td>
+              <td>
+                <div class="role-chip-set">
+                  {% for m in r.defaults %}
+                  <span class="chip">{{ module_label.get(m, m) }}</span>
+                  {% else %}
+                  <span class="chip chip-off">None &mdash; landing page only</span>
+                  {% endfor %}
+                </div>
+              </td>
+              <td>
+                <div class="role-people">
+                  <strong>{{ r.members | length }} primary</strong>
+                  {% if r.extras %}<span>{{ r.extras | length }} additional</span>{% endif %}
+                  {% if r.customised %}<span>{{ r.customised }} customised</span>{% endif %}
+                </div>
+              </td>
+              <td class="dir-actions-cell">
+                <details class="dir-row-menu">
+                  <summary aria-label="Actions for {{ r.label }}">{{ ui('dots') }}</summary>
+                  <div class="dir-menu-panel">
+                    <button type="button" class="dir-menu-item"
+                            data-open-dialog="roleDialog-{{ loop.index }}">
+                      {{ ui('edit') }} {{ 'View role' if r.role == 'admin' else 'Edit modules' }}
+                    </button>
+                    <button type="button" class="dir-menu-item"
+                            data-open-dialog="roleDialog-{{ loop.index }}"
+                            data-scroll=".role-dialog-section">
+                      {{ ui('person') }} Accounts holding this role
+                    </button>
+                    {% if not r.is_system %}
+                    <div class="dir-menu-sep"></div>
+                    <form method="POST" class="dir-menu-form"
+                          action="{{ url_for('admin_role_delete', role_key=r.role) }}"
+                          onsubmit="return confirm('Delete this custom role? This cannot be undone.');">
+                      {{ csrf_field() }}
+                      <button type="submit" class="dir-menu-item dir-menu-danger">
+                        {{ ui('trash') }} Delete role
+                      </button>
+                    </form>
+                    {% endif %}
+                  </div>
+                </details>
+              </td>
+            </tr>
+            {% endfor %}
+            <tr id="roleEmptyRow" hidden>
+              <td colspan="4">
+                <div class="dir-empty">
+                  <strong>No roles match this filter</strong>
+                  <span>Try a different search or clear the filter.</span>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="dir-table-footer">
+          <p class="dir-count" id="roleCount" aria-live="polite">Showing all {{ roles | length }} role{{ '' if roles | length == 1 else 's' }}</p>
+        </div>
+      </div>
+
+      <div class="dir-card" id="access-matrix">
+        <div class="dir-card-head">
+          <div>
+            <span class="dir-eyebrow">Matrix</span>
+            <h2>Who can open what</h2>
+            <p>A tick means the account holds the module. A ring marks a cell that differs
+              from the combined role defaults, which is what the per-account editor stores.</p>
+          </div>
+        </div>
+
+        <div class="dash-table-wrap">
+          <table class="matrix-table">
+            <thead>
+              <tr>
+                <th>Account</th>
+                <th>Primary role</th>
+                {% for m in modules %}<th>{{ module_label.get(m, m) }}</th>{% endfor %}
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for account in accounts %}
+              {% set u = account.user %}
+              {% set pill = u.role if u.role in pill_keys else 'other' %}
+              <tr>
+                <td>{{ u.full_name }}<span class="cell-sub">{{ u.email }}</span></td>
+                <td><span class="dir-pill role-{{ pill }}">{{ role_labels.get(u.role, u.role) }}</span></td>
+                {% for m in modules %}
+                <td class="cell-mark">
+                  {% if m in account.granted %}
+                    <span class="mark yes{% if (u.id, m) in deviated %} is-custom{% endif %}"
+                          title="{{ 'Set against the role default' if (u.id, m) in deviated else 'Role default' }}">
+                      {{ dash_icon('check') }}</span>
+                  {% else %}
+                    <span class="mark no{% if (u.id, m) in deviated %} is-custom{% endif %}">&mdash;</span>
+                  {% endif %}
+                </td>
+                {% endfor %}
+                <td>
+                  {% if u.role == 'admin' %}
+                  <span class="cell-note">All modules</span>
+                  {% else %}
+                  <a class="btn btn-outline-dark btn-sm" href="{{ url_for('admin_role_account', user_id=u.id) }}">Edit</a>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="dir-card">
+        <div class="dir-card-head">
+          <div>
+            <span class="dir-eyebrow">Overrides</span>
+            <h2>Stored deviations</h2>
+            <p>Every row below is one module ticked against an account's combined role
+              defaults. An account with no rows follows its roles exactly.</p>
+          </div>
+        </div>
+
+        <table class="dir-table overrides-table">
+          <thead>
+            <tr>
+              <th scope="col">Account</th>
+              <th scope="col">Primary role</th>
+              <th scope="col">Module</th>
+              <th scope="col">Effect</th>
+              <th scope="col">Updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in overrides %}
+            {% set pill = row.role if row.role in pill_keys else 'other' %}
+            <tr>
+              <td>{{ row.full_name }}</td>
+              <td><span class="dir-pill role-{{ pill }}">{{ role_labels.get(row.role, row.role) }}</span></td>
+              <td>{{ module_label.get(row.module, row.module) }}</td>
+              <td><span class="dir-pill status-{{ 'active' if row.allowed else 'disabled' }}">
+                <span class="status-dot"></span>{{ 'Granted' if row.allowed else 'Revoked' }}</span></td>
+              <td class="dir-cell-muted">{{ row.updated_at | audit_time }}</td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="5">
+                <div class="dir-empty">
+                  <strong>Every account follows its role defaults</strong>
+                  <span>No per-account override is stored right now.</span>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% for r in roles %}
+{% set pill = r.role if r.role in pill_keys else 'other' %}
+<dialog class="dir-dialog" id="roleDialog-{{ loop.index }}" aria-labelledby="roleTitle-{{ loop.index }}">
+  <div class="dir-dialog-head">
+    <span class="dir-avatar" aria-hidden="true">{{ r.label[:2] | upper }}</span>
+    <div class="dir-dialog-title">
+      <h2 id="roleTitle-{{ loop.index }}">{{ r.label }}</h2>
+      <p>
+        {{ 'Built-in role' if r.is_system else 'Custom role' }}
+        {%- if r.role == 'admin' %} · every module, always
+        {%- elif r.role == 'member' %} · lands on the member area
+        {%- else %} · lands on its <a href="{{ url_for(r.landing) }}">dashboard</a>
+        {%- endif %}
+      </p>
+    </div>
+    <button type="button" class="dir-dialog-close" data-close-dialog aria-label="Close">&times;</button>
+  </div>
+
+  {% if r.role != 'admin' %}
+  <form method="POST" action="{{ url_for('admin_role_update', role_key=r.role) }}">
+    {{ csrf_field() }}
+    <div class="dir-dialog-body">
+      <div class="account-grid">
+        {% if not r.is_system %}
+        <div class="full">
+          <label for="roleName-{{ loop.index }}">Role name</label>
+          <input id="roleName-{{ loop.index }}" name="name" value="{{ r.label }}"
+                 maxlength="60" required />
+        </div>
+        {% endif %}
+        <div class="full">
+          <label for="roleDescription-{{ loop.index }}">Description</label>
+          <input id="roleDescription-{{ loop.index }}" name="description"
+                 value="{{ r.description }}" maxlength="300"
+                 placeholder="What this role is for" />
+        </div>
+      </div>
+
+      <fieldset class="perm-grid">
+        <legend>Modules this role grants</legend>
+        {% for m in modules %}
+        <label class="perm-item">
+          <input type="checkbox" name="modules" value="{{ m }}"
+                 {% if m in r.defaults %}checked{% endif %} />
+          <span>{{ module_label.get(m, m) }}</span>
+        </label>
+        {% endfor %}
+      </fieldset>
+
+      <p class="dir-form-note">
+        {{ 'Built-in roles keep their name; only the description and module list change.'
+           if r.is_system else
+           'Custom roles do not change an account&rsquo;s home dashboard. They add modules,
+            so one person can sit at more than one desk without a second sign-in.' }}
+      </p>
+
+      <div class="role-dialog-section">
+        <h3>Accounts holding this role</h3>
+        <ul class="role-member-list">
+          {% for account in r.members %}
+          {% set u = account.user %}
+          <li>
+            <a href="{{ url_for('admin_role_account', user_id=u.id) }}">{{ u.full_name }}</a>
+            <span class="dir-pill status-{{ 'active' if u.status == 'Active' else 'disabled' }}">
+              <span class="status-dot"></span>{{ u.status }}</span>
+            <span class="cell-note">{{ 'Every module' if u.role == 'admin' else 'Primary role' }}</span>
+          </li>
+          {% else %}
+          <li><span class="cell-note">No account holds this role as its primary role.</span></li>
+          {% endfor %}
+          {% if r.extras %}
+          <li>
+            <span class="cell-note">Also carried as an additional role by</span>
+            {% for person in r.extras %}
+            <a href="{{ url_for('admin_role_account', user_id=person.id) }}">{{ person.full_name }}</a>{{ ', ' if not loop.last }}
+            {% endfor %}
+          </li>
+          {% endif %}
+        </ul>
+      </div>
+    </div>
+
+    <div class="dir-dialog-actions">
+      <button type="button" class="btn btn-outline btn-sm" data-close-dialog>Cancel</button>
+      <button type="submit" class="btn btn-sm">Save role</button>
+    </div>
+  </form>
+  {% else %}
+  <div class="dir-dialog-body">
+    <p class="dir-form-note">The Administrator role always holds every module and cannot be
+      reduced or deleted. Department and position assignments live in
+      Organization &amp; Hierarchy.</p>
+    <ul class="chip-row">
+      {% for m in modules %}<li class="chip">{{ module_label.get(m, m) }}</li>{% endfor %}
+    </ul>
+
+    <div class="role-dialog-section">
+      <h3>Accounts holding this role</h3>
+      <ul class="role-member-list">
+        {% for account in r.members %}
+        {% set u = account.user %}
+        <li>
+          <a href="{{ url_for('admin_role_account', user_id=u.id) }}">{{ u.full_name }}</a>
+          <span class="dir-pill status-{{ 'active' if u.status == 'Active' else 'disabled' }}">
+            <span class="status-dot"></span>{{ u.status }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+  <div class="dir-dialog-actions">
+    <button type="button" class="btn btn-sm" data-close-dialog>Close</button>
+  </div>
+  {% endif %}
+</dialog>
+{% endfor %}
+
+<dialog class="dir-dialog" id="newRoleDialog" aria-labelledby="newRoleTitle">
+  <div class="dir-dialog-head">
+    <div class="dir-dialog-title">
+      <h2 id="newRoleTitle">Create a custom role</h2>
+      <p>A reusable permission bundle assigned on top of a primary role.</p>
+    </div>
+    <button type="button" class="dir-dialog-close" data-close-dialog aria-label="Close">&times;</button>
+  </div>
+  <form method="POST" action="{{ url_for('admin_role_create') }}">
+    {{ csrf_field() }}
+    <div class="dir-dialog-body">
+      <div class="account-grid">
+        <div class="full">
+          <label for="new-role-name">Role name *</label>
+          <input id="new-role-name" name="name" maxlength="60" required
+                 placeholder="e.g. Stores supervisor" />
+        </div>
+        <div class="full">
+          <label for="new-role-description">Description</label>
+          <input id="new-role-description" name="description" maxlength="300"
+                 placeholder="What this role is for" />
+        </div>
+      </div>
+
+      <fieldset class="perm-grid">
+        <legend>Modules this role grants</legend>
+        {% for m in modules %}
+        <label class="perm-item">
+          <input type="checkbox" name="modules" value="{{ m }}" />
+          <span>{{ module_label.get(m, m) }}</span>
+        </label>
+        {% endfor %}
+      </fieldset>
+
+      <p class="dir-form-note">Custom roles do not change an account&rsquo;s home dashboard.
+        They add modules, so one person can sit at more than one desk without a second
+        sign-in. Assign the role on the account's module screen.</p>
+    </div>
+    <div class="dir-dialog-actions">
+      <button type="button" class="btn btn-outline btn-sm" data-close-dialog>Cancel</button>
+      <button type="submit" class="btn btn-sm">Create role</button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    var tbody = document.getElementById("roleTableBody");
+    if (!tbody) return;
+
+    var rows = Array.prototype.slice.call(tbody.querySelectorAll("[data-role-row]"));
+    var search = document.getElementById("roleSearch");
+    var typeFilter = document.getElementById("roleTypeFilter");
+    var filterDetails = document.getElementById("roleFilter");
+    var filterBadge = document.querySelector("[data-filter-badge]");
+    var emptyRow = document.getElementById("roleEmptyRow");
+    var countEl = document.getElementById("roleCount");
+
+    function matches(row) {
+      var q = search.value.trim().toLowerCase();
+      if (q && row.dataset.search.toLowerCase().indexOf(q) === -1) return false;
+      if (typeFilter.value && row.dataset.type !== typeFilter.value) return false;
+      return true;
+    }
+
+    function syncFilters() {
+      var n = typeFilter.value ? 1 : 0;
+      if (filterBadge) {
+        filterBadge.hidden = n === 0;
+        filterBadge.textContent = n;
+      }
+    }
+
+    function render() {
+      var visible = rows.filter(matches);
+      rows.forEach(function (row) { row.hidden = true; });
+      visible.forEach(function (row) { row.hidden = false; });
+      if (emptyRow) emptyRow.hidden = visible.length !== 0;
+
+      if (countEl) {
+        countEl.textContent = visible.length === rows.length
+          ? "Showing all " + rows.length + " role" + (rows.length === 1 ? "" : "s")
+          : "Showing " + visible.length + " of " + rows.length + " role" +
+            (rows.length === 1 ? "" : "s");
+      }
+      syncFilters();
+    }
+
+    search.addEventListener("input", render);
+    typeFilter.addEventListener("change", render);
+
+    var clearFilters = document.querySelector("[data-clear-filters]");
+    if (clearFilters) {
+      clearFilters.addEventListener("click", function () {
+        search.value = "";
+        typeFilter.value = "";
+        render();
+      });
+    }
+    var closeFilter = document.querySelector("[data-close-filter]");
+    if (closeFilter) {
+      closeFilter.addEventListener("click", function () {
+        if (filterDetails) filterDetails.open = false;
+      });
+    }
+
+    document.addEventListener("click", function (event) {
+      if (filterDetails && filterDetails.open && !filterDetails.contains(event.target)) {
+        filterDetails.open = false;
+      }
+      document.querySelectorAll(".dir-row-menu[open]").forEach(function (menu) {
+        if (!menu.contains(event.target)) menu.open = false;
+      });
+    });
+
+    document.addEventListener("toggle", function (event) {
+      var menu = event.target;
+      if (!menu.classList || !menu.classList.contains("dir-row-menu") || !menu.open) return;
+      document.querySelectorAll(".dir-row-menu[open]").forEach(function (other) {
+        if (other !== menu) other.open = false;
+      });
+      var panel = menu.querySelector(".dir-menu-panel");
+      if (!panel) return;
+      var rect = menu.getBoundingClientRect();
+      var header = document.querySelector("header");
+      var headerH = header ? header.getBoundingClientRect().height : 0;
+      var needed = panel.offsetHeight + 12;
+      var below = window.innerHeight - rect.bottom;
+      var above = rect.top - headerH;
+      menu.classList.toggle("is-up", below < needed && above >= needed);
+    }, true);
+
+    document.querySelectorAll("[data-open-dialog]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var menu = button.closest(".dir-row-menu");
+        if (menu) menu.open = false;
+        var dialog = document.getElementById(button.dataset.openDialog);
+        if (!dialog) return;
+        dialog.showModal();
+        if (button.dataset.scroll) {
+          var target = dialog.querySelector(button.dataset.scroll);
+          if (target) target.scrollIntoView({ block: "start" });
+        }
+      });
+    });
+
+    document.querySelectorAll("[data-close-dialog]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var dialog = button.closest("dialog");
+        if (dialog) dialog.close();
+      });
+    });
+
+    document.querySelectorAll("dialog.dir-dialog").forEach(function (dialog) {
+      dialog.addEventListener("click", function (event) {
+        if (event.target === dialog) dialog.close();
+      });
+    });
+
+    render();
+  })();
+</script>
+{% endblock %}

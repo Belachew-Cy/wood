@@ -1,0 +1,56 @@
+[
+  {
+    "id": 1,
+    "title": "Modern Kitchen",
+    "category": "Kitchen",
+    "image": "/static/img/kich.jpeg"
+  },
+  {
+    "id": 2,
+    "title": "Built-in Wardrobe",
+    "category": "Wardrobe",
+    "image": "/static/img/bed.jpeg"
+  },
+  {
+    "id": 3,
+    "title": "Interior Door",
+    "category": "Doors",
+    "image": "/static/img/home1.jpeg"
+  },
+  {
+    "id": 4,
+    "title": "Living Room TV Unit",
+    "category": "Interior",
+    "image": "/static/img/TV.jpeg"
+  },
+  {
+    "id": 5,
+    "title": "Ivory Kitchen",
+    "category": "Kitchen",
+    "image": "/static/img/kitchen-white.jpg"
+  },
+  {
+    "id": 6,
+    "title": "Teak Wardrobes",
+    "category": "Wardrobe",
+    "image": "/static/img/wardrobe.jpg"
+  },
+  {
+    "id": 7,
+    "title": "Walnut Panel Doors",
+    "category": "Doors",
+    "image": "/static/img/door.jpg"
+  },
+  {
+    "id": 8,
+    "title": "Open Plan Interior",
+    "category": "Interior",
+    "image": "/static/img/living-tv.jpg"
+  },
+  {
+    "id": 9,
+    "title": "ZZ button check",
+    "category": "Interior",
+    "image": "static/images/projects/p1.jpg"
+  }
+]

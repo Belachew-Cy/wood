@@ -1,0 +1,6 @@
+{% extends "organization.html" %}
+
+{% block org_actions %}
+  <a class="btn btn-sm" href="{{ url_for('manage_hierarchy') }}">Manage hierarchy</a>
+  <a class="btn btn-outline-dark btn-sm" href="{{ url_for('employees') }}">Employee directory</a>
+{% endblock %}

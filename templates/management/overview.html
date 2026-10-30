@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi, bars, columns, feed with context %}
+
+{% block title %}Management Overview | Dereje Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Audit &amp; Oversight</span>
+      <h1>Management Overview</h1>
+      <p>People, money, stock, buying and approvals read together in one place.</p>
+    </div>
+    <nav class="stock-actions" aria-label="Oversight sections">
+      <a class="btn btn-outline btn-sm" href="{{ url_for('audit.audit_dashboard') }}">Audit Trail</a>
+      <a class="btn btn-outline btn-sm" href="{{ url_for('approvals.dashboard') }}">Approvals</a>
+      <a class="btn btn-outline btn-sm" href="{{ url_for('procurement.dashboard') }}">Procurement</a>
+    </nav>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="hr-stats">
+      {{ kpi('Employee records', counts.employees, '{} active'.format(counts.employees_active)) }}
+      {{ kpi('Sign-in accounts', counts.accounts,
+             '{} disabled'.format(counts.disabled) if counts.disabled else 'All active',
+             'down' if counts.disabled else 'flat') }}
+      {{ kpi('Items below reorder', counts.low_stock,
+             'of {} live items'.format(counts['items']),
+             'down' if counts.low_stock else 'up') }}
+      {{ kpi('Purchase requests waiting', counts.purchase_requests,
+             '{} suppliers on file'.format(counts.suppliers),
+             'down' if counts.purchase_requests else 'flat') }}
+      {{ kpi('Approvals pending', counts.approvals_pending,
+             '{} payroll lines unpaid'.format(counts.payroll_pending)) }}
+      {{ kpi('Open purchase orders', counts.open_orders,
+             '{:,.2f} ETB committed'.format(money.procurement_spend | float)) }}
+    </div>
+
+    <div class="chart-grid">
+      {{ bars('Where the money stands ({} ETB)'.format(month), flow_rows, 'ETB, all time') }}
+      {{ columns('Headcount by department', department_rows, 'Employee records') }}
+      {{ feed('Needs attention', attention, 'Signals across every module') }}
+      {{ feed('Latest recorded actions', activity, 'Straight from the audit trail') }}
+    </div>
+
+    <div class="dash-grid">
+      <div class="dash-panel hr-table-panel">
+        <h2>Tightest stock cover</h2>
+        <div class="hr-table-wrap table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Category</th>
+                <th>On hand</th>
+                <th>Reorder at</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in stock %}
+              <tr>
+                <td>{{ row.name }}</td>
+                <td>{{ row.category }}</td>
+                <td>{{ row.quantity }} {{ row.unit }}</td>
+                <td>{{ row.min_stock }} {{ row.unit }}</td>
+                <td>
+                  <span class="status-badge {{ 'off' if row.quantity <= row.min_stock else 'active' }}">
+                    {{ 'Below' if row.quantity <= row.min_stock else 'Covered' }}
+                  </span>
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="5" class="employee-empty">No inventory items recorded yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="dash-panel hr-table-panel">
+        <h2>Buying and approvals in flight</h2>
+        <div class="hr-table-wrap table-scroll">
+          <table>
+            <tbody>
+              <tr>
+                <td>Purchase requests awaiting a decision</td>
+                <td class="num"><strong>{{ counts.purchase_requests }}</strong></td>
+              </tr>
+              <tr>
+                <td>Purchase orders open or partly received</td>
+                <td class="num"><strong>{{ counts.open_orders }}</strong></td>
+              </tr>
+              <tr>
+                <td>Approval requests pending somewhere in the chain</td>
+                <td class="num"><strong>{{ counts.approvals_pending }}</strong></td>
+              </tr>
+              <tr>
+                <td>New job applications unread</td>
+                <td class="num"><strong>{{ counts.applications }}</strong></td>
+              </tr>
+              <tr>
+                <td>Vacancies posted</td>
+                <td class="num"><strong>{{ counts.vacancies }}</strong></td>
+              </tr>
+              <tr>
+                <td>Receivables owed to the workshop</td>
+                <td class="num"><strong>{{ "{:,.2f}".format(money.receivables | float) }}</strong> ETB</td>
+              </tr>
+              <tr>
+                <td>Payables owed to suppliers</td>
+                <td class="num"><strong>{{ "{:,.2f}".format(money.payables | float) }}</strong> ETB</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="panel-note">Every figure is counted live from the module tables; nothing here is
+          estimated.</p>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

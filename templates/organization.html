@@ -1,0 +1,178 @@
+{% extends "public_base.html" %}
+{% from "base.html" import kpi, dash_icon, org_structure with context %}
+
+{% block title %}Organization | Dereje Belay Wood &amp; Kitchen Cabinet Finishing{% endblock %}
+
+{% block content %}
+<section class="page-hero">
+  <div class="container">
+    <span class="eyebrow">Our Team</span>
+    <h1>Organization Structure</h1>
+    <p>The people who lead each department and the teams behind every kitchen we
+      finish.</p>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% if user %}
+    <div class="org-toolbar">
+      <p class="perm-note">
+        {% if org_me %}You are marked on the chart as <strong>{{ org_me.name }}</strong>
+          &middot; {{ org_me.job_title or 'Staff' }}
+          {%- if org_me.department %} &middot; {{ org_me.department }}{% endif %}.
+        {% else %}Your account is not linked to an employee row yet, so the chart
+          cannot mark your place.{% endif %}
+      </p>
+      <div class="org-toolbar-actions">
+        {% block org_actions %}{% endblock %}
+        <a class="btn btn-outline-dark btn-sm" href="{{ dashboard_home }}">Back to dashboard</a>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="hr-stats">
+      {{ kpi('People', org_stats.people, 'Active staff on the chart') }}
+      {{ kpi('Departments', org_stats.departments, 'Named teams') }}
+      {{ kpi('Reporting lines', org_stats.lines, 'Manager to employee links') }}
+    </div>
+
+  </div>
+</section>
+
+<section class="section bg-white" id="leadership">
+  <div class="container">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow">Leadership</span>
+        <h2>Company Structure</h2>
+      </div>
+      <p>From the chief executive through the executive, director and manager
+        levels &mdash; the same reporting lines that route approvals.</p>
+    </div>
+    {{ org_structure(org_leadership_tiers, show_roles=not org_public,
+                     show_usernames=not org_public) }}
+  </div>
+</section>
+
+<section class="section bg-ivory" id="departments">
+  <div class="container">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow">Departments</span>
+        <h2>Who Works Where</h2>
+      </div>
+      <p>Headcount and named members by team, read from employee records and the
+        departments assigned to staff accounts.</p>
+    </div>
+
+    {% if can_create_department %}
+    <details class="org-dept-create">
+      <summary><span class="btn btn-sm">Create department</span></summary>
+      <form method="POST" action="{{ url_for('create_department') }}"
+            class="dash-form org-dept-create-form">
+        {{ csrf_field() }}
+        <div class="account-grid">
+          <div>
+            <label for="new_department_name">Department name *</label>
+            <input id="new_department_name" type="text" name="department_name"
+                   maxlength="120" required placeholder="e.g. Production" />
+          </div>
+          <div>
+            <label for="new_department_position">Leadership position *</label>
+            <select id="new_department_position" name="leadership_position" required>
+              <option value="" selected disabled>Select a position</option>
+              <option value="Executive">Executive</option>
+              <option value="Director">Director</option>
+              <option value="Manager">Manager</option>
+            </select>
+          </div>
+          <div>
+            <label for="new_department_description">Description</label>
+            <input id="new_department_description" type="text" name="description"
+                   maxlength="300" placeholder="What this team does" />
+          </div>
+        </div>
+        <div class="finance-form-actions">
+          <button type="submit" class="btn">Create department <span class="arrow">→</span></button>
+        </div>
+      </form>
+    </details>
+    {% endif %}
+
+    {% if org_departments %}
+    <div class="org-dept-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Department</th>
+            <th scope="col">Overview</th>
+            <th scope="col" class="org-dept-people">People</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for department in org_departments %}
+          <tr>
+            <td>
+              <div class="org-dept-name">
+                <span class="org-dept-icon">{{ dash_icon(department.icon | default('users')) }}</span>
+                <strong>{{ department.name }}</strong>
+                {% if user and department.is_active is defined and not department.is_active %}
+                <span class="status-badge neutral">Inactive</span>
+                {% endif %}
+              </div>
+            </td>
+            <td class="org-dept-desc">{{ department.description or '—' }}</td>
+            <td class="org-dept-people">
+              <span class="org-dept-count">{{ department.count }}</span>
+              <span class="org-dept-unit">{{ 'person' if department.count == 1 else 'people' }}</span>
+              {% if department.members %}
+              <ul class="org-dept-members">
+                {% for member in department.members %}
+                <li>
+                  <span class="org-member-name">{{ member.name }}</span>
+                  {% if member.title %}<em>{{ member.title }}</em>{% endif %}
+                  {% if member.is_me %}<span class="org-you">You</span>{% endif %}
+                </li>
+                {% endfor %}
+              </ul>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="empty-state"><strong>No departments yet.</strong> HR can add the first
+      one from Organization &amp; Hierarchy.</p>
+    {% endif %}
+
+    {% if user and ('hr' in permissions or 'accounts' in permissions) and org_unassigned %}
+    <div class="org-unassigned">
+      <h3>{{ org_unassigned | length }} people without a department</h3>
+      <p class="cell-note">Assign them in HR so approvals, rosters and headcount
+        reports place them on the right team.</p>
+      <ul>
+        {% for person in org_unassigned %}
+        <li>{{ person.name }}{% if person.job_title %} &middot; {{ person.job_title }}{% endif %}</li>
+        {% endfor %}
+      </ul>
+      <a class="btn btn-outline-dark btn-sm" href="{{ url_for('manage_hierarchy') }}#accounts">
+        Manage assignments
+      </a>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+{% if not user %}
+<section class="cta-band">
+  <div class="container">
+    <h2>Work with the team behind the work</h2>
+    <p>Tell us about your space and we will plan the woodwork around it.</p>
+    <a href="{{ url_for('contact') }}" class="btn">Contact Me <span class="arrow">&rarr;</span></a>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

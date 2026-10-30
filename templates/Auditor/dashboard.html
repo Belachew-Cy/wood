@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi, feed with context %}
+
+{% block title %}Audit Console | Dereje Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Audit &amp; Oversight</span>
+      <h1>Audit Console</h1>
+      <p>Read every department's records, raise reviews and findings, and export the reports.</p>
+    </div>
+    <nav class="stock-actions" aria-label="Audit sections">
+      <a class="btn btn-outline btn-sm" href="{{ url_for('auditor_reviews') }}">Reviews</a>
+      <a class="btn btn-outline btn-sm" href="{{ url_for('auditor_letters') }}">Letter audit</a>
+      <a class="btn btn-outline btn-sm" href="{{ url_for('reports_centre') }}">Reports</a>
+      <a class="btn btn-sm" href="{{ url_for('audit.audit_dashboard') }}">Audit Trail</a>
+    </nav>
+  </div>
+</section>
+
+<section class="container finance-page">
+  {% if not has_reviews or not has_findings %}
+  <div class="report-alert">
+    The audit review and finding tables are not in this database yet. Restart the
+    application so they can be created — reading department records already works.
+  </div>
+  {% endif %}
+
+  <div class="hr-stats">
+    {{ kpi('Reviews', stats.reviews, '', 'flat', 'file', url_for('auditor_reviews')) }}
+    {{ kpi('Open reviews', stats.open_reviews,
+           'Awaiting closure' if stats.open_reviews else '',
+           'down' if stats.open_reviews else 'flat', 'clock') }}
+    {{ kpi('Findings', stats.findings, '', 'flat', 'warn', url_for('auditor_reviews')) }}
+    {{ kpi('High risk', stats.high_risk,
+           'Needs a response' if stats.high_risk else '',
+           'down' if stats.high_risk else 'flat', 'lock') }}
+    {{ kpi('Logged events', stats.events, '', 'flat', 'chart',
+           url_for('audit.audit_dashboard')) }}
+    {{ kpi('Refusals', stats.refusals,
+           'Worth reading' if stats.refusals else '',
+           'down' if stats.refusals else 'flat', 'search',
+           url_for('audit.audit_dashboard', outcome='DENIED')) }}
+  </div>
+
+  <div class="chart-grid">
+    {{ feed('Refusals and failures', attention, 'Newest first, click to filter the trail') }}
+
+    <div class="dash-panel">
+      <h2>Reports ready to run</h2>
+      <div class="hr-table-wrap table-scroll">
+        <table class="report-table">
+          <thead>
+            <tr><th>Report</th><th>Rows</th><th><span class="sr-only">Open</span></th></tr>
+          </thead>
+          <tbody>
+            {% for tab in tabs %}
+            <tr>
+              <td>{{ tab.label }}</td>
+              <td>{{ tab.count }}</td>
+              <td>
+                {% if tab.available %}
+                <a class="btn btn-outline btn-sm" href="{{ tab.href }}">Open</a>
+                {% else %}
+                <span class="status-badge neutral">No data yet</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="chart-grid">
+    {{ feed('Latest activity', activity, 'Every module, newest first',
+            {'label': 'Open the audit trail', 'href': url_for('audit.audit_dashboard')}) }}
+
+    <div class="dash-panel">
+      <h2>Correspondence activity</h2>
+      <div class="hr-table-wrap table-scroll">
+        <table class="report-table">
+          <thead>
+            <tr><th>When</th><th>Action</th><th>Letter</th><th>User</th><th>Outcome</th></tr>
+          </thead>
+          <tbody>
+            {% for event in correspondence %}
+            <tr>
+              <td class="nowrap">{{ event.time }}</td>
+              <td>
+                <span class="status-badge {{ 'off' if event.outcome in ('DENIED', 'FAILURE') else 'neutral' }}">
+                  {{ event.action }}
+                </span>
+              </td>
+              <td class="wrap-cell">
+                {{ event.reference or '—' }}
+                {% if event.subject %}<span class="feed-meta">{{ event.subject }}</span>{% endif %}
+              </td>
+              <td>{{ event.username }} <span class="feed-meta">{{ event.role }}</span></td>
+              <td>
+                <span class="status-badge {{ 'active' if event.outcome == 'SUCCESS' else ('off' if event.outcome == 'DENIED' else 'neutral') }}">
+                  {{ event.outcome }}
+                </span>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="report-empty">No letter has been touched yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <a class="btn btn-outline btn-sm" href="{{ url_for('auditor_letters') }}">Open Letter Audit</a>
+    </div>
+  </div>
+
+  <div class="dash-panel hr-table-panel">
+    <h2>Latest audit reviews</h2>
+    <div class="hr-table-wrap table-scroll">
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th>Ref</th><th>Review</th><th>Department</th><th>Period</th>
+            <th>Findings</th><th>Status</th><th>Raised</th><th><span class="sr-only">Open</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for review in reviews %}
+          <tr>
+            <td class="nowrap">#{{ review.id }}</td>
+            <td class="wrap-cell">{{ review.title }}</td>
+            <td>{{ review.department }}</td>
+            <td class="nowrap">
+              {{ review.review_period_start or '—' }}
+              {%- if review.review_period_end %} → {{ review.review_period_end }}{% endif -%}
+            </td>
+            <td>{{ review.finding_count }}</td>
+            <td>
+              <span class="status-badge {{ 'active' if review.status == 'Completed' else 'neutral' }}">
+                {{ review.status }}
+              </span>
+            </td>
+            <td class="nowrap">{{ review.created_at | audit_time }}</td>
+            <td>
+              <a class="btn btn-outline btn-sm"
+                 href="{{ url_for('auditor_findings', review_id=review.id) }}">Open</a>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="8" class="report-empty">No review has been opened yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="dash-panel hr-table-panel">
+    <h2>Latest findings</h2>
+    <div class="hr-table-wrap table-scroll">
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th>Ref</th><th>Finding</th><th>Department</th><th>Risk</th>
+            <th>Status</th><th>Raised</th><th><span class="sr-only">Open</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for finding in findings %}
+          <tr>
+            <td class="nowrap">#{{ finding.id }}</td>
+            <td class="wrap-cell">{{ finding.title }}</td>
+            <td>{{ finding.department or '—' }}</td>
+            <td>
+              <span class="status-badge {{ finding.risk_level | lower }}">
+                {{ finding.risk_level }}
+              </span>
+            </td>
+            <td>
+              <span class="status-badge {{ 'active' if finding.status in ('Resolved', 'Closed') else 'neutral' }}">
+                {{ finding.status }}
+              </span>
+            </td>
+            <td class="nowrap">{{ finding.created_at | audit_time }}</td>
+            <td>
+              <a class="btn btn-outline btn-sm"
+                 href="{{ url_for('auditor_findings', review_id=finding.review_id) }}">Open</a>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7" class="report-empty">Nothing has been raised as a finding yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="dash-panel hr-table-panel">
+    <h2>Records you can open</h2>
+    <div class="hr-table-wrap table-scroll">
+      <table class="report-table">
+        <thead>
+          <tr><th>Department</th><th>Dataset</th><th>Records</th><th><span class="sr-only">Open</span></th></tr>
+        </thead>
+        <tbody>
+          {% for group in groups %}
+            {% for dataset in group.tables %}
+            <tr>
+              <td>{{ group.department }}{% if not loop.first %} <span class="feed-meta">continued</span>{% endif %}</td>
+              <td>{{ dataset.label }}</td>
+              <td>{{ dataset.count }}</td>
+              <td><a class="btn btn-outline btn-sm" href="{{ dataset.href }}">Open</a></td>
+            </tr>
+            {% endfor %}
+          {% else %}
+          <tr><td colspan="4" class="report-empty">This database holds no department records yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <p class="report-note">
+    Every list here is the module's own record, read as it stands. The console writes
+    nothing outside its reviews and findings, and columns that could hold a password or
+    a token are never shown.
+  </p>
+</section>
+{% endblock %}

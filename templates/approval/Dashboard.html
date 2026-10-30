@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi, bars, feed with context %}
+
+{% block title %}Approval Queue | Dereje Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Approvals</span>
+      <h1>Approval Queue</h1>
+      <p>Requests raised here, and the steps waiting on your account.</p>
+    </div>
+    <nav class="stock-actions" aria-label="Approval actions">
+      {% if 'approvals' in permissions %}
+      <a class="btn btn-sm" href="{{ url_for('approvals.new_request') }}">New request</a>
+      {% endif %}
+      <a class="btn btn-outline btn-sm" href="{{ url_for('approvals.dashboard') }}">All requests</a>
+      {% if can_manage_policy %}
+      <a class="btn btn-outline btn-sm" href="{{ url_for('management_approval_settings') }}">Approval policy</a>
+      {% endif %}
+    </nav>
+  </div>
+</section>
+
+<section class="container finance-page">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="finance-alert {{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <div class="hr-stats">
+    {{ kpi('Requests you can see', counts.total) }}
+    {{ kpi('Awaiting your decision', counts.for_me,
+           'Steps your account answers', 'down' if counts.for_me else 'flat') }}
+    {{ kpi('Pending somewhere', counts.pending) }}
+    {{ kpi('Waiting value (ETB)', "{:,.2f}".format(waiting_value | float),
+           'Pending and returned') }}
+    {{ kpi('Raised by you', counts.mine,
+           '{} approved · {} rejected'.format(counts.approved, counts.rejected)) }}
+  </div>
+
+  <div class="chart-grid">
+    {{ bars('Requests by status', status_rows, 'Everything your account can see') }}
+    {{ feed('Needs your decision', activity, 'Requests routed to a module you hold') }}
+    {% if counts.returned %}
+    {{ feed('Returned to you', returned, 'Revise and resubmit from the request page') }}
+    {% endif %}
+  </div>
+
+  <div class="dash-panel hr-table-panel">
+    <h2>All requests</h2>
+    <div class="hr-table-wrap table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Title</th>
+            <th>Type</th>
+            <th>Department</th>
+            <th>Amount (ETB)</th>
+            <th>Raised by</th>
+            <th>Current step</th>
+            <th>Status</th>
+            <th>Updated</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in requests_list %}
+          <tr>
+            <td class="nowrap">{{ row.id }}</td>
+            <td class="wrap-cell">{{ row.title }}</td>
+            <td class="nowrap">{{ row.request_type }}</td>
+            <td>{{ row.department | title }}</td>
+            <td>{{ "{:,.2f}".format(row.amount | float) if row.amount else '—' }}</td>
+            <td>{{ row.created_by_name }}</td>
+            <td class="nowrap">{{ step_label.get(row.current_approver_step, row.current_approver_step) }}</td>
+            <td>
+              <span class="status-badge {{ 'active' if row.status == 'Approved' else 'off' if row.status in ('Rejected', 'Returned') else 'neutral' }}">
+                {{ row.status }}
+              </span>
+            </td>
+            <td class="nowrap">{{ row.updated_at | audit_time }}{% if row.updated_by_name %}<br><span class="feed-meta">{{ row.updated_by_name }}</span>{% endif %}</td>
+            <td>
+              <a class="btn btn-outline btn-sm"
+                 href="{{ url_for('approvals.detail', request_id=row.id) }}">
+                {% if row.id in decidable %}Decide{% else %}Open{% endif %}
+              </a>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="10" class="employee-empty">No approval requests have been raised yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="panel-note">
+      A request is routed to the module that owns its department. Once it reaches
+      {{ "{:,.0f}".format(two_step) }} ETB Finance signs it as well, and from
+      {{ "{:,.0f}".format(three_step) }} ETB it ends with a management sign-off. A request you
+      raised is never shown to you as waiting on your own decision.
+    </p>
+  </div>
+</section>
+{% endblock %}

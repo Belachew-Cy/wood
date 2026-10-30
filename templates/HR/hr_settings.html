@@ -1,0 +1,235 @@
+
+{% extends "base.html" %}
+
+{% block title %}HR Settings | Dereje Wood & Kitchen Cabinet{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">HUMAN RESOURCES</span>
+            <h1>HR Settings</h1>
+            <p>Configure company details and HR policies.</p>
+        </div>
+    </div>
+</section>
+
+<section class="container hr-settings-page">
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+            <div class="settings-alert {{ category }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endwith %}
+
+    <div class="settings-layout">
+
+        <aside class="settings-sidebar">
+            <h3>HR Configuration</h3>
+
+            <a class="hr-nav-link active" href="#company">
+                Company Information
+            </a>
+            <a class="hr-nav-link" href="#working-hours">
+                Working Hours
+            </a>
+            <a class="hr-nav-link" href="#attendance">
+                Attendance Rules
+            </a>
+            <a class="hr-nav-link" href="#payroll">
+                Payroll Preferences
+            </a>
+        </aside>
+
+        <div class="settings-main">
+
+            <form method="POST"
+                  action="{{ url_for('hr_settings.index') }}">
+              {{ csrf_field() }}
+
+                <section class="settings-card" id="company">
+                    <h2>Company Information</h2>
+                    <p class="settings-description">
+                        Manage your organization's contact details.
+                    </p>
+
+                    <div class="settings-grid">
+                        <div class="settings-field full">
+                            <label for="company_name">Company Name *</label>
+                            <input id="company_name"
+                                   name="company_name"
+                                   value="{{ settings.company_name }}"
+                                   required>
+                        </div>
+
+                        <div class="settings-field">
+                            <label for="company_email">Email Address</label>
+                            <input id="company_email"
+                                   name="company_email"
+                                   type="email"
+                                   value="{{ settings.company_email }}">
+                        </div>
+
+                        <div class="settings-field">
+                            <label for="company_phone">Phone Number</label>
+                            <input id="company_phone"
+                                   name="company_phone"
+                                   type="tel"
+                                   value="{{ settings.company_phone }}">
+                        </div>
+
+                        <div class="settings-field full">
+                            <label for="company_address">Company Address</label>
+                            <textarea id="company_address"
+                                      name="company_address"
+                                      rows="3">{{ settings.company_address }}</textarea>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="settings-card" id="working-hours">
+                    <h2>Working Hours</h2>
+                    <p class="settings-description">
+                        Set the standard daily work schedule.
+                    </p>
+
+                    <div class="settings-grid">
+                        <div class="settings-field">
+                            <label for="work_start">Start Time *</label>
+                            <input id="work_start"
+                                   name="work_start"
+                                   type="time"
+                                   value="{{ settings.work_start }}"
+                                   required>
+                        </div>
+
+                        <div class="settings-field">
+                            <label for="work_end">End Time *</label>
+                            <input id="work_end"
+                                   name="work_end"
+                                   type="time"
+                                   value="{{ settings.work_end }}"
+                                   required>
+                        </div>
+
+                        <div class="settings-field">
+                            <label for="break_minutes">
+                                Break Duration (minutes) *
+                            </label>
+                            <input id="break_minutes"
+                                   name="break_minutes"
+                                   type="number"
+                                   min="0"
+                                   max="240"
+                                   value="{{ settings.break_minutes }}"
+                                   required>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="settings-card" id="attendance">
+                    <h2>Attendance Rules</h2>
+                    <p class="settings-description">
+                        Configure the permitted arrival grace period.
+                    </p>
+
+                    <div class="settings-grid">
+                        <div class="settings-field">
+                            <label for="attendance_grace_minutes">
+                                Grace Period (minutes) *
+                            </label>
+                            <input id="attendance_grace_minutes"
+                                   name="attendance_grace_minutes"
+                                   type="number"
+                                   min="0"
+                                   max="120"
+                                   value="{{ settings.attendance_grace_minutes }}"
+                                   required>
+                            <small>
+                                Allowed delay before marking an employee late.
+                            </small>
+                        </div>
+
+                        <div class="settings-field">
+                            <label for="overtime_enabled">
+                                Overtime
+                            </label>
+                            <select id="overtime_enabled"
+                                    name="overtime_enabled">
+                                <option value="1"
+                                    {% if settings.overtime_enabled == "1" %}
+                                    selected{% endif %}>
+                                    Enabled
+                                </option>
+                                <option value="0"
+                                    {% if settings.overtime_enabled == "0" %}
+                                    selected{% endif %}>
+                                    Disabled
+                                </option>
+                            </select>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="settings-card" id="payroll">
+                    <h2>Payroll Preferences</h2>
+                    <p class="settings-description">
+                        Set the payroll currency and preferred payment day.
+                    </p>
+
+                    <div class="settings-grid">
+                        <div class="settings-field">
+                            <label for="currency">Currency *</label>
+                            <select id="currency" name="currency" required>
+                                <option value="ETB"
+                                    {% if settings.currency == "ETB" %}
+                                    selected{% endif %}>
+                                    ETB - Ethiopian Birr
+                                </option>
+                                <option value="USD"
+                                    {% if settings.currency == "USD" %}
+                                    selected{% endif %}>
+                                    USD - US Dollar
+                                </option>
+                                <option value="EUR"
+                                    {% if settings.currency == "EUR" %}
+                                    selected{% endif %}>
+                                    EUR - Euro
+                                </option>
+                            </select>
+                        </div>
+
+                        <div class="settings-field">
+                            <label for="payroll_day">
+                                Preferred Payroll Day *
+                            </label>
+                            <input id="payroll_day"
+                                   name="payroll_day"
+                                   type="number"
+                                   min="1"
+                                   max="31"
+                                   value="{{ settings.payroll_day }}"
+                                   required>
+                            <small>
+                                For example, 30 means the 30th of the month.
+                            </small>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="settings-footer">
+                    <button type="reset" class="settings-btn secondary">
+                        Reset Form
+                    </button>
+                    <button type="submit" class="settings-btn primary">
+                        Save Settings
+                    </button>
+                </div>
+
+            </form>
+        </div>
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi with context %}
+
+{% block title %}Leave Management | Dereje Belay Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Human Resources</span>
+      <h1>Leave Management</h1>
+      <p>File leave requests and review the ones waiting for a decision.</p>
+    </div>
+    <nav class="stock-actions" aria-label="Leave actions">
+      <a class="btn btn-outline btn-sm" href="{{ url_for('hr_dashboard') }}">Back to HR</a>
+    </nav>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    <nav class="hr-navigation" aria-label="HR Management">
+      <a class="hr-nav-link" href="{{ url_for('hr_dashboard') }}">Dashboard</a>
+      <a class="hr-nav-link" href="{{ url_for('employees') }}">Employees</a>
+      <a class="hr-nav-link" href="{{ url_for('attendance') }}">Attendance</a>
+      <a class="hr-nav-link" href="{{ url_for('recruitment') }}">Recruitment</a>
+      <a class="hr-nav-link active" href="{{ url_for('leave_management') }}">Leave</a>
+      <a class="hr-nav-link" href="{{ url_for('training_performance') }}">Training &amp; Performance</a>
+      <a class="hr-nav-link" href="{{ url_for('manage_hierarchy') }}">Organization</a>
+      <a class="hr-nav-link" href="{{ url_for('reports_centre') }}">Reports</a>
+      <a class="hr-nav-link" href="{{ url_for('hr_settings.index') }}">HR Settings</a>
+    </nav>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="hr-stats">
+      {{ kpi('Total requests', stats.total, 'All leave filed') }}
+      {{ kpi('Pending', stats.pending, 'Waiting on a decision', 'warn' if stats.pending else 'flat') }}
+      {{ kpi('Approved', stats.approved, 'Cleared for leave', 'up') }}
+      {{ kpi('Rejected', stats.rejected, 'Not granted') }}
+    </div>
+  </div>
+</section>
+
+<section class="section bg-white">
+  <div class="container">
+    <div class="dash-panel">
+      <h2>Submit a leave request</h2>
+
+      {% if employees %}
+      <form method="POST" class="dash-form">
+        {{ csrf_field() }}
+        <div class="account-grid">
+          <div>
+            <label for="leave_employee_id">Employee *</label>
+            <select id="leave_employee_id" name="employee_id" required>
+              <option value="">Select employee</option>
+              {% for employee in employees %}
+              <option value="{{ employee.id }}">{{ employee.employee_code }} — {{ employee.full_name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label for="leave_type">Leave type *</label>
+            <select id="leave_type" name="leave_type" required>
+              <option value="">Select type</option>
+              <option>Annual</option>
+              <option>Sick</option>
+              <option>Maternity</option>
+              <option>Paternity</option>
+              <option>Unpaid</option>
+              <option>Emergency</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div>
+            <label for="start_date">Start date *</label>
+            <input type="date" id="start_date" name="start_date" min="{{ today }}" required />
+          </div>
+          <div>
+            <label for="end_date">End date *</label>
+            <input type="date" id="end_date" name="end_date" min="{{ today }}" required />
+          </div>
+          <div class="full">
+            <label for="reason">Reason for leave *</label>
+            <textarea id="reason" name="reason" maxlength="2000" required
+                      placeholder="Enter the reason…"></textarea>
+          </div>
+        </div>
+
+        <div class="finance-form-actions">
+          <button type="submit" class="btn">Submit request <span class="arrow">→</span></button>
+        </div>
+      </form>
+      {% else %}
+      <p class="empty-state">No active employees yet. Register employees before filing leave.</p>
+      {% endif %}
+    </div>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>Leave requests</h2>
+
+      {% if requests %}
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Employee</th>
+              <th>Department</th>
+              <th>Leave type</th>
+              <th>Dates</th>
+              <th>Days</th>
+              <th>Reason</th>
+              <th>Status</th>
+              <th>Review</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in requests %}
+            <tr>
+              <td><strong>{{ item.full_name }}</strong><br /><span class="cell-note">{{ item.employee_code }}</span></td>
+              <td>{{ item.department or '—' }}</td>
+              <td>{{ item.leave_type }}</td>
+              <td>{{ item.start_date }} – {{ item.end_date }}</td>
+              <td>{{ item.days_requested }}</td>
+              <td>{{ item.reason }}</td>
+              <td>
+                <span class="status-badge {{ 'active' if item.status == 'Approved' else ('off' if item.status == 'Rejected' else 'neutral') }}">{{ item.status }}</span>
+                {% if item.review_comment %}
+                <br /><span class="cell-note">{{ item.review_comment }}</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if item.status == 'Pending' %}
+                <form class="status-form" method="POST"
+                      action="{{ url_for('review_leave_request', leave_id=item.id) }}">
+                  {{ csrf_field() }}
+                  <input name="review_comment" placeholder="Optional comment" maxlength="1000" />
+                  <button name="status" value="Approved" type="submit" class="btn btn-sm">Approve</button>
+                  <button name="status" value="Rejected" type="submit" class="btn btn-outline btn-sm">Reject</button>
+                </form>
+                {% else %}
+                <span class="cell-note">Reviewed by: {{ item.reviewed_by_name or 'HR' }}</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="empty-state">No leave requests have been recorded.</p>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    var startInput = document.getElementById("start_date");
+    var endInput = document.getElementById("end_date");
+    if (!startInput || !endInput) return;
+    startInput.addEventListener("change", function () {
+      endInput.min = startInput.value || "{{ today }}";
+      if (endInput.value && endInput.value < startInput.value) {
+        endInput.value = startInput.value;
+      }
+    });
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% from "base.html" import dash_icon with context %}
+
+{% block title %}Search | Dereje Belay Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Find anything</span>
+      <h1>Search</h1>
+      <p>One box across the records your account can open: employees, accounts, stock,
+        suppliers, buying, money, requests and the activity log.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    <form method="GET" action="{{ url_for('search') }}" class="search-page-form" role="search">
+      <label for="page-search">Search term</label>
+      <div class="search-page-row">
+        <input id="page-search" type="search" name="q" maxlength="80" minlength="2" required
+               autofocus placeholder="Name, code, SKU, invoice number, description…"
+               value="{{ term }}" />
+        <button type="submit" class="finance-btn">Search <span class="arrow">→</span></button>
+      </div>
+      <p class="cell-note">At least two characters. Results respect your module permissions.</p>
+    </form>
+  </div>
+</section>
+
+<section class="section bg-white">
+  <div class="container">
+    {% if term | length >= 2 %}
+      {% if groups %}
+      <div class="section-head">
+        <div>
+          <span class="eyebrow">{{ total }} match{{ '' if total == 1 else 'es' }}</span>
+          <h2>&ldquo;{{ term }}&rdquo;</h2>
+        </div>
+        <p>Grouped by record type, newest first, six per group.</p>
+      </div>
+
+      <div class="search-groups">
+        {% for group in groups %}
+        <div class="dash-panel search-group">
+          <h2>{{ group.label }}<span class="cell-note">{{ group.rows | length }}</span></h2>
+          <ul class="search-results">
+            {% for row in group.rows %}
+            <li>
+              <a href="{{ row.href }}">
+                <span class="search-title">{{ row.title }}</span>
+                {% if row.meta %}<span class="search-meta">{{ row.meta }}</span>{% endif %}
+              </a>
+              <span class="module-arrow">→</span>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="empty-state"><strong>No matches</strong> Nothing your account can open is
+        called &ldquo;{{ term }}&rdquo;.</p>
+      {% endif %}
+    {% else %}
+      <p class="empty-state"><strong>Start typing</strong> Enter at least two characters to
+        search the records you have access to.</p>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+
+{% block title %}Reports | {{ company }}{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Reporting</span>
+      <h1>Reports</h1>
+      <p>{{ role_label }}{% if ctx.department %} &middot; {{ ctx.department }}{% endif %} &middot;
+        only the reports this account is allowed to read are listed.</p>
+    </div>
+    <nav class="stock-actions no-print" aria-label="Report links">
+      {% if legacy_reports %}
+      <a class="btn btn-outline btn-sm" href="{{ url_for('admin_reports') }}">Monthly overview</a>
+      {% endif %}
+      {% if item %}
+      <a class="btn btn-outline btn-sm" href="{{ url_for('reports_centre') }}">All reports</a>
+      {% endif %}
+    </nav>
+  </div>
+</section>
+
+{% if item is none %}
+<section class="section bg-ivory report-centre">
+  <div class="container">
+    {% if grouped %}
+      {% for group in grouped %}
+      <div class="report-panel">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">{{ group.reports | length }} report{{ '' if group.reports | length == 1 else 's' }}</span>
+            <h2>{{ group.label }}</h2>
+          </div>
+        </div>
+        <div class="report-index-grid">
+          {% for report in group.reports %}
+            {% if report.available %}
+            <a class="report-index-link"
+               href="{{ url_for('reports_centre', report=report.key) }}">
+              <strong>{{ report.label }}</strong>
+              <span>{{ report.description }}</span>
+              <em>{{ report.scope_label }}</em>
+            </a>
+            {% else %}
+            <div class="report-index-link is-disabled" aria-disabled="true">
+              <strong>{{ report.label }}</strong>
+              <span>{{ report.reason }}</span>
+            </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="report-panel">
+        <h2>No reports for this account yet</h2>
+        {% if not employee_linked %}
+        <p class="report-note">Personal reports unlock when this account is linked to a
+          staff record. Ask an administrator on User Management to make that link, or
+          ask HR to record you as an employee.</p>
+        {% else %}
+        <p class="report-note">This account's role does not carry any of the reporting
+          modules. An administrator can grant one on User Management.</p>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+</section>
+
+{% else %}
+<section class="section bg-ivory report-centre">
+  <div class="container">
+    <div class="report-toolbar">
+      <a class="btn btn-outline btn-sm no-print"
+         href="{{ url_for('reports_centre') }}">&larr; All reports</a>
+      <nav class="stock-actions no-print" aria-label="Report exports">
+        {% for label, fmt in (('CSV', 'csv'), ('Excel', 'xlsx'), ('PDF', 'pdf')) %}
+        <a class="btn btn-outline btn-sm" href="{{ export_urls[fmt] }}">Export {{ label }}</a>
+        {% endfor %}
+        <button type="button" class="btn btn-outline btn-sm"
+                onclick="window.print()">Print</button>
+      </nav>
+    </div>
+
+    <div class="report-panel">
+      <div class="report-heading">
+        <div>
+          <span class="eyebrow">{{ item.group }}</span>
+          <h2>{{ item.label }}</h2>
+          <p class="report-note">{{ item.description }}</p>
+        </div>
+        <span class="report-scope">{{ item.scope_label }}</span>
+      </div>
+
+      <form method="GET" class="report-filter no-print" role="search">
+        <input type="hidden" name="report" value="{{ item.key }}">
+        <div>
+          <label for="q">Search</label>
+          <input id="q" type="search" name="q" value="{{ q }}"
+                 placeholder="Words in this report">
+        </div>
+        <div>
+          <label for="start_date">From</label>
+          <input id="start_date" type="date" name="start_date"
+                 value="{{ start_date }}">
+        </div>
+        <div>
+          <label for="end_date">To</label>
+          <input id="end_date" type="date" name="end_date" value="{{ end_date }}">
+        </div>
+        {% for option in options %}
+        <div>
+          <label for="filter_{{ option.name }}">{{ option.label }}</label>
+          <select id="filter_{{ option.name }}" name="filter_{{ option.name }}">
+            <option value="">All</option>
+            {% for value in option.choices %}
+            <option value="{{ value }}"
+              {% if filters.get(option.name) == value %}selected{% endif %}>{{ value }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endfor %}
+        <div class="report-filter-actions">
+          <button type="submit" class="finance-btn primary">Apply</button>
+          <a class="btn btn-outline btn-sm"
+             href="{{ url_for('reports_centre', report=item.key) }}">Reset</a>
+        </div>
+      </form>
+
+      {% if summary %}
+      <div class="report-summary" aria-label="Totals for the selected rows">
+        {% for figure in summary %}
+        <div class="report-summary-item{% if figure.money %} is-money{% endif %}">
+          <span>{{ figure.label }}</span>
+          <strong>{{ figure.value }}</strong>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <p class="report-note">
+        {{ total }} row{{ '' if total == 1 else 's' }} in {{ item.label | lower }}
+        {% if showing < total %}&middot; showing the first {{ showing }}; export for the
+        full set{% endif %}
+      </p>
+
+      <div class="report-table-wrap">
+        <table class="report-table">
+          <thead>
+            <tr>
+              {% for key, label in item.columns %}
+              <th{% if key in item.money %} class="num"{% endif %}>{{ label }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+            <tr>
+              {% for cell in row %}
+              <td{% if cell.money %} class="num"{% endif %}>{{ cell.text }}</td>
+              {% endfor %}
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="{{ item.columns | length }}" class="report-empty">
+                No rows match the selected search, date range and filters.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <p class="report-note">{{ item.note }}</p>
+      <p class="reports-footer">Prepared {{ prepared }} &middot; {{ item.scope_label }}</p>
+    </div>
+
+    <div class="report-panel no-print">
+      <h3 class="panel-title">Other reports for this account</h3>
+      <div class="report-chips">
+        {% for other in items if other.available %}
+        <a class="report-chip{% if other.key == item.key %} is-active{% endif %}"
+           href="{{ url_for('reports_centre', report=other.key) }}">{{ other.label }}</a>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

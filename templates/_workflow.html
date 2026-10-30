@@ -1,0 +1,30 @@
+{# The approval route of a requisition or a purchase order: one card per desk,
+   tinted by its decision, naming the account whose signature it waits on. #}
+{% macro approval_route(trail, title, note=None) %}
+<div class="approval-route">
+  <h2>{{ title }}</h2>
+  {% if note %}<p>{{ note }}</p>{% endif %}
+  {% if trail %}
+  <ol class="approval-route-steps">
+    {% for step in trail %}
+    <li class="approval-route-step is-{{ step.state }}{% if step.current %} is-current{% endif %}">
+      <span class="approval-route-level">{{ loop.index }} · {{ step.label }}</span>
+      <strong>{% if step.actor_name %}{{ step.actor_name }}{% else %}{{ step.state_label }}{% endif %}</strong>
+      <em>
+        {% if step.actor_name %}
+        {{ step.state_label }}{% if step.decided_at %} · {{ step.decided_at | audit_time }}{% endif %}
+        {% elif step.holders %}
+        {{ step.holders | join(', ') }}
+        {% elif step.current %}
+        No active account holds this desk
+        {% else %}
+        No active account holds this desk yet
+        {% endif %}
+      </em>
+      {% if step.comments %}<em class="approval-route-comment">{{ step.comments }}</em>{% endif %}
+    </li>
+    {% endfor %}
+  </ol>
+  {% endif %}
+</div>
+{% endmacro %}

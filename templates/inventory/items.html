@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi, bars, donut, feed with context %}
+
+{% block title %}Inventory Items | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">INVENTORY MANAGEMENT</span>
+      <h1>Inventory Items</h1>
+      <p>Signed in as {{ user.full_name }} · {{ role_label }} access</p>
+    </div>
+    {% if 'inventory' in permissions %}
+    <a class="btn" href="{{ url_for('inventory.new_item') }}">Register item →</a>
+    {% endif %}
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    {% set ns = namespace(low=0, out=0, ok=0, value=0) %}
+        {% for it in items %}
+          {% set ns.value = ns.value + (it['quantity'] | float) * (it['unit_cost'] | float) %}
+          {% if it['quantity'] <= 0 %}
+            {% set ns.out = ns.out + 1 %}
+          {% elif it['quantity'] <= it['min_stock'] %}
+            {% set ns.low = ns.low + 1 %}
+          {% else %}
+            {% set ns.ok = ns.ok + 1 %}
+          {% endif %}
+        {% endfor %}
+        {% set shelf_rows = [
+          {'label': 'Healthy', 'value': ns.ok, 'display': ns.ok},
+          {'label': 'At or below minimum', 'value': ns.low, 'display': ns.low},
+          {'label': 'Out of stock', 'value': ns.out, 'display': ns.out}
+        ] %}
+        {% set cat_rows = [] %}
+        {% for name, rows in items | groupby('category') %}
+          {% set _ = cat_rows.append({
+            'label': name or 'Uncategorised',
+            'value': rows | length,
+            'display': '{} items in stock'.format(rows | length)
+          }) %}
+        {% endfor %}
+        {% set cat_rows = cat_rows | sort(reverse=true, attribute='value') %}
+        {% set need_restock = [] %}
+        {% for it in items %}
+          {% if it['quantity'] <= it['min_stock'] %}
+            {% set _ = need_restock.append({
+              'icon': 'box', 'tone': 'bad' if it['quantity'] <= 0 else 'warn',
+              'title': '{} · {}'.format(it['sku'], it['name']),
+              'meta': '{} {} on shelf, minimum {} {}.'.format(it['quantity'], it['unit'], it['min_stock'], it['unit']),
+              'time': it['location'] or 'Unplaced'
+            }) %}
+          {% endif %}
+        {% endfor %}
+
+        <div class="hr-stats">
+          {{ kpi('Items listed', items | length) }}
+          {{ kpi('Stock value (ETB)', "{:,.2f}".format(ns.value)) }}
+          {{ kpi('At or below minimum', ns.low, 'to reorder', 'down' if ns.low else 'flat') }}
+          {{ kpi('Out of stock', ns.out, 'blocked issues', 'down' if ns.out else 'flat') }}
+        </div>
+
+        <div class="chart-grid">
+          {{ bars('Stock health', shelf_rows, 'items') }}
+          {{ bars('Items by category', cat_rows, 'active items') }}
+          {{ donut('Ready to issue', (ns.ok / (items | length)) if items else 0,
+                  '{}%'.format((((ns.ok / (items | length)) * 100) | round(0, 'common') | int) if items else 0),
+                  [
+                    {'label': 'Above minimum', 'color': 'var(--walnut)', 'value': ns.ok},
+                    {'label': 'Low or empty', 'color': 'var(--ivory-2)', 'value': ns.low + ns.out}
+                  ], 'of listed items') }}
+          {% if need_restock %}
+          {{ feed('Reorder list', need_restock[:5],
+                  '{} items at or below minimum'.format(need_restock | length),
+                  {'href': url_for('inventory.stock_movement'), 'label': 'Record stock in'}) }}
+          {% endif %}
+        </div>
+
+    <form method="GET" class="stock-search">
+      <label for="q">Search</label>
+      <input id="q" name="q" value="{{ search }}"
+             placeholder="SKU, item name or category" />
+      <button class="btn" type="submit">Search</button>
+      <a class="btn btn-outline" href="{{ url_for('inventory.items') }}">Reset</a>
+    </form>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>{{ items | length }} item{{ '' if items | length == 1 else 's' }}</h2>
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>SKU</th><th>Item</th><th>Category</th><th>In stock</th>
+              <th>Minimum</th><th>Unit cost</th><th>Location</th><th>Status</th>
+              <th>Last modified</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in items %}
+            <tr>
+              <td>{{ item["sku"] }}</td>
+              <td>{{ item["name"] }}</td>
+              <td>{{ item["category"] }}</td>
+              <td>{{ item["quantity"] }} {{ item["unit"] }}</td>
+              <td>{{ item["min_stock"] }}</td>
+              <td>{{ "{:,.2f}".format(item["unit_cost"]) }}</td>
+              <td>{{ item["location"] or '-' }}</td>
+              <td>
+                {% if item["quantity"] == 0 %}
+                  <span class="status-badge off">Out of stock</span>
+                {% elif item["quantity"] <= item["min_stock"] %}
+                  <span class="status-badge neutral">Low stock</span>
+                {% else %}
+                  <span class="status-badge active">In stock</span>
+                {% endif %}
+              </td>
+              <td class="nowrap">
+                {{ item["updated_by_name"] or '—' }}
+                {% if item["updated_at"] %}
+                <br><span class="feed-meta">{{ item["updated_at"] | audit_time }}</span>
+                {% endif %}
+              </td>
+              <td class="row-actions">
+                <a class="btn" href="{{ url_for('inventory.edit_item', item_id=item['id']) }}">Edit</a>
+                <form method="POST" action="{{ url_for('inventory.deactivate_item', item_id=item['id']) }}"
+                      onsubmit="return confirm('Deactivate {{ item['name'] }}?');">
+                  {{ csrf_field() }}
+                  <button class="btn-danger" type="submit">Deactivate</button>
+                </form>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="10">No inventory items found.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

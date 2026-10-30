@@ -1,0 +1,261 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi with context %}
+
+{% block title %}Training &amp; Performance | Dereje Belay Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Human Resources</span>
+      <h1>Training &amp; Performance</h1>
+      <p>Log employee training and record performance reviews with ratings.</p>
+    </div>
+    <nav class="stock-actions" aria-label="Training actions">
+      <a class="btn btn-outline btn-sm" href="{{ url_for('hr_dashboard') }}">Back to HR</a>
+    </nav>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    <nav class="hr-navigation" aria-label="HR Management">
+      <a class="hr-nav-link" href="{{ url_for('hr_dashboard') }}">Dashboard</a>
+      <a class="hr-nav-link" href="{{ url_for('employees') }}">Employees</a>
+      <a class="hr-nav-link" href="{{ url_for('attendance') }}">Attendance</a>
+      <a class="hr-nav-link" href="{{ url_for('recruitment') }}">Recruitment</a>
+      <a class="hr-nav-link" href="{{ url_for('leave_management') }}">Leave</a>
+      <a class="hr-nav-link active" href="{{ url_for('training_performance') }}">Training &amp; Performance</a>
+      <a class="hr-nav-link" href="{{ url_for('manage_hierarchy') }}">Organization</a>
+      <a class="hr-nav-link" href="{{ url_for('reports_centre') }}">Reports</a>
+      <a class="hr-nav-link" href="{{ url_for('hr_settings.index') }}">HR Settings</a>
+    </nav>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="hr-stats">
+      {{ kpi('Training records', stats.training, 'Courses logged') }}
+      {{ kpi('Completed', stats.completed, 'Courses finished', 'up') }}
+      {{ kpi('Performance reviews', stats.reviews, 'Reviews on file') }}
+      {{ kpi('Average rating', stats.average_rating, 'Out of 5') }}
+    </div>
+  </div>
+</section>
+
+<section class="section bg-white">
+  <div class="container">
+    {% if employees %}
+    <div class="dash-grid">
+      <div class="dash-panel">
+        <h2>Add employee training</h2>
+
+        <form method="POST" class="dash-form">
+          {{ csrf_field() }}
+          <input type="hidden" name="form_type" value="training" />
+
+          <div class="account-grid">
+            <div class="full">
+              <label for="training_employee">Employee *</label>
+              <select id="training_employee" name="employee_id" required>
+                <option value="">Select employee</option>
+                {% for employee in employees %}
+                <option value="{{ employee.id }}">{{ employee.employee_code }} — {{ employee.full_name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="full">
+              <label for="course_title">Course / training title *</label>
+              <input id="course_title" name="course_title" required maxlength="200"
+                     placeholder="e.g. Cabinet Design Software" />
+            </div>
+            <div class="full">
+              <label for="provider">Training provider</label>
+              <input id="provider" name="provider" maxlength="200"
+                     placeholder="Organization or trainer" />
+            </div>
+            <div>
+              <label for="training_start">Start date *</label>
+              <input type="date" id="training_start" name="training_start" required />
+            </div>
+            <div>
+              <label for="training_end">End date</label>
+              <input type="date" id="training_end" name="training_end" />
+            </div>
+            <div class="full">
+              <label for="training_status">Status</label>
+              <select id="training_status" name="training_status">
+                <option>Planned</option>
+                <option>In Progress</option>
+                <option>Completed</option>
+                <option>Cancelled</option>
+              </select>
+            </div>
+            <div class="full">
+              <label for="certificate">Certificate / reference</label>
+              <input id="certificate" name="certificate" maxlength="300" />
+            </div>
+            <div class="full">
+              <label for="training_notes">Notes</label>
+              <textarea id="training_notes" name="training_notes" maxlength="2000"></textarea>
+            </div>
+          </div>
+
+          <div class="finance-form-actions">
+            <button type="submit" class="btn">Save training <span class="arrow">→</span></button>
+          </div>
+        </form>
+      </div>
+
+      <div class="dash-panel">
+        <h2>Record performance review</h2>
+
+        <form method="POST" class="dash-form">
+          {{ csrf_field() }}
+          <input type="hidden" name="form_type" value="performance" />
+
+          <div class="account-grid">
+            <div class="full">
+              <label for="review_employee">Employee *</label>
+              <select id="review_employee" name="employee_id" required>
+                <option value="">Select employee</option>
+                {% for employee in employees %}
+                <option value="{{ employee.id }}">{{ employee.employee_code }} — {{ employee.full_name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label for="review_date">Review date *</label>
+              <input type="date" id="review_date" name="review_date" value="{{ today }}" required />
+            </div>
+            <div>
+              <label for="review_period">Review period *</label>
+              <input id="review_period" name="review_period" required maxlength="100"
+                     placeholder="e.g. Jan–Jun 2026" />
+            </div>
+            <div>
+              <label for="rating">Rating (1–5) *</label>
+              <select id="rating" name="rating" required>
+                <option value="">Select rating</option>
+                <option value="1">1 — Needs improvement</option>
+                <option value="2">2 — Below expectations</option>
+                <option value="3">3 — Meets expectations</option>
+                <option value="4">4 — Very good</option>
+                <option value="5">5 — Excellent</option>
+              </select>
+            </div>
+            <div>
+              <label for="reviewer">Reviewer name *</label>
+              <input id="reviewer" name="reviewer" required maxlength="150" />
+            </div>
+            <div class="full">
+              <label for="strengths">Strengths</label>
+              <textarea id="strengths" name="strengths" maxlength="2000"></textarea>
+            </div>
+            <div class="full">
+              <label for="improvements">Areas to improve</label>
+              <textarea id="improvements" name="improvements" maxlength="2000"></textarea>
+            </div>
+            <div class="full">
+              <label for="goals">Goals and action plan</label>
+              <textarea id="goals" name="goals" maxlength="2000"></textarea>
+            </div>
+          </div>
+
+          <div class="finance-form-actions">
+            <button type="submit" class="btn">Save review <span class="arrow">→</span></button>
+          </div>
+        </form>
+      </div>
+    </div>
+    {% else %}
+    <div class="dash-panel">
+      <p class="empty-state">No active employees yet. Register employees before logging training or reviews.</p>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    <div class="dash-panel">
+      <h2>Employee training records</h2>
+
+      {% if training_records %}
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Employee</th>
+              <th>Course</th>
+              <th>Provider</th>
+              <th>Dates</th>
+              <th>Status</th>
+              <th>Certificate</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in training_records %}
+            <tr>
+              <td><strong>{{ item.full_name }}</strong><br /><span class="cell-note">{{ item.employee_code }}</span></td>
+              <td>{{ item.course_title }}<br /><span class="cell-note">{{ item.notes }}</span></td>
+              <td>{{ item.provider or '—' }}</td>
+              <td>{{ item.start_date }} – {{ item.end_date or 'Not set' }}</td>
+              <td>
+                <span class="status-badge {{ 'active' if item.status == 'Completed' else ('off' if item.status == 'Cancelled' else 'neutral') }}">{{ item.status }}</span>
+              </td>
+              <td>{{ item.certificate or '—' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="empty-state">No training records yet.</p>
+      {% endif %}
+    </div>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>Performance review history</h2>
+
+      {% if performance_records %}
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Employee</th>
+              <th>Date</th>
+              <th>Period</th>
+              <th>Rating</th>
+              <th>Reviewer</th>
+              <th>Strengths</th>
+              <th>Improvements</th>
+              <th>Goals</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in performance_records %}
+            <tr>
+              <td><strong>{{ item.full_name }}</strong><br /><span class="cell-note">{{ item.employee_code }}</span></td>
+              <td>{{ item.review_date }}</td>
+              <td>{{ item.review_period }}</td>
+              <td><span class="status-badge neutral">{{ item.rating }}/5</span></td>
+              <td>{{ item.reviewer }}</td>
+              <td>{{ item.strengths or '—' }}</td>
+              <td>{{ item.improvements or '—' }}</td>
+              <td>{{ item.goals or '—' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="empty-state">No performance reviews yet.</p>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}

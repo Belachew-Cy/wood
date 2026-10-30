@@ -1,0 +1,230 @@
+{% extends "public_base.html" %}
+
+{% block title %}Sign In | Dereje Belay Wood &amp; Kitchen Cabinet Finishing{% endblock %}
+
+{% block content %}
+<section class="auth-section">
+    <div class="auth-shell">
+
+        <aside class="auth-aside">
+            <span class="eyebrow">MANAGEMENT SUITE</span>
+
+            <h2>Every board, cut, and payslip in one place.</h2>
+
+            <ul class="auth-points">
+                <li>
+                    <span class="tick" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none"
+                             stroke="currentColor" stroke-width="2.2"
+                             stroke-linecap="round" stroke-linejoin="round">
+                            <path d="m5 12.5 4.2 4.2L19 7"/>
+                        </svg>
+                    </span>
+                    HR, payroll, finance, and inventory under one roof.
+                </li>
+
+                <li>
+                    <span class="tick" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none"
+                             stroke="currentColor" stroke-width="2.2"
+                             stroke-linecap="round" stroke-linejoin="round">
+                            <path d="m5 12.5 4.2 4.2L19 7"/>
+                        </svg>
+                    </span>
+                    Each employee accesses their authorized dashboard.
+                </li>
+
+                <li>
+                    <span class="tick" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none"
+                             stroke="currentColor" stroke-width="2.2"
+                             stroke-linecap="round" stroke-linejoin="round">
+                            <path d="m5 12.5 4.2 4.2L19 7"/>
+                        </svg>
+                    </span>
+                    Connected dashboards for employees, finances, and materials.
+                </li>
+            </ul>
+
+            <p class="auth-footnote">Better Woodwork. Better Living.</p>
+        </aside>
+
+        <div class="auth-card">
+
+            <div class="auth-brand">
+                <span class="mark" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="1.7"
+                         stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 10.5 12 3l9 7.5"/>
+                        <path d="M5.5 9V21h13V9"/>
+                        <path d="M10 21v-6h4v6"/>
+                    </svg>
+                </span>
+
+                <h1>Welcome back</h1>
+                <p>Sign in to your Dereje Belay account</p>
+            </div>
+
+            {% if lock_notice %}
+            <div class="auth-lock" role="alert">
+                <strong>{{ lock_notice.title }}</strong>
+                <p>{{ lock_notice.body }}</p>
+            </div>
+            {% endif %}
+
+            <form method="POST" class="auth-form" id="login-form">
+                {# Include this if Flask-WTF CSRF protection is enabled. #}
+                {% if csrf_token is defined %}
+                    <input type="hidden" name="csrf_token"
+                           value="{{ csrf_token() }}">
+                {% endif %}
+
+                <label for="email">Email or username</label>
+                <input
+                    type="text"
+                    id="email"
+                    name="email"
+                    placeholder="you@example.com or DB1000"
+                    autocomplete="username"
+                    spellcheck="false"
+                    autocapitalize="none"
+                    required
+                    autofocus
+                >
+
+                <label for="password">Password</label>
+
+                <div class="pw-wrap">
+                    <input
+                        type="password"
+                        id="password"
+                        name="password"
+                        placeholder="Enter your password"
+                        autocomplete="current-password"
+                        required
+                    >
+
+                    <button
+                        type="button"
+                        class="pw-toggle"
+                        aria-label="Show password"
+                        aria-pressed="false"
+                    >
+                        <svg class="eye-open" viewBox="0 0 24 24"
+                             fill="none" stroke="currentColor"
+                             stroke-width="1.7" stroke-linecap="round"
+                             stroke-linejoin="round" aria-hidden="true">
+                            <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/>
+                            <circle cx="12" cy="12" r="3"/>
+                        </svg>
+
+                        <svg class="eye-off" viewBox="0 0 24 24"
+                             fill="none" stroke="currentColor"
+                             stroke-width="1.7" stroke-linecap="round"
+                             stroke-linejoin="round" aria-hidden="true">
+                            <path d="M3 3l18 18"/>
+                            <path d="M10.6 6a9.9 9.9 0 0 1 1.4-.1c6 0 9.5 6.1 9.5 6.1a17 17 0 0 1-2.6 3.5"/>
+                            <path d="M6.3 7.8A16.7 16.7 0 0 0 2.5 12S6 18.1 12 18.1a9.4 9.4 0 0 0 3.6-.7"/>
+                            <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <a class="auth-forgot" href="{{ url_for('forgot_password') }}">
+                    Forgot password?
+                </a>
+
+                <button type="submit" class="btn btn-full" id="login-submit">
+                    <span class="btn-label">Sign In</span>
+                    <span class="arrow" aria-hidden="true">→</span>
+                </button>
+            </form>
+
+            {% if ms_login_enabled %}
+            <div class="auth-divider"><span>or</span></div>
+
+            <a class="auth-ms" id="ms-login"
+               href="{{ url_for('microsoft_login') }}{% if request.args.get('next') %}?next={{ request.args.get('next') | urlencode }}{% endif %}">
+                <svg class="ms-logo" viewBox="0 0 23 23" aria-hidden="true" focusable="false">
+                    <path fill="#f35325" d="M1 1h10v10H1z"/>
+                    <path fill="#81bc06" d="M12 1h10v10H12z"/>
+                    <path fill="#05a6f0" d="M1 12h10v10H1z"/>
+                    <path fill="#ffba08" d="M12 12h10v10H12z"/>
+                </svg>
+                <span>Sign in with Microsoft</span>
+            </a>
+
+            <p class="auth-hint auth-hint-tight">
+                Use your organization Microsoft account. Your role still decides which
+                dashboard opens.
+            </p>
+            {% endif %}
+
+            <p class="auth-hint">
+                Sign in with your email or the username your administrator gave you.
+                Your role determines which dashboard you land on.
+            </p>
+
+            <a href="{{ url_for('index') }}" class="auth-back">
+                <span aria-hidden="true">←</span> Back to website
+            </a>
+        </div>
+
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    "use strict";
+
+    const toggle = document.querySelector(".pw-toggle");
+    const password = document.getElementById("password");
+    const form = document.getElementById("login-form");
+    const submitButton = document.getElementById("login-submit");
+
+    if (toggle && password) {
+        toggle.addEventListener("click", function () {
+            const showPassword = password.type === "password";
+
+            password.type = showPassword ? "text" : "password";
+            toggle.setAttribute(
+                "aria-pressed",
+                showPassword ? "true" : "false"
+            );
+            toggle.setAttribute(
+                "aria-label",
+                showPassword ? "Hide password" : "Show password"
+            );
+            toggle.classList.toggle("is-shown", showPassword);
+
+            password.focus();
+        });
+    }
+
+    if (form && submitButton) {
+        form.addEventListener("submit", function (event) {
+            if (!form.checkValidity()) {
+                return;
+            }
+
+            if (form.dataset.submitting === "true") {
+                event.preventDefault();
+                return;
+            }
+
+            form.dataset.submitting = "true";
+            submitButton.classList.add("is-busy");
+            submitButton.setAttribute("aria-busy", "true");
+
+            const label = submitButton.querySelector(".btn-label");
+            if (label) {
+                label.textContent = "Signing in...";
+            }
+        });
+    }
+})();
+</script>
+{% endblock %}

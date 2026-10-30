@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi, bars, donut, columns, feed with context %}
+
+{% block title %}Payroll Dashboard | Dereje Wood &amp; Kitchen Cabinet Finishing{% endblock %}
+
+{% block content %}
+{% set month_cols = [] %}
+{% for m in months | sort(attribute='month') %}
+  {% set _ = month_cols.append({
+    'label': m["month"][5:7],
+    'value': m["net"] or 0,
+    'display': "{} · {:,.0f} ETB".format(m["month"], m["net"] or 0)
+  }) %}
+{% endfor %}
+
+{% set cost_rows = [
+  {'label': 'Gross', 'value': gross, 'display': "{:,.2f}".format(gross)},
+  {'label': 'Deductions', 'value': deductions, 'display': "{:,.2f}".format(deductions)},
+  {'label': 'Net pay', 'value': net, 'display': "{:,.2f}".format(net)}
+] %}
+
+{% set dept_rows = [] %}
+{% for name, rows in records | groupby('department') %}
+  {% set total_net = rows | map(attribute='net_salary') | sum %}
+  {% set _ = dept_rows.append({
+    'label': name or 'Unassigned',
+    'value': total_net,
+    'display': "{:,.0f} ETB".format(total_net)
+  }) %}
+{% endfor %}
+{% set dept_rows = dept_rows | sort(reverse=true, attribute='value') %}
+
+{% set lines = records | length %}
+{% set attention = [] %}
+{% for r in records %}
+  {% if r["payment_status"] != 'Paid' %}
+    {% set _ = attention.append({
+      'icon': 'cash', 'tone': 'warn',
+      'title': "{} unpaid".format(r["full_name"]),
+      'meta': "{} · {:,.2f} ETB net.".format(r["employee_code"], r["net_salary"]),
+      'href': url_for('payroll', month=month), 'time': 'Mark paid'
+    }) %}
+  {% endif %}
+{% endfor %}
+{% if attention | length > 4 %}
+  {% set extra = attention | length - 4 %}
+  {% set attention = attention[:4] + [{
+    'icon': 'inbox', 'tone': 'warn',
+    'title': "{} more payslip lines still pending".format(extra),
+    'meta': 'Open Run Payroll to settle them.',
+    'href': url_for('payroll', month=month), 'time': 'All'
+  }] %}
+{% endif %}
+{% if lines and paid == lines %}
+  {% set _ = attention.append({
+    'icon': 'check', 'tone': 'ok',
+    'title': "{} is fully paid".format(month),
+    'meta': "All {} salary lines are marked Paid.".format(lines),
+    'time': 'Done'
+  }) %}
+{% endif %}
+{% if not lines %}
+  {% set _ = attention.append({
+    'icon': 'calendar', 'tone': '',
+    'title': "No salary lines for {}".format(month),
+    'meta': 'Run payroll for the month or pick another month above.',
+    'href': url_for('payroll', month=month), 'time': 'Run'
+  }) %}
+{% endif %}
+
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Payroll</span>
+      <h1>Payroll Dashboard</h1>
+      <p>Signed in as {{ user.full_name }} · {{ role_label }} access</p>
+    </div>
+    {% if 'hr' in permissions %}
+    <a class="btn" href="{{ url_for('hr_dashboard') }}">HR Management →</a>
+    {% endif %}
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    <nav class="hr-navigation" aria-label="Payroll">
+      <a class="hr-nav-link active" href="{{ url_for('payroll_dashboard') }}">Dashboard</a>
+      {% if 'hr' in permissions or 'payroll' in permissions %}
+      <a class="hr-nav-link" href="{{ url_for('payroll') }}">Run Payroll</a>
+      {% endif %}
+    </nav>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <form method="GET" class="payroll-month-form">
+      <label for="month">Payroll month</label>
+      <input id="month" type="month" name="month" value="{{ month }}" />
+      <button class="btn" type="submit">Open</button>
+    </form>
+
+    <div class="hr-stats">
+      {{ kpi('Lines for ' ~ month, lines) }}
+      {{ kpi('Gross (ETB)', "{:,.2f}".format(gross)) }}
+      {{ kpi('Deductions (ETB)', "{:,.2f}".format(deductions),
+             '{}% of gross'.format(((deductions / gross * 100) | round(0, 'common') | int) if gross else 0)) }}
+      {{ kpi('Net pay (ETB)', "{:,.2f}".format(net)) }}
+      {{ kpi('Paid', paid,
+             '{} of {} lines'.format(paid, lines),
+             'up' if lines and paid == lines else 'flat') }}
+      {{ kpi('Pending', lines - paid,
+             'to release',
+             'down' if lines - paid else 'flat') }}
+    </div>
+
+    <div class="chart-grid">
+      {{ columns('Net payroll by month', month_cols, 'ETB') }}
+      {{ bars('Cost breakdown for ' ~ month, cost_rows, 'ETB') }}
+      {{ bars('Net pay by department', dept_rows, 'ETB') }}
+      {{ donut('Payment progress', (paid / lines) if lines else 0,
+              '{}%'.format(((paid / lines * 100) | round(0, 'common') | int) if lines else 0),
+              [
+                {'label': 'Paid', 'color': 'var(--walnut)', 'value': paid},
+                {'label': 'Pending', 'color': 'var(--ivory-2)', 'value': lines - paid}
+              ], 'of salary lines') }}
+      {{ feed('Needs attention', attention, 'Payslips to release') }}
+    </div>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>Salary lines</h2>
+      <div class="hr-table-wrap table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Employee ID</th><th>Name</th><th>Department</th>
+              <th>Basic</th><th>Allowances</th><th>Deductions</th><th>Net</th><th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in records %}
+            <tr>
+              <td>{{ r["employee_code"] }}</td>
+              <td>{{ r["full_name"] }}</td>
+              <td>{{ r["department"] }}</td>
+              <td>{{ "{:,.2f}".format(r["basic_salary"]) }}</td>
+              <td>{{ "{:,.2f}".format(r["allowances"]) }}</td>
+              <td>{{ "{:,.2f}".format(r["deductions"]) }}</td>
+              <td>{{ "{:,.2f}".format(r["net_salary"]) }}</td>
+              <td><span class="status-badge {{ 'active' if r['payment_status'] == 'Paid' else 'off' }}">{{ r["payment_status"] }}</span></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="8" class="employee-empty">No salary lines for {{ month }} yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>Recent months</h2>
+      <div class="hr-table-wrap table-scroll">
+        <table>
+          <thead><tr><th>Month</th><th>Lines</th><th>Net paid (ETB)</th><th>Paid</th></tr></thead>
+          <tbody>
+            {% for m in months %}
+            <tr>
+              <td><a href="{{ url_for('payroll_dashboard', month=m['month']) }}">{{ m["month"] }}</a></td>
+              <td>{{ m["lines"] }}</td>
+              <td>{{ "{:,.2f}".format(m["net"]) }}</td>
+              <td>
+                <div class="bar-track" style="max-width:120px;display:inline-block;vertical-align:middle;">
+                  <div class="bar-fill" style="width: {{ ((m['paid'] / m['lines'] * 100) | round(1)) if m['lines'] else 0 }}%"></div>
+                </div>
+                <span class="feed-meta"> {{ m["paid"] }} / {{ m["lines"] }}</span>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="employee-empty">Nothing has been processed yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

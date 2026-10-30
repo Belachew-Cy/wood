@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi with context %}
+
+{% block title %}Approval Policy | Dereje Belay Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Approvals</span>
+      <h1>Approval policy</h1>
+      <p>The amount that decides how far a request travels, and the desk that opens each
+        department&rsquo;s chain. Both are stored in the database, so a change here takes
+        effect on the next request &mdash; no code edit and no restart.</p>
+    </div>
+    <nav class="stock-actions" aria-label="Approval policy actions">
+      <a class="btn btn-outline btn-sm" href="{{ url_for('approvals.dashboard') }}">Approval queue</a>
+      <a class="btn btn-outline btn-sm" href="{{ url_for('admin_settings') }}">System settings</a>
+    </nav>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="hr-stats">
+      {{ kpi('Manager limit', '{:,.0f} ETB'.format(policy.manager_limit),
+             'Below this, one desk signs it') }}
+      {{ kpi('Director limit', '{:,.0f} ETB'.format(policy.director_limit),
+             'At or above this, Management signs last') }}
+      {{ kpi('Departments routed', departments | length,
+             'Each one opens with its own desk') }}
+      {{ kpi('Last changed by', policy.updated_by,
+             policy.updated_at or 'Seeded from the shipped defaults') }}
+    </div>
+
+    <p class="perm-note">A request that is already waiting keeps the chain it was opened
+      with. Retuning the policy changes new requests only, so nothing mid-flight has to be
+      re-signed.</p>
+  </div>
+</section>
+
+<section class="section bg-white">
+  <div class="container">
+    <div class="emp-panel">
+      <div class="account-card">
+        <header class="account-head">
+          <span class="role-badge admin">Approval limits</span>
+          <span class="cell-note">Read on every new request</span>
+        </header>
+
+        <form method="POST" class="dash-form account-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+          <div class="account-grid">
+            <div>
+              <label for="manager_limit">Manager limit (ETB)</label>
+              <input id="manager_limit" name="manager_limit" type="number" min="0" step="500"
+                     required value="{{ '%.0f' | format(policy.manager_limit) }}" />
+              <p class="cell-note">A request at or above this adds Finance after the
+                department&rsquo;s own desk.</p>
+            </div>
+            <div>
+              <label for="director_limit">Director limit (ETB)</label>
+              <input id="director_limit" name="director_limit" type="number" min="1" step="500"
+                     required value="{{ '%.0f' | format(policy.director_limit) }}" />
+              <p class="cell-note">At or above this the chain closes with a Management
+                signature. Must be larger than the manager limit.</p>
+            </div>
+          </div>
+
+          <div class="account-grid">
+            {% for department in departments %}
+            <div>
+              <label for="route_{{ department }}">{{ department | capitalize }} requests open with</label>
+              <select id="route_{{ department }}" name="route_{{ department }}">
+                {% for step in steps %}
+                <option value="{{ step }}"
+                        {% if routes.get(department) == step %}selected{% endif %}>{{ step_label[step] }} ({{ desk_holders[step] }})</option>
+                {% endfor %}
+              </select>
+            </div>
+            {% endfor %}
+          </div>
+
+          <div class="finance-form-actions">
+            <button type="submit" class="btn">Save policy <span class="arrow">→</span></button>
+          </div>
+        </form>
+      </div>
+
+      <div class="account-card">
+        <header class="account-head">
+          <span class="role-badge finance">The chains this produces</span>
+          <span class="cell-note">Calculated live from the saved policy</span>
+        </header>
+        <div class="dash-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Department</th>
+                <th>Under {{ '{:,.0f}'.format(probe_amounts[0] + 1) }} ETB</th>
+                <th>{{ '{:,.0f}'.format(probe_amounts[0] + 1) }}–{{ '{:,.0f}'.format(probe_amounts[2] - 1) }} ETB</th>
+                <th>{{ '{:,.0f}'.format(probe_amounts[2]) }} ETB and above</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for department in departments %}
+              <tr>
+                <th>{{ department | capitalize }}</th>
+                {% for chain in chain_probe[department] %}
+                <td>{{ chain | join(' → ') }}</td>
+                {% endfor %}
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <p class="perm-note">Production, Sales and General have no desk of their own in the
+          module list, so they open with Management by default. Point them at another desk
+          above if a manager should screen them first.</p>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

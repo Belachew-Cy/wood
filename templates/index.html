@@ -1,0 +1,212 @@
+{% extends "public_base.html" %}
+{% from "base.html" import org_structure with context %}
+{% block title %}Dereje Belay Wood &amp; Kitchen Cabinet Finishing | Beautiful Spaces Crafted with Wood{% endblock %}
+
+{% block content %}
+<!-- ============== HERO ============== -->
+<section class="hero">
+  <div class="hero-text">
+    <span class="eyebrow">Custom Woodwork &amp; Kitchen Finishing</span>
+    <h1>Beautiful Spaces <span class="accent">Crafted with Wood</span></h1>
+    <p>We design and build custom kitchens, wardrobes, doors and complete interior finishing solutions to make your home more beautiful, functional and unique.</p>
+    <div class="hero-actions">
+      <a href="{{ url_for('projects') }}" class="btn">View Our Projects <span class="arrow">→</span></a>
+      <a href="{{ url_for('contact') }}" class="btn btn-outline"><svg viewBox="0 0 24 24" fill="currentColor" class="wa"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.074-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.269.489 1.703.625.713.227 1.36.195 1.872.118.571-.085 1.758-.719 2.006-1.413.247-.694.247-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.038-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/></svg> Contact Us</a>
+    </div>
+  </div>
+  <div class="hero-image"></div>
+</section>
+
+<!-- ============== SERVICES ============== -->
+<section class="section bg-ivory">
+  <div class="container">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow">Our Services</span>
+        <h2>What We Offer</h2>
+      </div>
+      <p>From kitchen cabinets to full home finishing, we provide high-quality woodwork and professional installation.</p>
+    </div>
+
+    <div class="services-grid">
+      <div class="service-card">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 10h14v9a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"/><path d="M3 13h2m14 0h2M3 16.5h2m14 0h2"/><path d="M8.5 6.5a3.5 3.5 0 0 1 7 0"/><path d="M12 6.5V10"/></svg></div>
+        <h3>Kitchen Finishing</h3>
+        <p>Custom cabinets, countertops and storage.</p>
+      </div>
+      <div class="service-card">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="1"/><path d="M12 3v18"/><path d="M9.7 12h.01M14.3 12h.01"/></svg></div>
+        <h3>Wardrobes &amp; Closets</h3>
+        <p>Built-in wardrobes and space-saving designs.</p>
+      </div>
+      <div class="service-card">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="3" width="12" height="18" rx="1"/><path d="M14.5 12h.01"/><path d="M4 21h16"/></svg></div>
+        <h3>Doors &amp; Wall Panels</h3>
+        <p>Interior doors, wall cladding and decorative woodwork.</p>
+      </div>
+      <div class="service-card">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 12h18M12 4v16"/><path d="M6 8h3M15 16h3"/></svg></div>
+        <h3>Custom Cabinets</h3>
+        <p>Office, TV units, shelves and more.</p>
+      </div>
+      <div class="service-card">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21h4v-4h4v-4h4v-4h4"/><path d="M4 21V17"/></svg></div>
+        <h3>Stairs &amp; Railings</h3>
+        <p>Elegant and durable wooden stairs.</p>
+      </div>
+      <div class="service-card">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9V21h13V9"/><path d="M10 21v-6h4v6"/></svg></div>
+        <h3>Complete Interior Finishing</h3>
+        <p>Turnkey solutions for your home or office.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============== RECENT WORK ============== -->
+<section class="section bg-sand">
+  <div class="container">
+    <div class="projects-row">
+      <div class="intro">
+        <span class="eyebrow">Our Projects</span>
+        <h2>Recent Work</h2>
+        <p>Explore our latest completed projects and see the quality and craftsmanship we bring to every space.</p>
+        <a href="{{ url_for('projects') }}" class="btn">View All Projects <span class="arrow">→</span></a>
+      </div>
+      <div class="projects-cards" id="recentWork" aria-busy="true"
+           data-source="{{ url_for('projects_api') }}"
+           data-projects-url="{{ url_for('projects') }}">
+        <!-- Filled by js.js: the placeholders are the loading state. -->
+        <div class="project-card skeleton" aria-hidden="true"></div>
+        <div class="project-card skeleton" aria-hidden="true"></div>
+        <div class="project-card skeleton" aria-hidden="true"></div>
+        <div class="project-card skeleton" aria-hidden="true"></div>
+      </div>
+    </div>
+    <noscript>
+      <style>#recentWork .project-card.skeleton { display: none; }</style>
+      <p class="empty-state"><strong>Our recent work is a photo gallery.</strong> Enable JavaScript, or ask us to send project photos directly.</p>
+    </noscript>
+  </div>
+</section>
+
+<!-- ============== ABOUT SPLIT ============== -->
+<section class="about-split">
+  <div class="about-image"></div>
+  <div class="about-panel">
+    <span class="eyebrow">About Us</span>
+    <h2>Your Trusted Woodwork Partner</h2>
+    <p>We are a team of skilled craftsmen and designers dedicated to delivering high-quality wood design and kitchen finishing services. With years of experience, we focus on customer satisfaction, quality materials and attention to detail.</p>
+    <div class="features-row">
+      <div class="feature">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 2.8V12c0 4.6-3 8-7 9.7-4-1.7-7-5.1-7-9.7V5.8z"/><path d="m9 11.5 2 2 4-4"/></svg></div>
+        <span>Quality<br>Materials</span>
+      </div>
+      <div class="feature">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+        <span>Experienced<br>Team</span>
+      </div>
+      <div class="feature">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 2.7 5.5 6 .9-4.3 4.2 1 6-5.4-2.9-5.4 2.9 1-6L2.3 9.4l6-.9z"/></svg></div>
+        <span>Modern<br>Designs</span>
+      </div>
+      <div class="feature">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 18V6a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h1"/><path d="M14 9h4l3 3v5a1 1 0 0 1-1 1h-1"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/><path d="M9 18h6"/></svg></div>
+        <span>On-Time<br>Delivery</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============== ORGANIZATION ============== -->
+<section class="section bg-sand org-home" id="organization">
+  <div class="container">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow">Our Team</span>
+        <h2>How Our Team Is Organized</h2>
+      </div>
+      <p>The CEO, executives, directors and managers who lead the teams carrying a
+        kitchen from the first drawing to the final fitting.</p>
+    </div>
+
+    {% if org_leadership_tiers %}
+    <div class="org-panel org-panel-wide">
+      <div class="panel-head">
+        <div>
+          <h2>Leadership structure</h2>
+          <p class="cell-note">From the CEO through the executive, director and
+            manager levels across every department.</p>
+        </div>
+        <a class="btn btn-outline-dark btn-sm" href="{{ url_for('organization') }}">
+          Full organization page
+        </a>
+      </div>
+      {{ org_structure(org_leadership_tiers, show_roles=False) }}
+    </div>
+    {% else %}
+    <p class="empty-state"><strong>Our team chart is being prepared.</strong> Ask us
+      directly and we will introduce the people who will handle your project.</p>
+    {% endif %}
+  </div>
+</section>
+
+<!-- ============== PROCESS ============== -->
+<section class="section bg-white">
+  <div class="container">
+    <div class="process-head">
+      <div>
+        <span class="eyebrow">Our Process</span>
+        <h2>From Idea to Reality</h2>
+        <p>We make the process simple and stress-free. Here's how we work with you:</p>
+      </div>
+      <div class="process-steps">
+        <div class="step">
+          <div class="step-icon">
+            <span class="num">1</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-11.9 7.6L4 20.5l1.5-4.8A8.4 8.4 0 1 1 21 11.5z"/><path d="M8.5 11.5h.01M12 11.5h.01M15.5 11.5h.01"/></svg>
+          </div>
+          <h4>Consultation</h4>
+          <p>Discuss your needs and ideas.</p>
+        </div>
+        <div class="step">
+          <div class="step-icon">
+            <span class="num">2</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15.5 3.5a2.1 2.1 0 0 1 3 3L8 17l-4.5 1.5L5 14z"/><path d="m13.5 5.5 3 3"/></svg>
+          </div>
+          <h4>Design</h4>
+          <p>Create detailed drawings and 3D views.</p>
+        </div>
+        <div class="step">
+          <div class="step-icon">
+            <span class="num">3</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5 5l2.1 2.1M16.9 16.9 19 19M19 5l-2.1 2.1M7.1 16.9 5 19"/></svg>
+          </div>
+          <h4>Production</h4>
+          <p>Crafted with high-quality materials.</p>
+        </div>
+        <div class="step">
+          <div class="step-icon">
+            <span class="num">4</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9V21h13V9"/><path d="M10 21v-6h4v6"/></svg>
+          </div>
+          <h4>Installation</h4>
+          <p>Professional and on-time delivery.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============== CLOSING CTA ============== -->
+<section class="cta-band">
+  <div class="container">
+    <h2>Ready to start your project?</h2>
+    <p>Book a free consultation — we discuss your ideas, measure the space and prepare a quote.</p>
+    <div class="cta-actions">
+      <a href="{{ url_for('contact') }}" class="btn">Contact Me <span class="arrow">→</span></a>
+      <a href="{{ url_for('projects') }}" class="btn btn-outline">See Our Projects <span class="arrow">→</span></a>
+    </div>
+  </div>
+</section>
+{% endblock %}

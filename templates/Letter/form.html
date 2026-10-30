@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit' if letter else 'Create' }} Letter | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">CORRESPONDENCE</span>
+      <h1>{{ 'Edit Letter' if letter else 'Create Letter' }}</h1>
+      {% if letter %}
+      <p>{{ letter['reference_no'] }} · {{ letter_type_label(letter['letter_type']) }} · {{ letter['status'] }}</p>
+      {% else %}
+      <p>General correspondence, memoranda, and the HR, Finance, Procurement,
+         legal and confidential series share one register.</p>
+      {% endif %}
+    </div>
+    <nav class="letter-actions">
+      <a class="btn btn-outline" href="{{ url_for('letters.dashboard') }}">Back to letters</a>
+    </nav>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    <div class="dash-panel">
+      <h2>{{ 'Letter details' if letter else 'New letter' }}</h2>
+
+      <form method="POST" class="dash-form stock-grid letter-form"
+            data-letter-type="{{ letter['letter_type'] if letter else values.letter_type }}">
+        {{ csrf_field() }}
+
+        <div>
+          <label for="letter_type">Letter category *</label>
+          {% if letter %}
+          <input id="letter_type" value="{{ letter_type_label(letter['letter_type']) }}" disabled />
+          {% else %}
+          <select id="letter_type" name="letter_type" data-letter-type-select required>
+            {% for value, label in letter_types %}
+            <option value="{{ value }}"{% if values.letter_type == value %} selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+          {% endif %}
+        </div>
+
+        <div data-letter-kind-block>
+          <label for="letter_kind">Letter subject</label>
+          <select id="letter_kind" name="letter_kind" data-letter-kind>
+            <option value="">— no second level —</option>
+            {% for category, kinds in letter_kinds.items() %}
+            {% for kind in kinds %}
+            <option value="{{ kind }}" data-for="{{ category }}"
+                    {% if values.letter_kind == kind %}selected{% endif %}>{{ letter_kind_labels[category][kind] }}</option>
+            {% endfor %}
+            {% endfor %}
+          </select>
+          <p class="letter-kind-hint" data-kind-hint hidden>
+            This category is filed under the letter category alone.
+          </p>
+        </div>
+
+        <div class="letter-form-wide">
+          <label for="subject">Subject</label>
+          <input id="subject" name="subject" maxlength="250"
+                 value="{{ values.subject }}"
+                 placeholder="Optional — taken from the first line of the letter text" />
+          <p class="letter-kind-hint">
+            Leave it blank and the first line of the letter text becomes the subject.
+          </p>
+        </div>
+
+        <div class="letter-form-wide" data-form-types="official outgoing memo hr finance procurement legal confidential">
+          <span class="letter-field-label">Sender</span>
+          <div class="letter-auto-sender">
+            <strong>{{ sender_display }}</strong>
+            <em>Filled from your account and its HR department.</em>
+          </div>
+        </div>
+
+        <div class="letter-form-wide" data-form-types="incoming">
+          <label for="sender">Sender — who wrote the incoming letter *</label>
+          <input id="sender" name="sender" maxlength="160" value="{{ values.sender }}"
+                 placeholder="Name of the person or organisation" />
+        </div>
+
+        <div class="letter-form-wide" data-recipient-mode="external">
+          <label for="recipient">Recipient — external addressee *</label>
+          <input id="recipient" name="recipient" maxlength="160"
+                 value="{{ values.recipient }}"
+                 placeholder="Name of the person or organisation" />
+        </div>
+
+        <div class="letter-form-wide" data-recipient-mode="internal">
+          <label>Recipient *</label>
+          <div class="letter-mode-row">
+            <label class="letter-mode">
+              <input type="radio" name="recipient_mode" value="user"
+                     {% if values.recipient_mode != 'department' %}checked{% endif %} />
+              <span>Staff member</span>
+            </label>
+            <label class="letter-mode">
+              <input type="radio" name="recipient_mode" value="department"
+                     {% if values.recipient_mode == 'department' %}checked{% endif %} />
+              <span>Department</span>
+            </label>
+          </div>
+
+          <div class="letter-picker" data-mode="user">
+            <label class="letter-picker-label" for="recipient_user_id">Send to a staff member</label>
+            <select id="recipient_user_id" name="recipient_user_id">
+              <option value="">Choose an active staff member</option>
+              {% for account in accounts %}
+              <option value="{{ account['id'] }}"
+                      {% if values.recipient_user_id == account['id'] | string %}selected{% endif %}>
+                {{ account['full_name'] }}{% if account['department_name'] %} — {{ account['department_name'] }}{% endif %}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="letter-picker" data-mode="department">
+            <label class="letter-picker-label" for="recipient_department_id">Send to a department</label>
+            <select id="recipient_department_id" name="recipient_department_id">
+              <option value="">Choose an active department</option>
+              {% for department in departments %}
+              <option value="{{ department['id'] }}"
+                      {% if values.recipient_department_id == department['id'] | string %}selected{% endif %}>
+                {{ department['name'] }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <p class="letter-kind-hint">
+            Only accounts that may open this letter category can be addressed.
+          </p>
+        </div>
+
+        <div>
+          <label for="letter_date">Letter date *</label>
+          <input id="letter_date" type="date" name="letter_date" required
+                 value="{{ values.letter_date }}" />
+        </div>
+
+        <div class="letter-form-wide" data-form-types="official">
+          <label class="letter-mode letter-approval-toggle">
+            <input type="checkbox" name="requires_approval" value="1"
+                   {% if values.requires_approval %}checked{% endif %} />
+            <span>Requires approval — signed level by level before it is sent</span>
+          </label>
+          <p class="letter-kind-hint">
+            The letter is held as a draft for signature at each level in turn.
+            It can only be sent once the last level of its route has signed.
+          </p>
+        </div>
+
+        <div class="letter-form-wide" data-form-types="official" data-approval-level-block>
+          <label for="approval_level">Approval level *</label>
+          <select id="approval_level" name="approval_level" data-approval-level>
+            {% for value, label in approval_levels %}
+            <option value="{{ value }}"{% if values.approval_level == value %} selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+          <p class="letter-kind-hint">
+            Level 1 stops at the Manager, level 2 adds the Director, and level 3
+            runs to the CEO. The author files the letter; the chosen levels sign
+            it in order.
+          </p>
+        </div>
+
+        <div class="stock-notes">
+          <label for="body">Letter body / correspondence notes</label>
+          <textarea id="body" name="body" rows="12" maxlength="20000">{{ values.body }}</textarea>
+        </div>
+
+        <div class="stock-form-actions">
+          <button class="btn" type="submit">Save letter</button>
+          <a class="btn btn-outline" href="{{ url_for('letters.dashboard') }}">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  var form = document.querySelector('.letter-form');
+  if (!form) return;
+  var typeSelect = form.querySelector('[data-letter-type-select]');
+  var type = typeSelect ? typeSelect.value : form.dataset.letterType;
+  var blocks = form.querySelectorAll('[data-form-types]');
+  var radios = form.querySelectorAll('input[name="recipient_mode"]');
+  var modes = {{ letter_modes | tojson }};
+  var kinds = {{ letter_kinds | tojson }};
+  var kindSelect = form.querySelector('[data-letter-kind]');
+  var kindBlock = form.querySelector('[data-letter-kind-block]');
+  var kindHint = form.querySelector('[data-kind-hint]');
+  var approvalBlock = form.querySelector('[data-approval-level-block]');
+  var approvalToggle = form.querySelector('input[name="requires_approval"]');
+
+  function currentMode() {
+    var checked = form.querySelector('input[name="recipient_mode"]:checked');
+    return checked ? checked.value : 'user';
+  }
+
+  function renderRecipients() {
+    var external = (modes[type] || ['user']).indexOf('external') !== -1;
+    form.querySelectorAll('[data-recipient-mode]').forEach(function (block) {
+      block.hidden = (block.dataset.recipientMode === 'external') !== external;
+    });
+    form.querySelectorAll('.letter-picker').forEach(function (picker) {
+      picker.hidden = external || picker.dataset.mode !== currentMode();
+    });
+  }
+
+  function renderKinds() {
+    var allowed = kinds[type] || [];
+    if (kindSelect) {
+      kindSelect.querySelectorAll('option[data-for]').forEach(function (option) {
+        var fits = option.dataset.for === type;
+        option.hidden = !fits;
+        option.disabled = !fits;
+        if (!fits && option.selected) { kindSelect.value = ''; }
+      });
+      kindSelect.hidden = allowed.length === 0;
+    }
+    if (kindHint) { kindHint.hidden = allowed.length !== 0; }
+    if (kindBlock) { kindBlock.hidden = false; }
+  }
+
+  function renderApproval() {
+    if (!approvalBlock) return;
+    approvalBlock.hidden = (type !== 'official'
+                            || !(approvalToggle && approvalToggle.checked));
+  }
+
+  function render() {
+    blocks.forEach(function (block) {
+      block.hidden = block.dataset.formTypes.split(' ').indexOf(type) === -1;
+    });
+    renderRecipients();
+    renderKinds();
+    renderApproval();
+  }
+
+  if (typeSelect) {
+    typeSelect.addEventListener('change', function () {
+      type = typeSelect.value;
+      render();
+    });
+  }
+  radios.forEach(function (radio) { radio.addEventListener('change', renderRecipients); });
+  if (approvalToggle) {
+    approvalToggle.addEventListener('change', renderApproval);
+  }
+  render();
+})();
+</script>
+{% endblock %}

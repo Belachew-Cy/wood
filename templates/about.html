@@ -1,0 +1,46 @@
+{% extends "public_base.html" %}
+{% block title %}About Us | Dereje Belay Wood &amp; Kitchen Cabinet Finishing{% endblock %}
+
+{% block content %}
+<section class="page-hero">
+  <div class="container">
+    <span class="eyebrow">About Us</span>
+    <h1>Your Trusted Woodwork Partner</h1>
+    <p>Skilled craftsmen. Quality materials. Attention to detail.</p>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container content-block">
+    <h2>Our Story</h2>
+    <p>Dereje Belay Wood &amp; Kitchen Cabinet Finishing is a team of skilled craftsmen and designers dedicated to delivering high-quality wood design and kitchen finishing services...</p>
+    <p>With years of experience, we focus on customer satisfaction, quality materials, and attention to detail on every project.</p>
+  </div>
+</section>
+
+<section class="section bg-white">
+  <div class="container">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow">Why Choose Us</span>
+        <h2>What We Bring to Every Project</h2>
+      </div>
+      <p>Four commitments behind the kitchens, wardrobes and doors we hand over.</p>
+    </div>
+    <div class="services-page-grid is-four">
+      <div class="service-full"><div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 2.8V12c0 4.6-3 8-7 9.7-4-1.7-7-5.1-7-9.7V5.8z"/><path d="m9 11.5 2 2 4-4"/></svg></div><h3>Quality Materials</h3><p>We source only premium woods and finishes.</p></div>
+      <div class="service-full"><div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><h3>Experienced Team</h3><p>Skilled craftsmen with years of expertise.</p></div>
+      <div class="service-full"><div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 2.7 5.5 6 .9-4.3 4.2 1 6-5.4-2.9-5.4 2.9 1-6L2.3 9.4l6-.9z"/></svg></div><h3>Modern Designs</h3><p>Timeless style meets functional design.</p></div>
+      <div class="service-full"><div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 18V6a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h1"/><path d="M14 9h4l3 3v5a1 1 0 0 1-1 1h-1"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/><path d="M9 18h6"/></svg></div><h3>On-Time Delivery</h3><p>We respect your time and your budget.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="cta-band">
+  <div class="container">
+    <h2>Ready to transform your space?</h2>
+    <p>Get in touch for a free consultation and quote.</p>
+    <a href="{{ url_for('contact') }}" class="btn">Contact Me <span class="arrow">→</span></a>
+  </div>
+</section>
+{% endblock %}

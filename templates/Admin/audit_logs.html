@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi, bars, feed with context %}
+
+{% block title %}Audit Trail | Dereje Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Audit &amp; Oversight</span>
+      <h1>Audit Trail</h1>
+      <p>Every sign-in, record change and refusal, in one searchable list.</p>
+    </div>
+    <nav class="stock-actions" aria-label="Oversight sections">
+      <a class="btn btn-outline btn-sm" href="{{ url_for('management_overview') }}">Management Overview</a>
+      <a class="btn btn-outline btn-sm" href="{{ url_for('audit.audit_export', **filters) }}">Export CSV</a>
+      <button class="btn btn-outline btn-sm" type="button" data-print>Print</button>
+      <a class="btn btn-sm" href="{{ url_for('audit.audit_dashboard') }}">All Events</a>
+    </nav>
+  </div>
+</section>
+
+<section class="container finance-page">
+  <div class="hr-stats">
+    {{ kpi('Events recorded', stats.total or 0) }}
+    {{ kpi('Successful logins', stats.logins or 0) }}
+    {{ kpi('Failed logins', stats.failed_logins or 0,
+           'Worth a look' if (stats.failed_logins or 0) else '',
+           'down' if (stats.failed_logins or 0) else 'flat') }}
+    {{ kpi('Denied actions', stats.denied or 0,
+           'Permission refused' if (stats.denied or 0) else '',
+           'down' if (stats.denied or 0) else 'flat') }}
+  </div>
+
+  <div class="chart-grid">
+    {{ bars('Events by module', module_rows, 'All recorded activity') }}
+    {{ feed('Refusals and failures', attention, 'Newest first, click to filter the trail',
+            {'href': url_for('audit.audit_dashboard', outcome='DENIED'),
+             'label': 'Show all refusals'}) }}
+  </div>
+
+  <div class="finance-panel">
+    <h2>Filter the trail</h2>
+    <form method="GET" class="filter-form">
+      <input type="search" name="q" value="{{ filters.q }}"
+             placeholder="Search anything" aria-label="Search descriptions and records">
+
+      <input type="search" name="username" value="{{ filters.username }}"
+             placeholder="Search by name or username" aria-label="Search by name">
+
+      <select name="department" aria-label="Department">
+        <option value="">All departments</option>
+        {% for name in departments %}
+        <option value="{{ name }}" {% if filters.department == name %}selected{% endif %}>
+          {{ name }}
+        </option>
+        {% endfor %}
+      </select>
+
+      <select name="module" aria-label="Module">
+        <option value="">All modules</option>
+        {% for row in modules %}
+        <option value="{{ row.module }}" {% if filters.module == row.module %}selected{% endif %}>
+          {{ row.module }}
+        </option>
+        {% endfor %}
+      </select>
+
+      <select name="action" aria-label="Action">
+        <option value="">All actions</option>
+        {% for row in actions %}
+        <option value="{{ row.action }}" {% if filters.action == row.action %}selected{% endif %}>
+          {{ row.action }}
+        </option>
+        {% endfor %}
+      </select>
+
+      <select name="outcome" aria-label="Outcome">
+        <option value="">All outcomes</option>
+        {% for value in ('SUCCESS', 'FAILURE', 'DENIED') %}
+        <option value="{{ value }}" {% if filters.outcome == value %}selected{% endif %}>
+          {{ value | title }}
+        </option>
+        {% endfor %}
+      </select>
+
+      <select name="device_type" aria-label="Device type">
+        <option value="">Any device</option>
+        {% for device in devices %}
+        <option value="{{ device }}" {% if filters.device_type == device %}selected{% endif %}>
+          {{ device }}
+        </option>
+        {% endfor %}
+      </select>
+
+      <input type="search" name="ip_address" value="{{ filters.ip_address }}"
+             placeholder="IP address" aria-label="IP address">
+
+      <input type="date" name="start_date" value="{{ filters.start_date }}" aria-label="From date">
+      <input type="date" name="end_date" value="{{ filters.end_date }}" aria-label="To date">
+
+      <button class="finance-btn primary" type="submit">Apply filters</button>
+      <a class="btn btn-outline btn-sm" href="{{ url_for('audit.audit_dashboard') }}">Reset</a>
+    </form>
+  </div>
+
+  <div class="dash-panel hr-table-panel">
+    <h2>{{ total }} record{{ '' if total == 1 else 's' }} · page {{ page }} of {{ pages }}</h2>
+
+    <div class="hr-table-wrap table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Account</th>
+            <th>Role</th>
+            <th>Department</th>
+            <th>Action</th>
+            <th>Module</th>
+            <th>What happened</th>
+            <th>Record</th>
+            <th>Changes</th>
+            <th>Device</th>
+            <th>IP</th>
+            <th>Outcome</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for entry in logs %}
+          {% set log = entry.log %}
+          <tr>
+            <td class="nowrap">{{ log.occurred_at | audit_time }}</td>
+            <td>
+              {{ log.username }}
+              {% if log.full_name and log.full_name != log.username %}
+              <span class="feed-meta">{{ log.full_name }}</span>
+              {% endif %}
+            </td>
+            <td>{{ log.role | title }}</td>
+            <td>{{ log.department or '—' }}</td>
+            <td>{{ log.action | title }}</td>
+            <td>{{ log.module | title }}</td>
+            <td class="wrap-cell">{{ log.description }}</td>
+            <td>
+              {% if log.record_type %}
+              {{ log.record_type }} #{{ log.record_id }}
+              {% else %}
+              <span class="feed-meta">—</span>
+              {% endif %}
+            </td>
+            <td class="wrap-cell">
+              {% for change in entry.changes %}
+              <span class="feed-meta">{{ change }}</span>{% if not loop.last %}<br>{% endif %}
+              {% else %}
+              <span class="feed-meta">—</span>
+              {% endfor %}
+            </td>
+            <td>
+              {% if log.device_type or log.os or log.browser %}
+              {{ log.device_type or 'Device' }}{% if log.os %} · {{ log.os }}{% endif %}{% if log.browser %} · {{ log.browser }}{% endif %}
+              {% else %}
+              <span class="feed-meta">—</span>
+              {% endif %}
+            </td>
+            <td class="nowrap">{{ log.ip_address or '—' }}</td>
+            <td>
+              <span class="status-badge {{ 'active' if log.outcome == 'SUCCESS' else 'off' if log.outcome == 'FAILURE' else 'neutral' }}">
+                {{ log.outcome | title }}
+              </span>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="12" class="employee-empty">
+              No events match these filters yet.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if pages > 1 %}
+    <footer class="audit-pagination">
+      <div>
+        {% if page > 1 %}
+        <a class="btn btn-outline btn-sm"
+           href="{{ url_for('audit.audit_dashboard', page=page-1, **filters) }}">Previous</a>
+        {% endif %}
+        {% if page < pages %}
+        <a class="btn btn-sm"
+           href="{{ url_for('audit.audit_dashboard', page=page+1, **filters) }}">Next</a>
+        {% endif %}
+      </div>
+    </footer>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Print {{ letter['reference_no'] }} | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+<section class="section bg-ivory letter-print-page">
+  <div class="container">
+    <div class="letter-actions no-print letter-actions-foot">
+      <a class="btn btn-outline" href="{{ url_for('letters.detail', letter_id=letter['id']) }}">Back to letter</a>
+      <button class="btn" type="button" onclick="window.print()">Print this letter</button>
+    </div>
+
+    <article class="letter-sheet">
+      <header class="letter-sheet-head">
+        <div class="letter-sheet-brand">
+          <strong>Dereje Belay</strong>
+          <span>Wood &amp; Kitchen Cabinet Finishing</span>
+        </div>
+        <dl class="letter-sheet-ref">
+          <div><dt>Reference</dt><dd>{{ letter['reference_no'] }}</dd></div>
+          <div><dt>Date</dt><dd>{{ letter['letter_date'] | friendly_date }}</dd></div>
+        </dl>
+      </header>
+
+      <dl class="letter-meta">
+        <div><dt>From</dt><dd>{{ letter['sender'] or '—' }}</dd></div>
+        <div><dt>To</dt><dd>{{ letter['recipient'] or '—' }}</dd></div>
+        <div><dt>Category</dt><dd>{{ letter_type_label(letter['letter_type']) }}{% if letter['letter_kind'] %} · {{ letter_kind_label(letter['letter_type'], letter['letter_kind']) }}{% endif %}</dd></div>
+        {% if letter['approved_at'] %}
+        <div><dt>Approved by</dt><dd>{{ approver['full_name'] if approver else '—' }} · {{ letter['approved_at'] | audit_time }}</dd></div>
+        {% endif %}
+        <div class="letter-meta-wide"><dt>Subject</dt><dd>{{ letter['subject'] }}</dd></div>
+      </dl>
+
+      <div class="letter-body">{{ letter['body'] or 'No letter body has been entered.' }}</div>
+
+      <footer class="letter-sign">
+        <p>Authorized signature: ________________________</p>
+        <p>Date: ________________________</p>
+      </footer>
+    </article>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+window.addEventListener('load', function () { window.print(); });
+</script>
+{% endblock %}

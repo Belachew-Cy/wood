@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}Letter {{ 'Inbox' if folder == 'inbox' else 'Outbox' }} | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+{% set is_inbox = folder == 'inbox' %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">CORRESPONDENCE</span>
+      <h1>{{ 'Inbox' if is_inbox else 'Outbox' }}</h1>
+      {% if is_inbox %}
+      <p>Letters routed to you{% if department %} and to the {{ department['name'] }} department{% endif %}.</p>
+      {% else %}
+      <p>Letters you wrote, from first draft to sent mail.</p>
+      {% endif %}
+    </div>
+    <nav class="letter-actions">
+      {% if is_inbox %}
+      <span class="btn" aria-current="page">Inbox{% if unread %} · {{ unread }} unread{% endif %}</span>
+      {% else %}
+      <a class="btn btn-outline" href="{{ url_for('letters.inbox') }}">Inbox{% if unread %} · {{ unread }} unread{% endif %}</a>
+      {% endif %}
+      {% if not is_inbox %}
+      <span class="btn" aria-current="page">Outbox</span>
+      {% else %}
+      <a class="btn btn-outline" href="{{ url_for('letters.outbox') }}">Outbox</a>
+      {% endif %}
+      {% if can_create %}
+      <a class="btn btn-outline" href="{{ url_for('letters.create') }}">Create letter</a>
+      {% endif %}
+      <a class="btn btn-outline" href="{{ url_for('letters.dashboard') }}">Register</a>
+    </nav>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    <div class="dash-panel">
+      <h2>
+        {{ letters | length }} letter{{ '' if letters | length == 1 else 's' }}
+        {% if is_inbox and unread %} · {{ unread }} unread{% endif %}
+      </h2>
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Reference</th>
+              <th>Category</th>
+              <th>{{ 'From' if is_inbox else 'To' }}</th>
+              <th>Subject</th>
+              <th>Date</th>
+              <th>Status</th>
+              <th>{{ 'Read' if is_inbox else 'Delivery' }}</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for letter in letters %}
+            <tr{% if is_inbox and letter['unread'] %} class="letter-unread"{% endif %}>
+              <td>
+                <a href="{{ url_for('letters.detail', letter_id=letter['id']) }}">{{ letter['reference_no'] }}</a>
+              </td>
+              <td>
+                {{ letter_type_label(letter['letter_type']) }}
+                {% if letter['letter_kind'] %}
+                <em class="letter-kind">{{ letter_kind_label(letter['letter_type'], letter['letter_kind']) }}</em>
+                {% endif %}
+              </td>
+              <td>{{ (letter['sender'] if is_inbox else letter['recipient']) or '—' }}</td>
+              <td>{{ letter['subject'] }}</td>
+              <td>{{ letter['letter_date'] | friendly_date }}</td>
+              <td>
+                {% if letter['status'] in ('Sent', 'Received') %}
+                <span class="status-badge active">{{ letter['status'] }}</span>
+                {% elif letter['status'] == 'Archived' %}
+                <span class="status-badge off">{{ letter['status'] }}</span>
+                {% else %}
+                <span class="status-badge neutral">{{ letter['status'] }}</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if is_inbox %}
+                  {% if letter['unread'] %}
+                  <span class="status-badge neutral">Unread</span>
+                  {% else %}
+                  <span class="status-badge active">Read</span>
+                  {% endif %}
+                {% else %}
+                <span class="status-badge neutral">{{ letter['status'] if letter['status'] in ('Sent', 'Approved') else 'Draft' }}</span>
+                {% endif %}
+              </td>
+              <td class="row-actions">
+                <a class="btn" href="{{ url_for('letters.detail', letter_id=letter['id']) }}">Open</a>
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="8">
+                {% if is_inbox %}
+                No letters have been routed to you yet.{% if can_create %} Letters you receive or register will appear here.{% endif %}
+                {% else %}
+                No letters in your outbox yet.{% if can_create %} Create a letter to start one.{% endif %}
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

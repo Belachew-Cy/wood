@@ -1,0 +1,57 @@
+{% extends "public_base.html" %}
+{% block title %}Process | Dereje Belay Wood &amp; Kitchen Cabinet Finishing{% endblock %}
+
+{% block content %}
+<section class="page-hero">
+  <div class="container">
+    <span class="eyebrow">Our Process</span>
+    <h1>From Idea to Reality</h1>
+    <p>A simple, transparent process from consultation to installation.</p>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    <div class="process-steps is-five">
+      <div class="step">
+        <div class="step-icon"><span class="num">1</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-11.9 7.6L4 20.5l1.5-4.8A8.4 8.4 0 1 1 21 11.5z"/><path d="M8.5 11.5h.01M12 11.5h.01M15.5 11.5h.01"/></svg>
+        </div>
+        <h4>Consultation</h4><p>We discuss your needs, style and budget.</p>
+      </div>
+      <div class="step">
+        <div class="step-icon"><span class="num">2</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="9" width="20" height="6" rx="1"/><path d="M6 9v3M10 9v3M14 9v3M18 9v3"/></svg>
+        </div>
+        <h4>Measurement</h4><p>On-site measurement for precise planning.</p>
+      </div>
+      <div class="step">
+        <div class="step-icon"><span class="num">3</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15.5 3.5a2.1 2.1 0 0 1 3 3L8 17l-4.5 1.5L5 14z"/><path d="m13.5 5.5 3 3"/></svg>
+        </div>
+        <h4>Design</h4><p>Detailed drawings and 3D visualizations.</p>
+      </div>
+      <div class="step">
+        <div class="step-icon"><span class="num">4</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5 5l2.1 2.1M16.9 16.9 19 19M19 5l-2.1 2.1M7.1 16.9 5 19"/></svg>
+        </div>
+        <h4>Production</h4><p>Crafted in our workshop with quality materials.</p>
+      </div>
+      <div class="step">
+        <div class="step-icon"><span class="num">5</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9V21h13V9"/><path d="M10 21v-6h4v6"/></svg>
+        </div>
+        <h4>Installation</h4><p>Professional and on-time installation.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="cta-band">
+  <div class="container">
+    <h2>Ready to begin?</h2>
+    <p>Book your free consultation today.</p>
+    <a href="{{ url_for('contact') }}" class="btn">Contact Me <span class="arrow">→</span></a>
+  </div>
+</section>
+{% endblock %}

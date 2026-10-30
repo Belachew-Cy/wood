@@ -1,0 +1,970 @@
+{% extends "base.html" %}
+{% from "base.html" import dash_icon with context %}
+
+{% block title %}All Users | Dereje Belay Wood &amp; Kitchen{% endblock %}
+
+{% macro ui(name) -%}
+  {%- set paths = {
+    'filter': '<path d="M3 5h18l-7 8v6l-4 2v-8z"/>',
+    'plus': '<path d="M12 5v14"/><path d="M5 12h14"/>',
+    'dots': '<circle cx="5" cy="12" r="1.7" fill="currentColor"/><circle cx="12" cy="12" r="1.7" fill="currentColor"/><circle cx="19" cy="12" r="1.7" fill="currentColor"/>',
+    'eye': '<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+    'edit': '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+    'key': '<circle cx="8" cy="15" r="4"/><path d="m10.8 12.2 8.2-8.2"/><path d="M16 4l4 4"/><path d="M14 6l2 2"/>',
+    'lock': '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+    'shield': '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>',
+    'mail': '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
+    'upload': '<path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M4 20h16"/>',
+    'person': '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>'
+  } -%}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ paths.get(name, paths['person']) | safe }}</svg>
+{%- endmacro %}
+
+{% block content %}
+<section class="dir-page">
+  <div class="container">
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    {% if handover %}
+    <div class="handover-card" role="status">
+      <div>
+        <span class="eyebrow">Shown once</span>
+        <h2>Hand {{ handover.full_name }} their account</h2>
+        <p>Pass these on in person. Nothing is stored in the database and this panel is
+          gone as soon as the page reloads, so write it down now.
+          {{ handover.full_name }} will have to set a password of their own before the
+          dashboard opens.</p>
+      </div>
+      <dl class="handover-list">
+        <div>
+          <dt>Sign-in username</dt>
+          <dd><code>{{ handover.username }}</code></dd>
+        </div>
+        <div>
+          <dt>Initial password</dt>
+          <dd>{% if handover.password %}<code>{{ handover.password }}</code>
+            {% else %}the password you typed{% endif %}</dd>
+        </div>
+      </dl>
+    </div>
+    {% endif %}
+
+    <header class="dir-head">
+      <div class="dir-head-copy">
+        <span class="dir-eyebrow">Directory</span>
+        <h1>All Users</h1>
+        <p class="dir-sub">Sign-in accounts, roles and access for everyone on the team.</p>
+        <p class="dir-summary">
+          <span><span class="dir-swatch"></span><strong>{{ counts.total }}</strong> account{{ '' if counts.total == 1 else 's' }}</span>
+          <span><span class="dir-swatch success"></span><strong>{{ counts.active }}</strong> active</span>
+          <span><span class="dir-swatch muted"></span><strong>{{ counts.disabled }}</strong> disabled</span>
+          <span><span class="dir-swatch warning"></span><strong>{{ counts.never }}</strong> never signed in</span>
+          <span><span class="dir-swatch warning"></span><strong>{{ counts.gated }}</strong> on initial password</span>
+        </p>
+      </div>
+      <div class="dir-head-actions">
+        <a class="dir-quiet-link" href="{{ url_for('admin_roles') }}">{{ ui('shield') }} Role management</a>
+        <a class="dir-quiet-link" href="{{ url_for('admin_password_security') }}">{{ ui('key') }} Password audit</a>
+        <a class="dir-quiet-link" href="{{ url_for('admin_user_import') }}">{{ ui('upload') }} Import users</a>
+        <button type="button" class="btn btn-sm dir-add" data-open-dialog="add">
+          {{ ui('plus') }} Add user
+        </button>
+      </div>
+    </header>
+
+    <div class="dir-card">
+
+      <div class="dir-toolbar">
+        <div class="dir-search">
+          {{ dash_icon('search') }}
+          <label class="sr-only" for="userSearch">Search users</label>
+          <input id="userSearch" type="search" placeholder="Search users…" autocomplete="off" aria-controls="userTable" />
+        </div>
+
+        <details class="dir-filter" id="userFilter">
+          <summary>
+            {{ ui('filter') }} <span>Filter</span>
+            <em class="dir-filter-badge" data-filter-badge hidden></em>
+          </summary>
+          <div class="dir-filter-panel">
+            <label for="roleFilter">Role</label>
+            <select id="roleFilter">
+              <option value="">All roles</option>
+              {% for r in roles %}
+              <option value="{{ r }}">{{ role_labels.get(r, r) }}</option>
+              {% endfor %}
+            </select>
+
+            <label for="statusFilter">Status</label>
+            <select id="statusFilter">
+              <option value="">All statuses</option>
+              {% for s in statuses %}
+              <option value="{{ s }}">{{ s }}</option>
+              {% endfor %}
+            </select>
+
+            <label class="dir-check-line" for="gatedFilter">
+              <input id="gatedFilter" type="checkbox" /> Initial password pending
+            </label>
+            <label class="dir-check-line" for="neverFilter">
+              <input id="neverFilter" type="checkbox" /> Never signed in
+            </label>
+
+            <div class="dir-filter-foot">
+              <button type="button" class="dir-text-btn" data-clear-filters>Clear filters</button>
+              <button type="button" class="btn btn-sm" data-close-filter>Done</button>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <div class="dir-bulk" id="bulkBar" hidden>
+        <form method="POST" class="dir-bulk-form" id="bulkForm">
+          {{ csrf_field() }}
+          <input type="hidden" name="action" value="bulk_status" />
+          <div id="bulkIds"></div>
+          <span class="dir-bulk-count"><strong data-bulk-count>0</strong> selected</span>
+          <button type="submit" class="btn btn-sm" name="status" value="Disabled">Disable selected</button>
+          <button type="submit" class="btn btn-sm btn-outline" name="status" value="Active">Enable selected</button>
+          <button type="button" class="dir-text-btn" data-clear-selection>Clear</button>
+        </form>
+      </div>
+
+      <table class="dir-table" id="userTable">
+        <thead>
+          <tr>
+            <th class="dir-check"><input id="selectAllRows" type="checkbox" aria-label="Select all users on this page" /></th>
+            <th scope="col">User</th>
+            <th scope="col">Role</th>
+            <th scope="col">Department</th>
+            <th scope="col">Status</th>
+            <th scope="col">Last active</th>
+            <th scope="col">Joined</th>
+            <th scope="col">Last modified</th>
+            <th scope="col" class="dir-actions-cell"><span class="sr-only">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody id="userTableBody">
+          {% for account in accounts %}
+          {% set u = account.user %}
+          {% set clean_name = u.full_name.split('(')[0].strip() %}
+          {% set parts = clean_name.split() %}
+          {% set initials = (parts[0][0] ~ (parts[-1][0] if parts|length > 1 else ''))|upper %}
+          <tr data-user-row
+              data-id="{{ u.id }}"
+              data-name="{{ u.full_name }}"
+              data-email="{{ u.email }}"
+              data-phone="{{ u.phone or '' }}"
+              data-username="{{ u.username or '' }}"
+              data-role="{{ u.role }}"
+              data-role-label="{{ role_labels.get(u.role, u.role) }}"
+              data-status="{{ u.status }}"
+              data-last="{{ (u.last_login | audit_time) if u.last_login else '' }}"
+              data-joined="{{ (u.employee_hire_date | friendly_date) if u.employee_hire_date else '' }}"
+              data-modified="{% if u.updated_at %}{{ u.updated_by_name or '—' }} · {{ u.updated_at | audit_time }}{% endif %}"
+              data-staff="{{ u.employee_name or '' }}"
+              data-staff-code="{{ u.employee_code or '' }}"
+              data-staff-id="{{ u.employee_id or '' }}"
+              data-gated="{{ 1 if u.must_change_password else 0 }}"
+              data-self="{{ 1 if u.id == user.id else 0 }}"
+              data-never="{{ 0 if u.last_login else 1 }}"
+              data-modules="{% if u.role == 'admin' %}All modules{% elif account.granted %}{% for m in account.granted | sort %}{{ module_label.get(m, m) }}{{ ', ' if not loop.last }}{% endfor %}{% else %}No modules{% endif %}"
+              data-permissions-url="{{ url_for('admin_role_account', user_id=u.id) }}"
+              data-search="{{ (u.full_name ~ ' ' ~ u.email ~ ' ' ~ (u.username or '') ~ ' ' ~ role_labels.get(u.role, u.role) ~ ' ' ~ (u.department_name or '') ~ ' ' ~ (u.employee_name or '') ~ ' ' ~ (u.employee_code or '')) | lower }}">
+            <td class="dir-check">
+              <input type="checkbox" class="dir-row-check" value="{{ u.id }}"
+                     aria-label="Select {{ u.full_name }}"
+                     {% if u.id == user.id %}disabled title="Your own account"{% endif %} />
+            </td>
+            <td>
+              <div class="dir-user">
+                <span class="dir-avatar" aria-hidden="true">{{ initials }}</span>
+                <span class="dir-user-text">
+                  <span class="dir-user-line">
+                    <span class="dir-user-name">{{ u.full_name }}</span>
+                    {% if u.must_change_password or u.id == user.id %}
+                    <span class="dir-user-flags">
+                      {% if u.must_change_password %}<span class="dir-flag">Initial password</span>{% endif %}
+                      {% if u.id == user.id %}<span class="dir-flag self">You</span>{% endif %}
+                    </span>
+                    {% endif %}
+                  </span>
+                  <span class="dir-user-mail">{{ u.email }}</span>
+                </span>
+              </div>
+            </td>
+            <td><span class="dir-pill role-{{ u.role }}">{{ role_labels.get(u.role, u.role) }}</span></td>
+            <td class="dir-cell-muted">
+              {{ u.department_name or '—' }}
+              {% if u.position_level in [0, 2, 3] %}
+              <span class="dir-pill status-active" style="margin-left:6px"
+                    title="Approver rights are granted automatically by this position">
+                <span class="status-dot"></span>Approves · {{ {0: 'CEO', 2: 'Director', 3: 'Manager'}[u.position_level] }} desk
+              </span>
+              {% endif %}
+            </td>
+            <td>
+              <span class="dir-pill status-{{ 'active' if u.status == 'Active' else 'disabled' }}">
+                <span class="status-dot"></span>{{ u.status }}
+              </span>
+              {% if (u.lock_state or 'unlocked') == 'permanent' %}
+              <span class="dir-pill status-disabled"
+                    title="Locked until an administrator unlocks it">Locked</span>
+              {% elif (u.lock_state or 'unlocked') == 'temporary' %}
+              <span class="dir-pill status-disabled"
+                    title="Locked until {{ u.lock_until }}">Temporary lock</span>
+              {% endif %}
+            </td>
+            <td class="dir-cell-muted">{{ (u.last_login | audit_time) if u.last_login else 'Never' }}</td>
+            <td class="dir-cell-muted">
+              {% if u.employee_hire_date %}{{ u.employee_hire_date | friendly_date }}
+              {% else %}<span title="No staff record is linked to this account">—</span>{% endif %}
+            </td>
+            <td class="dir-cell-muted">
+              {{ u.updated_by_name or '—' }}
+              {% if u.updated_at %}
+              <br><span class="feed-meta">{{ u.updated_at | audit_time }}</span>
+              {% endif %}
+            </td>
+            <td class="dir-actions-cell">
+              <details class="dir-row-menu">
+                <summary aria-label="Actions for {{ u.full_name }}">{{ ui('dots') }}</summary>
+                <div class="dir-menu-panel">
+                  <button type="button" class="dir-menu-item" data-action="view">{{ ui('eye') }} View</button>
+                  <button type="button" class="dir-menu-item" data-action="edit">{{ ui('edit') }} Edit</button>
+                  <button type="button" class="dir-menu-item" data-action="reset">{{ ui('key') }} Reset password</button>
+                  <a class="dir-menu-item" href="{{ url_for('admin_role_account', user_id=u.id) }}">{{ ui('shield') }} Role permissions</a>
+                  <a class="dir-menu-item" href="{{ url_for('admin_letter_permissions', user_id=u.id) }}">{{ ui('mail') }} Letter permissions</a>
+                  {% if u.id == user.id %}
+                  <p class="dir-menu-note">Your own account cannot be disabled or locked here.</p>
+                  {% else %}
+                  <div class="dir-menu-sep"></div>
+                  {% if (u.lock_state or 'unlocked') != 'unlocked' %}
+                  <form method="POST" class="dir-menu-form"
+                        onsubmit="return confirm('Unlock this account so they can sign in again?');">
+                    {{ csrf_field() }}
+                    <input type="hidden" name="action" value="unlock_user" />
+                    <input type="hidden" name="id" value="{{ u.id }}" />
+                    <button type="submit" class="dir-menu-item">
+                      {{ ui('lock') }} Unlock account
+                    </button>
+                  </form>
+                  {% else %}
+                  <form method="POST" class="dir-menu-form"
+                        onsubmit="return confirm('Lock this account? They will not be able to sign in until an administrator unlocks it.');">
+                    {{ csrf_field() }}
+                    <input type="hidden" name="action" value="lock_user" />
+                    <input type="hidden" name="id" value="{{ u.id }}" />
+                    <button type="submit" class="dir-menu-item dir-menu-danger">
+                      {{ ui('lock') }} Lock account
+                    </button>
+                  </form>
+                  {% endif %}
+                  <div class="dir-menu-sep"></div>
+                  <form method="POST" class="dir-menu-form"
+                        onsubmit="return confirm('{% if u.status == 'Active' %}Disable this account? They will not be able to sign in until it is enabled again.{% else %}Enable this account so they can sign in again?{% endif %}');">
+                    {{ csrf_field() }}
+                    <input type="hidden" name="action" value="bulk_status" />
+                    <input type="hidden" name="status" value="{{ 'Disabled' if u.status == 'Active' else 'Active' }}" />
+                    <input type="hidden" name="ids" value="{{ u.id }}" />
+                    <button type="submit" class="dir-menu-item{% if u.status == 'Active' %} dir-menu-danger{% endif %}">
+                      {{ ui('key') }} {{ 'Disable account' if u.status == 'Active' else 'Enable account' }}
+                    </button>
+                  </form>
+                  {% if u.role != 'admin' %}
+                  <div class="dir-menu-sep"></div>
+                  <form method="POST" class="dir-menu-form"
+                        onsubmit="return confirm('Delete {{ u.full_name | e }} permanently? Accounts that own records cannot be deleted; this cannot be undone.');">
+                    {{ csrf_field() }}
+                    <input type="hidden" name="action" value="delete_user" />
+                    <input type="hidden" name="id" value="{{ u.id }}" />
+                    <button type="submit" class="dir-menu-item dir-menu-danger">
+                      {{ ui('trash') }} Delete account
+                    </button>
+                  </form>
+                  {% endif %}
+                  {% endif %}
+                </div>
+              </details>
+            </td>
+          </tr>
+          {% endfor %}
+          <tr id="dirEmptyRow" hidden>
+            <td colspan="9">
+              <div class="dir-empty">
+                <strong>No users match these filters</strong>
+                <span>Try a different search or clear the filters.</span>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="dir-table-footer">
+        <p class="dir-count" id="userCount" aria-live="polite">Showing all {{ accounts|length }} user{{ '' if accounts|length == 1 else 's' }}</p>
+        <nav class="dir-pager" id="userPager" aria-label="User pages"></nav>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- View account -->
+<dialog class="dir-dialog" id="viewDialog" aria-labelledby="viewName">
+  <div class="dir-dialog-head">
+    <span class="dir-avatar dir-avatar-lg" data-view-avatar aria-hidden="true"></span>
+    <div class="dir-dialog-title">
+      <h2 id="viewName" data-view-name></h2>
+      <p data-view-email></p>
+    </div>
+    <button type="button" class="dir-dialog-close" data-close-dialog aria-label="Close">&times;</button>
+  </div>
+  <div class="dir-view-badges" data-view-badges></div>
+  <div class="dir-dialog-body">
+    <dl class="dir-view-grid">
+      <div><dt>Username</dt><dd data-view-username></dd></div>
+      <div><dt>Phone</dt><dd data-view-phone></dd></div>
+      <div><dt>Joined</dt><dd data-view-joined></dd></div>
+      <div><dt>Last active</dt><dd data-view-last></dd></div>
+      <div class="full"><dt>Last modified</dt><dd data-view-modified></dd></div>
+      <div class="full"><dt>Staff record</dt><dd data-view-staff></dd></div>
+      <div class="full"><dt>Module access</dt><dd data-view-modules></dd></div>
+      <div class="full"><dt>Password</dt><dd data-view-password></dd></div>
+    </dl>
+  </div>
+  <div class="dir-dialog-actions">
+    <a class="btn btn-outline btn-sm" data-view-permissions href="{{ url_for('admin_roles') }}">{{ ui('shield') }} Role permissions</a>
+    <button type="button" class="btn btn-outline btn-sm" id="viewReset">{{ ui('key') }} Reset password</button>
+    <button type="button" class="btn btn-sm" id="viewEdit">{{ ui('edit') }} Edit account</button>
+  </div>
+</dialog>
+
+<!-- Edit account -->
+<dialog class="dir-dialog" id="editDialog" aria-labelledby="editTitle">
+  <div class="dir-dialog-head">
+    <div class="dir-dialog-title">
+      <h2 id="editTitle">Edit account</h2>
+      <p data-edit-sub></p>
+    </div>
+    <button type="button" class="dir-dialog-close" data-close-dialog aria-label="Close">&times;</button>
+  </div>
+  <form method="POST" id="editForm">
+    {{ csrf_field() }}
+    <input type="hidden" name="action" value="save_account" />
+    <input type="hidden" name="id" id="editId" />
+    <div class="dir-dialog-body">
+      <div class="account-grid">
+        <div>
+          <label for="editName">Full name</label>
+          <input id="editName" type="text" name="full_name" maxlength="120" required />
+        </div>
+        <div>
+          <label for="editEmail">Email</label>
+          <input id="editEmail" type="email" name="email" maxlength="254" required />
+        </div>
+        <div>
+          <label for="editPhone">Phone</label>
+          <input id="editPhone" type="text" name="phone" maxlength="30" />
+        </div>
+        <div>
+          <label for="editRole">Role — landing dashboard</label>
+          <select id="editRole" name="role">
+            {% for r in roles %}
+            <option value="{{ r }}">{{ role_labels.get(r, r) }}</option>
+            {% endfor %}
+          </select>
+          <input type="hidden" name="role" id="editSelfRole" disabled />
+        </div>
+        <div>
+          <label for="editStatus">Account status</label>
+          <select id="editStatus" name="status">
+            {% for s in statuses %}
+            <option value="{{ s }}">{{ s }}</option>
+            {% endfor %}
+          </select>
+          <input type="hidden" name="status" id="editSelfStatus" disabled />
+        </div>
+        <div class="full">
+          <label for="editStaff">Staff record</label>
+          <select id="editStaff" name="employee_id">
+            <option value="">No staff record</option>
+            {% for record in staff %}
+            <option value="{{ record.id }}" data-owner="{{ record.owner_id or '' }}">
+              {{ record.full_name }} &middot; {{ record.employee_code }}
+              &middot; {{ record.employment_status }}
+              {%- if record.owner_id %} &mdash; {{ record.owner_name }}'s sign-in{% endif %}
+            </option>
+            {% endfor %}
+          </select>
+          <p class="cell-note">The record owns this account's name, contact details and sign-in.</p>
+        </div>
+      </div>
+      <p class="dir-form-note warn" id="editNote" hidden></p>
+    </div>
+    <div class="dir-dialog-actions">
+      <button type="button" class="btn btn-outline btn-sm" data-close-dialog>Cancel</button>
+      <button type="submit" class="btn btn-sm">Save changes</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Reset password -->
+<dialog class="dir-dialog" id="resetDialog" aria-labelledby="resetTitle">
+  <div class="dir-dialog-head">
+    <div class="dir-dialog-title">
+      <h2 id="resetTitle">Reset password</h2>
+      <p data-reset-sub></p>
+    </div>
+    <button type="button" class="dir-dialog-close" data-close-dialog aria-label="Close">&times;</button>
+  </div>
+  <form method="POST" id="resetForm">
+    {{ csrf_field() }}
+    <input type="hidden" name="action" value="set_password" />
+    <input type="hidden" name="id" id="resetId" />
+    <div class="dir-dialog-body">
+      <div class="account-grid">
+        <div class="full">
+          <label for="resetPassword">New password</label>
+          <input id="resetPassword" type="text" name="password" minlength="8"
+                 placeholder="Leave blank to generate a one-time password"
+                 autocomplete="new-password" />
+          <p class="cell-note">Shown once after saving. The account must choose its own
+            password before the dashboard opens.</p>
+        </div>
+      </div>
+    </div>
+    <div class="dir-dialog-actions">
+      <button type="button" class="btn btn-outline btn-sm" data-close-dialog>Cancel</button>
+      <button type="submit" class="btn btn-sm">Set password</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Add user -->
+<dialog class="dir-dialog" id="addDialog" aria-labelledby="addTitle">
+  <div class="dir-dialog-head">
+    <div class="dir-dialog-title">
+      <h2 id="addTitle">Add employee account</h2>
+      <p>A new sign-in starts with its role's default modules.</p>
+    </div>
+    <button type="button" class="dir-dialog-close" data-close-dialog aria-label="Close">&times;</button>
+  </div>
+  <form method="POST" id="addForm">
+    {{ csrf_field() }}
+    <input type="hidden" name="action" value="add_user" />
+    <div class="dir-dialog-body">
+      <div class="account-grid">
+        <div>
+          <label for="new-name">Full name</label>
+          <input id="new-name" type="text" name="full_name" placeholder="e.g. Almaz Tadesse" maxlength="120" required />
+        </div>
+        <div>
+          <label for="new-email">Email — used to sign in</label>
+          <input id="new-email" type="email" name="email" placeholder="staff@derejebelay.com" maxlength="254" required />
+        </div>
+        <div>
+          <label for="new-phone">Phone</label>
+          <input id="new-phone" type="text" name="phone" placeholder="+251 9.." maxlength="30" />
+        </div>
+        <div>
+          <label for="new-password">Initial password — blank to generate</label>
+          <input id="new-password" type="text" name="password" minlength="8"
+                 placeholder="Leave blank for a generated one" autocomplete="new-password" />
+          <p class="cell-note">Shown once after creation; they must replace it at first sign-in.</p>
+        </div>
+        <div>
+          <label for="new-role">Role — landing dashboard</label>
+          <select id="new-role" name="role" required>
+            {% for r in roles %}
+            <option value="{{ r }}">{{ role_labels.get(r, r) }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="new-status">Account status</label>
+          <select id="new-status" name="status">
+            {% for s in statuses %}
+            <option value="{{ s }}">{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="full">
+          <label for="new-staff">Staff record</label>
+          <select id="new-staff" name="employee_id">
+            <option value="">No staff record yet</option>
+            {% for record in staff %}
+            <option value="{{ record.id }}"
+                    data-owner="{{ record.owner_id or '' }}"
+                    {% if record.owner_id %}disabled{% endif %}>
+              {{ record.full_name }} &middot; {{ record.employee_code }}
+              &middot; {{ record.employment_status }}
+              {%- if record.owner_id %} &mdash; {{ record.owner_name }}'s sign-in{% endif %}
+            </option>
+            {% endfor %}
+          </select>
+          <p class="cell-note">Links the account to HR's record, so the name, contact
+            details and sign-in follow the staff file.</p>
+        </div>
+      </div>
+      <p class="dir-form-note">Add or remove modules later in Role management.</p>
+      <p class="cell-note">No account is ever deleted; disable it instead when someone
+        leaves.</p>
+    </div>
+    <div class="dir-dialog-actions">
+      <button type="button" class="btn btn-outline btn-sm" data-close-dialog>Cancel</button>
+      <button type="submit" class="btn btn-sm">Create account</button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    var tbody = document.getElementById("userTableBody");
+    if (!tbody) return;
+
+    var rows = Array.prototype.slice.call(tbody.querySelectorAll("[data-user-row]"));
+    var search = document.getElementById("userSearch");
+    var roleFilter = document.getElementById("roleFilter");
+    var statusFilter = document.getElementById("statusFilter");
+    var gatedFilter = document.getElementById("gatedFilter");
+    var neverFilter = document.getElementById("neverFilter");
+    var filterDetails = document.getElementById("userFilter");
+    var filterBadge = document.querySelector("[data-filter-badge]");
+    var emptyRow = document.getElementById("dirEmptyRow");
+    var countEl = document.getElementById("userCount");
+    var pagerEl = document.getElementById("userPager");
+    var bulkBar = document.getElementById("bulkBar");
+    var bulkForm = document.getElementById("bulkForm");
+    var bulkIds = document.getElementById("bulkIds");
+    var perPage = 8;
+    var page = 1;
+    var selected = new Set();
+    var visibleRows = rows.slice();
+    var currentRow = null;
+
+    function initials(name) {
+      var parts = (name || "").trim().split(/\s+/);
+      return ((parts[0] ? parts[0][0] : "") +
+              (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase();
+    }
+
+    function matches(row) {
+      var q = search.value.trim().toLowerCase();
+      if (q && row.dataset.search.indexOf(q) === -1) return false;
+      if (roleFilter.value && row.dataset.role !== roleFilter.value) return false;
+      if (statusFilter.value && row.dataset.status !== statusFilter.value) return false;
+      if (gatedFilter.checked && row.dataset.gated !== "1") return false;
+      if (neverFilter.checked && row.dataset.never !== "1") return false;
+      return true;
+    }
+
+    function activeFilterCount() {
+      return (roleFilter.value ? 1 : 0) + (statusFilter.value ? 1 : 0) +
+             (gatedFilter.checked ? 1 : 0) + (neverFilter.checked ? 1 : 0);
+    }
+
+    function pageList(total, current) {
+      if (total <= 7) {
+        var all = [];
+        for (var i = 1; i <= total; i++) all.push(i);
+        return all;
+      }
+      var wanted = [1, total, current - 1, current, current + 1]
+        .filter(function (n) { return n >= 1 && n <= total; })
+        .sort(function (a, b) { return a - b; })
+        .filter(function (n, i, list) { return list.indexOf(n) === i; });
+      var out = [];
+      wanted.forEach(function (n, i) {
+        if (i && n - wanted[i - 1] > 1) out.push("gap");
+        out.push(n);
+      });
+      return out;
+    }
+
+    function syncSelection() {
+      var counter = document.querySelector("[data-bulk-count]");
+      if (counter) counter.textContent = selected.size;
+      if (bulkBar) bulkBar.hidden = selected.size === 0;
+
+      var boxes = visibleRows
+        .map(function (row) { return row.querySelector(".dir-row-check"); })
+        .filter(function (box) { return box && !box.disabled; });
+      var checked = boxes.filter(function (box) { return box.checked; }).length;
+      var all = document.getElementById("selectAllRows");
+      if (all) {
+        all.checked = boxes.length > 0 && checked === boxes.length;
+        all.indeterminate = checked > 0 && checked < boxes.length;
+      }
+    }
+
+    function syncFilters() {
+      var n = activeFilterCount();
+      if (filterBadge) {
+        filterBadge.hidden = n === 0;
+        filterBadge.textContent = n;
+      }
+    }
+
+    function render() {
+      visibleRows = rows.filter(matches);
+      var totalPages = Math.max(1, Math.ceil(visibleRows.length / perPage));
+      if (page > totalPages) page = totalPages;
+      if (page < 1) page = 1;
+
+      rows.forEach(function (row) { row.hidden = true; });
+      var start = (page - 1) * perPage;
+      var end = Math.min(start + perPage, visibleRows.length);
+      visibleRows.slice(start, end).forEach(function (row) { row.hidden = false; });
+      if (emptyRow) emptyRow.hidden = visibleRows.length !== 0;
+
+      if (countEl) {
+        if (!visibleRows.length) {
+          countEl.textContent = "No users match these filters.";
+        } else {
+          countEl.textContent = "Showing " + (start + 1) + " to " + end + " of " +
+            visibleRows.length + " user" + (visibleRows.length === 1 ? "" : "s") +
+            (visibleRows.length !== rows.length ? " (filtered from " + rows.length + ")" : "");
+        }
+      }
+
+      if (pagerEl) {
+        pagerEl.textContent = "";
+        if (totalPages > 1) {
+          var prev = document.createElement("button");
+          prev.type = "button";
+          prev.className = "dir-page-btn";
+          prev.textContent = "\u2039";
+          prev.setAttribute("aria-label", "Previous page");
+          prev.disabled = page === 1;
+          prev.addEventListener("click", function () { page -= 1; render(); });
+          pagerEl.appendChild(prev);
+
+          pageList(totalPages, page).forEach(function (n) {
+            if (n === "gap") {
+              var gap = document.createElement("span");
+              gap.className = "dir-page-gap";
+              gap.textContent = "\u2026";
+              pagerEl.appendChild(gap);
+              return;
+            }
+            var btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "dir-page-btn" + (n === page ? " is-current" : "");
+            btn.textContent = String(n);
+            btn.setAttribute("aria-label", "Page " + n);
+            if (n === page) btn.setAttribute("aria-current", "page");
+            btn.addEventListener("click", function () { page = n; render(); });
+            pagerEl.appendChild(btn);
+          });
+
+          var next = document.createElement("button");
+          next.type = "button";
+          next.className = "dir-page-btn";
+          next.textContent = "\u203a";
+          next.setAttribute("aria-label", "Next page");
+          next.disabled = page === totalPages;
+          next.addEventListener("click", function () { page += 1; render(); });
+          pagerEl.appendChild(next);
+        }
+      }
+
+      syncFilters();
+      syncSelection();
+    }
+
+    function resetPage() { page = 1; render(); }
+
+    search.addEventListener("input", resetPage);
+    roleFilter.addEventListener("change", resetPage);
+    statusFilter.addEventListener("change", resetPage);
+    gatedFilter.addEventListener("change", resetPage);
+    neverFilter.addEventListener("change", resetPage);
+
+    var clearFilters = document.querySelector("[data-clear-filters]");
+    if (clearFilters) {
+      clearFilters.addEventListener("click", function () {
+        search.value = "";
+        roleFilter.value = "";
+        statusFilter.value = "";
+        gatedFilter.checked = false;
+        neverFilter.checked = false;
+        resetPage();
+      });
+    }
+    var closeFilter = document.querySelector("[data-close-filter]");
+    if (closeFilter) {
+      closeFilter.addEventListener("click", function () {
+        if (filterDetails) filterDetails.open = false;
+      });
+    }
+
+    document.addEventListener("click", function (event) {
+      if (filterDetails && filterDetails.open && !filterDetails.contains(event.target)) {
+        filterDetails.open = false;
+      }
+      document.querySelectorAll(".dir-row-menu[open]").forEach(function (menu) {
+        if (!menu.contains(event.target)) menu.open = false;
+      });
+    });
+
+    document.addEventListener("toggle", function (event) {
+      var menu = event.target;
+      if (!menu.classList || !menu.classList.contains("dir-row-menu") || !menu.open) return;
+      document.querySelectorAll(".dir-row-menu[open]").forEach(function (other) {
+        if (other !== menu) other.open = false;
+      });
+      var panel = menu.querySelector(".dir-menu-panel");
+      if (!panel) return;
+      var rect = menu.getBoundingClientRect();
+      var header = document.querySelector("header");
+      var headerH = header ? header.getBoundingClientRect().height : 0;
+      var needed = panel.offsetHeight + 12;
+      var below = window.innerHeight - rect.bottom;
+      var above = rect.top - headerH;
+      menu.classList.toggle("is-up", below < needed && above >= needed);
+    }, true);
+
+    var selectAll = document.getElementById("selectAllRows");
+    if (selectAll) {
+      selectAll.addEventListener("change", function () {
+        visibleRows.forEach(function (row) {
+          var box = row.querySelector(".dir-row-check");
+          if (!box || box.disabled) return;
+          box.checked = selectAll.checked;
+          if (box.checked) selected.add(String(box.value));
+          else selected.delete(String(box.value));
+        });
+        syncSelection();
+      });
+    }
+
+    tbody.addEventListener("change", function (event) {
+      var box = event.target.closest(".dir-row-check");
+      if (!box) return;
+      if (box.checked) selected.add(String(box.value));
+      else selected.delete(String(box.value));
+      syncSelection();
+    });
+
+    var clearSelection = document.querySelector("[data-clear-selection]");
+    if (clearSelection) {
+      clearSelection.addEventListener("click", function () {
+        selected.clear();
+        tbody.querySelectorAll(".dir-row-check").forEach(function (box) {
+          box.checked = false;
+        });
+        syncSelection();
+      });
+    }
+
+    if (bulkForm) {
+      bulkForm.addEventListener("submit", function (event) {
+        if (!selected.size) {
+          event.preventDefault();
+          return;
+        }
+        bulkIds.textContent = "";
+        selected.forEach(function (id) {
+          var input = document.createElement("input");
+          input.type = "hidden";
+          input.name = "ids";
+          input.value = id;
+          bulkIds.appendChild(input);
+        });
+      });
+    }
+
+    /* ---------------- dialogs ---------------- */
+    var viewDialog = document.getElementById("viewDialog");
+    var editDialog = document.getElementById("editDialog");
+    var resetDialog = document.getElementById("resetDialog");
+    var addDialog = document.getElementById("addDialog");
+
+    var viewName = document.querySelector("[data-view-name]");
+    var viewEmail = document.querySelector("[data-view-email]");
+    var viewAvatar = document.querySelector("[data-view-avatar]");
+    var viewBadges = document.querySelector("[data-view-badges]");
+    var viewUsername = document.querySelector("[data-view-username]");
+    var viewPhone = document.querySelector("[data-view-phone]");
+    var viewJoined = document.querySelector("[data-view-joined]");
+    var viewLast = document.querySelector("[data-view-last]");
+    var viewModified = document.querySelector("[data-view-modified]");
+    var viewStaff = document.querySelector("[data-view-staff]");
+    var viewModules = document.querySelector("[data-view-modules]");
+    var viewPassword = document.querySelector("[data-view-password]");
+    var viewPermissions = document.querySelector("[data-view-permissions]");
+
+    var editId = document.getElementById("editId");
+    var editName = document.getElementById("editName");
+    var editEmail = document.getElementById("editEmail");
+    var editPhone = document.getElementById("editPhone");
+    var editRole = document.getElementById("editRole");
+    var editStatus = document.getElementById("editStatus");
+    var editStaff = document.getElementById("editStaff");
+    var editSelfRole = document.getElementById("editSelfRole");
+    var editSelfStatus = document.getElementById("editSelfStatus");
+    var editNote = document.getElementById("editNote");
+    var editSub = document.querySelector("[data-edit-sub]");
+
+    var resetId = document.getElementById("resetId");
+    var resetPassword = document.getElementById("resetPassword");
+    var resetSub = document.querySelector("[data-reset-sub]");
+    var resetForm = document.getElementById("resetForm");
+
+    var addStaff = document.getElementById("new-staff");
+
+    function pill(text, className) {
+      var el = document.createElement("span");
+      el.className = "dir-pill " + className;
+      if (className.indexOf("status-") === 0) {
+        var dot = document.createElement("span");
+        dot.className = "status-dot";
+        el.appendChild(dot);
+      }
+      el.appendChild(document.createTextNode(text));
+      return el;
+    }
+
+    function openView(row) {
+      var data = row.dataset;
+      viewName.textContent = data.name;
+      viewEmail.textContent = data.email;
+      viewAvatar.textContent = initials(data.name);
+      viewBadges.textContent = "";
+      viewBadges.appendChild(pill(data.roleLabel, "role-" + data.role));
+      viewBadges.appendChild(pill(data.status, "status-" + data.status.toLowerCase()));
+
+      viewUsername.textContent = data.username || "Not assigned";
+      viewPhone.textContent = data.phone || "Not provided";
+      viewJoined.textContent = data.joined || "No staff record linked";
+      viewLast.textContent = data.last || "Never signed in";
+      viewModified.textContent = data.modified || "No recorded change";
+      viewStaff.textContent = data.staff
+        ? data.staff + (data.staffCode ? " · " + data.staffCode : "")
+        : "No staff record linked";
+      viewModules.textContent = data.modules;
+      viewPassword.textContent = data.gated === "1"
+        ? "Initial password — must be changed at next sign-in"
+        : "Set by the account owner";
+      viewPermissions.href = data.permissionsUrl;
+      if (viewDialog) viewDialog.showModal();
+    }
+
+    function fillStaff(select, row) {
+      if (!select) return;
+      Array.prototype.forEach.call(select.options, function (option) {
+        if (!option.value) return;
+        var owner = option.dataset.owner || "";
+        option.disabled = !!owner && owner !== String(row ? row.dataset.id : "");
+      });
+    }
+
+    function openEdit(row) {
+      var data = row.dataset;
+      editId.value = data.id;
+      editName.value = data.name;
+      editEmail.value = data.email;
+      editPhone.value = data.phone;
+      editRole.value = data.role;
+      editStatus.value = data.status;
+      fillStaff(editStaff, row);
+      editStaff.value = data.staffId || "";
+
+      var self = data.self === "1";
+      editRole.disabled = self;
+      editStatus.disabled = self;
+      editSelfRole.disabled = !self;
+      editSelfStatus.disabled = !self;
+      if (self) {
+        editSelfRole.value = data.role;
+        editSelfStatus.value = data.status;
+      }
+      editNote.hidden = !self;
+      editNote.textContent = self
+        ? "Your own role and status cannot be changed here."
+        : "";
+      editSub.textContent = data.name + (data.username ? " · " + data.username : "");
+      if (editDialog) editDialog.showModal();
+    }
+
+    function openReset(row) {
+      resetId.value = row.dataset.id;
+      resetPassword.value = "";
+      resetSub.textContent = row.dataset.name +
+        (row.dataset.username ? " · " + row.dataset.username : "");
+      if (resetDialog) resetDialog.showModal();
+    }
+
+    tbody.addEventListener("click", function (event) {
+      var trigger = event.target.closest("[data-action]");
+      if (!trigger) return;
+      var row = trigger.closest("[data-user-row]");
+      if (!row) return;
+      var menu = trigger.closest(".dir-row-menu");
+      if (menu) menu.open = false;
+      currentRow = row;
+      var action = trigger.dataset.action;
+      if (action === "view") openView(row);
+      else if (action === "edit") openEdit(row);
+      else if (action === "reset") openReset(row);
+    });
+
+    var viewEdit = document.getElementById("viewEdit");
+    if (viewEdit) {
+      viewEdit.addEventListener("click", function () {
+        if (!currentRow) return;
+        viewDialog.close();
+        openEdit(currentRow);
+      });
+    }
+    var viewReset = document.getElementById("viewReset");
+    if (viewReset) {
+      viewReset.addEventListener("click", function () {
+        if (!currentRow) return;
+        viewDialog.close();
+        openReset(currentRow);
+      });
+    }
+
+    if (resetForm) {
+      resetForm.addEventListener("submit", function (event) {
+        if (!confirm("Reset this account's password? They must choose a new one at their next sign-in.")) {
+          event.preventDefault();
+        }
+      });
+    }
+
+    var addTrigger = document.querySelector("[data-open-dialog='add']");
+    if (addTrigger) {
+      addTrigger.addEventListener("click", function () {
+        var form = document.getElementById("addForm");
+        if (form) form.reset();
+        fillStaff(addStaff, null);
+        if (addDialog) addDialog.showModal();
+      });
+    }
+
+    document.querySelectorAll("[data-close-dialog]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var dialog = button.closest("dialog");
+        if (dialog) dialog.close();
+      });
+    });
+
+    [viewDialog, editDialog, resetDialog, addDialog].forEach(function (dialog) {
+      if (!dialog) return;
+      dialog.addEventListener("click", function (event) {
+        if (event.target === dialog) dialog.close();
+      });
+    });
+
+    render();
+  })();
+</script>
+{% endblock %}

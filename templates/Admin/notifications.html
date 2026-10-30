@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi, dash_icon with context %}
+
+{% block title %}Announcements | Dereje Belay Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Access Control</span>
+      <h1>Announcements</h1>
+      <p>Send an important notice to everyone, or only to the roles whose work it
+        concerns. Every recipient gets it in their own notification list with an
+        unread count, alongside the approval and status alerts their role already
+        receives.</p>
+    </div>
+    <nav class="stock-actions" aria-label="Announcement actions">
+      <a class="btn btn-outline btn-sm" href="{{ url_for('notification_center') }}">My notifications</a>
+      <a class="btn btn-outline btn-sm" href="{{ url_for('admin_users') }}">User Management</a>
+    </nav>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="hr-stats">
+      {{ kpi('Announcements', announcements | length, 'Kept on the record') }}
+      {{ kpi('Roles', roles | length, 'Targets you can address') }}
+    </div>
+
+    <div class="emp-panel">
+      <div class="account-card">
+        <header class="account-head">
+          <span class="role-badge admin">New announcement</span>
+          <span class="cell-note">Delivered once per active account in the audience</span>
+        </header>
+
+        <form method="POST" class="dash-form account-form">
+          {{ csrf_field() }}
+          <div class="account-grid">
+            <div class="full">
+              <label for="announcement-title">Title *</label>
+              <input id="announcement-title" type="text" name="title" maxlength="180"
+                     required placeholder="e.g. Payroll closes on Friday" />
+            </div>
+            <div class="full">
+              <label for="announcement-body">Message *</label>
+              <textarea id="announcement-body" name="body" rows="4" maxlength="400"
+                        required placeholder="What changed, who it affects, what they should do."></textarea>
+            </div>
+            <div class="full announcement-link">
+              <label for="announcement-href">Link (optional)</label>
+              <input id="announcement-href" type="text" name="href" maxlength="300"
+                     placeholder="/payroll" />
+              <p class="cell-note">An internal path. Leave blank when the notice needs no action.</p>
+            </div>
+          </div>
+
+          <fieldset class="audience-field">
+            <legend>Audience *</legend>
+            <div class="audience-grid">
+              <label class="audience-option">
+                <input type="checkbox" name="roles" value="all" /> Everyone
+              </label>
+              {% for role in roles %}
+              <label class="audience-option">
+                <input type="checkbox" name="roles" value="{{ role }}" /> {{ role_labels.get(role, role) }}
+              </label>
+              {% endfor %}
+            </div>
+          </fieldset>
+
+          <div class="account-actions">
+            <p class="perm-note">Recipients see it under Notifications; the bell count
+              updates the next time one of their pages loads.</p>
+            <button type="submit" class="btn">Send announcement <span class="arrow">→</span></button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section bg-white">
+  <div class="container">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow">History</span>
+        <h2>Sent announcements</h2>
+      </div>
+      <p>What was sent, to whom, and how many accounts received it.</p>
+    </div>
+
+    {% if announcements %}
+    <div class="hr-table-wrap">
+      <table>
+        <thead>
+          <tr><th>Sent</th><th>Title</th><th>Audience</th><th>Delivered</th><th>By</th></tr>
+        </thead>
+        <tbody>
+          {% for row in announcements %}
+          <tr>
+            <td>{{ row.created_at | audit_time }}</td>
+            <td><strong>{{ row.title }}</strong>{% if row.href %}<span class="cell-sub">{{ row.href }}</span>{% endif %}</td>
+            <td>
+              {% if row.audience == 'all' %}Everyone{% else %}
+                {% for role in row.audience.split(',') %}{{ role_labels.get(role, role) }}{{ ', ' if not loop.last }}{% endfor %}
+              {% endif %}
+            </td>
+            <td>{{ row.delivered }} account{{ '' if row.delivered == 1 else 's' }}</td>
+            <td>{{ row.created_by_name or '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="empty-state"><strong>No announcements yet.</strong> The first one you send
+      will be listed here with its audience and delivery count.</p>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    var boxes = document.querySelectorAll('.audience-grid input[type="checkbox"]');
+    var all = document.querySelector('.audience-grid input[value="all"]');
+    if (!boxes.length || !all) return;
+    all.addEventListener('change', function () {
+      boxes.forEach(function (box) { if (box !== all) box.checked = false; });
+    });
+    boxes.forEach(function (box) {
+      if (box === all) return;
+      box.addEventListener('change', function () {
+        if (box.checked) all.checked = false;
+      });
+    });
+  })();
+</script>
+{% endblock %}

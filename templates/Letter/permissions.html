@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}Letter Permissions | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">ADMINISTRATION</span>
+      <h1>Letter permissions</h1>
+      <p>{{ target['full_name'] }}{% if target['username'] %} · {{ target['username'] }}{% endif %} · {{ role_label }} role</p>
+    </div>
+    <nav class="letter-actions">
+      <a class="btn btn-outline" href="{{ url_for('admin_users') }}">Back to user management</a>
+    </nav>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    <div class="dash-panel">
+      <h2>Letter actions and categories</h2>
+
+      <p class="panel-note">
+        Access follows exactly the actions and categories ticked here and nothing
+        else. Saving with nothing ticked closes the register to this account; an
+        administrator keeps every action without a screen.
+      </p>
+      {% if using_defaults %}
+      <p class="panel-note">
+        No letter action is granted to this account yet, so the Letters button and
+        the register stay closed until you tick and save.
+      </p>
+      {% endif %}
+
+      <form method="POST" class="letter-permission-form">
+        {{ csrf_field() }}
+
+        <h3 class="letter-permission-group">Actions</h3>
+        {% for key, label in permissions %}
+        <label class="letter-permission-row" for="{{ key }}">
+          <input id="{{ key }}" type="checkbox" name="permissions" value="{{ key }}"
+                 {% if key in granted %}checked{% endif %} />
+          <span>
+            <strong>{{ label }}</strong>
+            <em>{{ notes[key] }}</em>
+          </span>
+        </label>
+        {% endfor %}
+
+        <h3 class="letter-permission-group">Categories this account may open and file</h3>
+        {% if categories_using_defaults and default_categories %}
+        <p class="panel-note">
+          Until a category is saved here, this account may open:
+          {% for key, label, hint in categories if key in default_categories %}{{ label }}{% if not loop.last %}, {% endif %}{% endfor %}.
+          Ticking and saving replaces that default with exactly the ticks below.
+        </p>
+        {% endif %}
+        {% for key, label, hint in categories %}
+        <label class="letter-permission-row" for="category-{{ key }}">
+          <input id="category-{{ key }}" type="checkbox" name="categories" value="{{ key }}"
+                 {% if key in granted_categories %}checked{% endif %} />
+          <span>
+            <strong>{{ label }}</strong>
+            <em>{{ hint }}</em>
+          </span>
+        </label>
+        {% endfor %}
+
+        <div class="stock-form-actions">
+          <button class="btn" type="submit">Save permissions</button>
+          <button class="btn btn-outline" type="submit" name="action" value="reset">Clear grants</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+{% endblock %}

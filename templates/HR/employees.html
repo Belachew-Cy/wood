@@ -1,0 +1,612 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi, bars, donut, feed, dash_icon with context %}
+
+{% block title %}Employee Management | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+{% set active_count = records | selectattr('employment_status', 'equalto', 'Active') | list | length %}
+{% set on_leave = records | selectattr('employment_status', 'equalto', 'On Leave') | list | length %}
+{% set payroll_cost = (records | map(attribute='salary') | map('float') | sum) if can_view_salary else 0 %}
+{% set document_total = records | map(attribute='document_total') | sum %}
+{% set missing_phone = records | rejectattr('phone') | list %}
+{% set missing_email = records | rejectattr('email') | list %}
+{% set missing_manager = records | rejectattr('manager_id') | list %}
+
+{% set dept_rows = [] %}
+{% for name, rows in records | groupby('department') %}
+  {% set _ = dept_rows.append({'label': name or 'Unassigned', 'value': rows | length}) %}
+{% endfor %}
+{% set dept_rows = dept_rows | sort(reverse=true, attribute='value') %}
+
+{% set status_rows = [] %}
+{% for name, rows in records | groupby('employment_status') %}
+  {% set _ = status_rows.append({'label': name or 'Unknown', 'value': rows | length}) %}
+{% endfor %}
+{% set status_rows = status_rows | sort(reverse=true, attribute='value') %}
+
+{% set attention = [] %}
+{% if missing_phone %}
+  {% set _ = attention.append({
+    'icon': 'phone', 'tone': 'warn',
+    'title': "{} employee{} without a phone number".format(
+        missing_phone | length, '' if missing_phone | length == 1 else 's'),
+    'meta': 'Attendance and payroll notices cannot reach them.',
+    'time': 'Fix'}) %}
+{% endif %}
+{% if missing_email %}
+  {% set _ = attention.append({
+    'icon': 'mail', 'tone': '',
+    'title': "{} record{} without an email address".format(
+        missing_email | length, '' if missing_email | length == 1 else 's'),
+    'meta': 'Payslips and staff letters need a working address.',
+    'time': 'Update'}) %}
+{% endif %}
+{% if missing_manager %}
+  {% set _ = attention.append({
+    'icon': 'users', 'tone': '',
+    'title': "{} employee{} with no reporting manager".format(
+        missing_manager | length, '' if missing_manager | length == 1 else 's'),
+    'meta': 'Place them in the organization so approvals find the right person.',
+    'time': 'Assign'}) %}
+{% endif %}
+
+{% set directories = [] %}
+{% for e in records | sort(attribute='created_at', reverse=true) %}
+  {% if loop.index <= 4 %}
+    {% set _ = directories.append({
+      'icon': 'user', 'tone': 'ok',
+      'title': e.full_name,
+      'meta': "{} · {}".format(e.employee_code, e.job_title or 'No position'),
+      'href': url_for('edit_employee', employee_id=e.id),
+      'time': e.employment_status}) %}
+  {% endif %}
+{% endfor %}
+
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Human Resources</span>
+      <h1>Employee Management</h1>
+      <p>One record per person: personal details, employment terms, qualifications and the documents HR keeps on file.</p>
+    </div>
+    <nav class="stock-actions" aria-label="Employee actions">
+      <a class="btn btn-outline btn-sm" href="{{ url_for('hr_dashboard') }}">Back to HR</a>
+      <a class="btn btn-sm" href="#employee-form">{{ "Edit record" if editing else "Register employee" }}</a>
+    </nav>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    <nav class="hr-navigation" aria-label="HR Management">
+      <a class="hr-nav-link" href="{{ url_for('hr_dashboard') }}">Dashboard</a>
+      <a class="hr-nav-link active" href="{{ url_for('employees') }}">Employees</a>
+      <a class="hr-nav-link" href="{{ url_for('attendance') }}">Attendance</a>
+      <a class="hr-nav-link" href="{{ url_for('recruitment') }}">Recruitment</a>
+      <a class="hr-nav-link" href="{{ url_for('leave_management') }}">Leave</a>
+      <a class="hr-nav-link" href="{{ url_for('training_performance') }}">Training &amp; Performance</a>
+      <a class="hr-nav-link" href="{{ url_for('manage_hierarchy') }}">Organization</a>
+      <a class="hr-nav-link" href="{{ url_for('reports_centre') }}">Reports</a>
+      <a class="hr-nav-link" href="{{ url_for('hr_settings.index') }}">Settings</a>
+    </nav>
+
+    <div class="hr-stats">
+      {{ kpi('Employee records', records | length, 'In the directory') }}
+      {{ kpi('Departments', dept_rows | length, '{} active'.format(active_count), 'up') }}
+      {{ kpi('On leave', on_leave, '{} inactive'.format(records | length - active_count - on_leave),
+             'warn' if on_leave else 'flat') }}
+      {% if can_view_salary %}
+        {{ kpi('Monthly salaries (ETB)', "{:,.2f}".format(payroll_cost), 'Basic pay') }}
+      {% else %}
+        {{ kpi('Documents on file', document_total, 'Certificates and letters') }}
+      {% endif %}
+    </div>
+
+    <div class="chart-grid">
+      {{ bars('Headcount by department', dept_rows, 'employees') }}
+      {{ bars('Employment status', status_rows, 'employees') }}
+      {{ donut('Active workforce', (active_count / (records | length)) if records else 0,
+              '{}%'.format(((active_count / (records | length) * 100) | round(0, 'common') | int) if records else 0),
+              [
+                {'label': 'Active', 'color': 'var(--walnut)', 'value': active_count},
+                {'label': 'On leave or inactive', 'color': 'var(--ivory-2)', 'value': records | length - active_count}
+              ], 'of the directory') }}
+      {{ feed('Records to complete', attention, 'Data quality') }}
+    </div>
+  </div>
+</section>
+
+<section class="section bg-white" id="employee-form">
+  <div class="container employee-page">
+    <div class="employee-card employee-form-card">
+      <div class="employee-form-head">
+        <div>
+          <span class="eyebrow">{{ 'Update record' if editing else 'New staff record' }}</span>
+          <h2>{{ 'Edit employee' if editing else 'Register new employee' }}</h2>
+          <p>{{ 'Correct any detail below and save the record.' if editing else 'Complete the four sections below. Fields marked * are required.' }}</p>
+        </div>
+        {% if editing %}
+        <div class="employee-form-head-actions">
+          <span class="employee-code-chip">{{ form_data.employee_code }}</span>
+          <a class="employee-btn secondary small" href="{{ url_for('employees', _anchor='directory') }}">Back to directory</a>
+        </div>
+        {% endif %}
+      </div>
+
+      {% if errors %}
+      <div class="employee-alert error employee-errors" id="form-errors" role="alert" tabindex="-1">
+        <strong>Please fix {{ errors | length }} item{{ '' if errors | length == 1 else 's' }} before saving.</strong>
+        <ul>
+          {% for error in errors %}
+          <li>{{ error }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
+      {% if pending_uploads %}
+      <div class="employee-alert info">
+        Selected files are not saved until the record passes validation. Attach again:
+        {{ pending_uploads | join(', ') }}.
+      </div>
+      {% endif %}
+
+      <form method="POST" enctype="multipart/form-data" class="employee-form"
+            action="{{ url_for('edit_employee', employee_id=editing.id) if editing else url_for('add_employee') }}">
+        {{ csrf_field() }}
+
+        <fieldset class="employee-fieldset">
+          <legend><span class="employee-step">1</span> Personal information</legend>
+          <div class="employee-grid">
+            <div class="form-group">
+              <label for="employee_code">Employee ID</label>
+              <input id="employee_code" name="employee_code" type="text" maxlength="30"
+                     value="{{ form_data.employee_code or '' }}" placeholder="DRB-001"
+                     pattern="[A-Za-z0-9][A-Za-z0-9._/-]{1,29}" />
+              <span class="employee-hint">Unique. Leave blank to continue the automatic series.</span>
+            </div>
+            <div class="form-group">
+              <label for="full_name">Full name *</label>
+              <input id="full_name" name="full_name" type="text" maxlength="120" required
+                     value="{{ form_data.full_name or '' }}" placeholder="e.g. Almaz Tadesse" />
+            </div>
+            <div class="form-group">
+              <label for="gender">Gender</label>
+              <select id="gender" name="gender">
+                <option value="">Select gender</option>
+                {% for option in ["Male", "Female", "Other"] %}
+                <option value="{{ option }}" {% if form_data.gender == option %}selected{% endif %}>{{ option }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="date_of_birth">Date of birth</label>
+              <input id="date_of_birth" name="date_of_birth" type="date"
+                     min="1900-01-01" max="{{ today }}"
+                     value="{{ form_data.date_of_birth or '' }}" />
+            </div>
+            <div class="form-group">
+              <label for="phone">Phone number *</label>
+              <input id="phone" name="phone" type="tel" maxlength="30" required
+                     value="{{ form_data.phone or '' }}" placeholder="+251 911 123 456" />
+              <span class="employee-hint">7 to 15 digits; +, spaces and dashes are accepted.</span>
+            </div>
+            <div class="form-group">
+              <label for="email">Email address</label>
+              <input id="email" name="email" type="email" maxlength="254"
+                     value="{{ form_data.email or '' }}" placeholder="employee@example.com" />
+            </div>
+            <div class="form-group full">
+              <label for="address">Home address</label>
+              <input id="address" name="address" type="text" maxlength="300"
+                     value="{{ form_data.address or '' }}" placeholder="Sub-city, woreda, house number" />
+            </div>
+            <div class="form-group">
+              <label for="emergency_contact_name">Emergency contact name</label>
+              <input id="emergency_contact_name" name="emergency_contact_name" type="text"
+                     maxlength="120" value="{{ form_data.emergency_contact_name or '' }}"
+                     placeholder="Relative or next of kin" />
+            </div>
+            <div class="form-group">
+              <label for="emergency_contact_phone">Emergency contact phone</label>
+              <input id="emergency_contact_phone" name="emergency_contact_phone" type="tel"
+                     maxlength="30" value="{{ form_data.emergency_contact_phone or '' }}"
+                     placeholder="+251 9.." />
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset class="employee-fieldset">
+          <legend><span class="employee-step">2</span> Employment details</legend>
+          <div class="employee-grid">
+            <div class="form-group">
+              <label for="department">Department *</label>
+              <select id="department" name="department" required>
+                <option value="">Select department</option>
+                {% for department in departments %}
+                <option value="{{ department }}" {% if form_data.department == department %}selected{% endif %}>{{ department }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="job_title">Job title / position *</label>
+              <input id="job_title" name="job_title" type="text" maxlength="100" required
+                     value="{{ form_data.job_title or '' }}" placeholder="e.g. Cabinet Finisher" />
+            </div>
+            <div class="form-group">
+              <label for="employment_type">Employment type *</label>
+              <select id="employment_type" name="employment_type" required>
+                {% for option in employment_types %}
+                <option value="{{ option }}" {% if form_data.employment_type == option %}selected{% endif %}>{{ option }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="hire_date">Date of hire *</label>
+              <input id="hire_date" name="hire_date" type="date" min="1950-01-01" required
+                     value="{{ form_data.hire_date or '' }}" />
+            </div>
+            <div class="form-group">
+              <label for="employment_status">Employment status *</label>
+              <select id="employment_status" name="employment_status" required>
+                {% for option in statuses %}
+                <option value="{{ option }}" {% if form_data.employment_status == option %}selected{% endif %}>{{ option }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="manager_id">Reporting manager</label>
+              <select id="manager_id" name="manager_id">
+                <option value="">No reporting manager</option>
+                {% for manager in managers %}
+                <option value="{{ manager.id }}"
+                        {% if form_data.manager_id and form_data.manager_id | string == manager.id | string %}selected{% endif %}>
+                  {{ manager.full_name }}{% if manager.job_title %} — {{ manager.job_title }}{% endif %}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="work_location">Work location</label>
+              <input id="work_location" name="work_location" type="text" maxlength="120"
+                     value="{{ form_data.work_location or '' }}" placeholder="e.g. Head office workshop" />
+            </div>
+            {% if can_view_salary %}
+            <div class="form-group">
+              <label for="salary">Basic monthly salary (ETB)</label>
+              <input id="salary" name="salary" type="number" min="0" step="0.01"
+                     value="{{ form_data.salary or 0 }}" placeholder="0.00" />
+              <span class="employee-hint">Visible and editable to payroll-authorized users only.</span>
+            </div>
+            {% else %}
+            <div class="employee-restricted">
+              <strong>Salary restricted</strong>
+              <span>Only administrators and payroll-authorized users can view or change pay.</span>
+            </div>
+            {% endif %}
+          </div>
+        </fieldset>
+
+        <fieldset class="employee-fieldset">
+          <legend><span class="employee-step">3</span> Education &amp; qualifications</legend>
+          <div class="employee-grid">
+            <div class="form-group">
+              <label for="education_level">Highest education level</label>
+              <select id="education_level" name="education_level">
+                <option value="">Select level</option>
+                {% for option in education_levels %}
+                <option value="{{ option }}" {% if form_data.education_level == option %}selected{% endif %}>{{ option }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="field_of_study">Field of study</label>
+              <input id="field_of_study" name="field_of_study" type="text" maxlength="120"
+                     value="{{ form_data.field_of_study or '' }}" placeholder="e.g. Furniture Production" />
+            </div>
+            <div class="form-group">
+              <label for="institution">Institution / university</label>
+              <input id="institution" name="institution" type="text" maxlength="160"
+                     value="{{ form_data.institution or '' }}" placeholder="e.g. TVET College" />
+            </div>
+            <div class="form-group">
+              <label for="graduation_year">Graduation year</label>
+              <input id="graduation_year" name="graduation_year" type="number"
+                     min="1950" max="{{ current_year + 1 }}" value="{{ form_data.graduation_year or '' }}"
+                     placeholder="e.g. {{ current_year }}" />
+            </div>
+            <div class="form-group full">
+              <label for="certifications">Professional certifications</label>
+              <textarea id="certifications" name="certifications" maxlength="500"
+                        placeholder="One per line: certificate name, issuing body, year">{{ form_data.certifications or '' }}</textarea>
+            </div>
+            <div class="form-group full">
+              <label for="work_experience">Relevant work experience</label>
+              <textarea id="work_experience" name="work_experience" maxlength="1000"
+                        placeholder="Previous roles, employers and years">{{ form_data.work_experience or '' }}</textarea>
+            </div>
+            {% if can_view_documents %}
+            <div class="form-group full">
+              <label for="education_documents">Upload educational certificates</label>
+              <input id="education_documents" name="education_documents" type="file" multiple
+                     accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.webp"
+                     data-file-note="#education-file-note" />
+              <span class="employee-hint" id="education-file-note">PDF, Word or image · up to 5 files, 5 MB each.</span>
+              {% if editing and form_data.education_documents %}
+              <div class="document-list">
+                {% for document in form_data.education_documents %}
+                <div class="document-row">
+                  <span class="document-icon">{{ dash_icon('file') }}</span>
+                  <div class="document-body">
+                    <a href="{{ url_for('employee_document', employee_id=editing.id, filename=document.file) }}">{{ document.name }}</a>
+                    <span>{{ "%.1f" | format(document.size / 1024) }} KB{% if document.uploaded %} · uploaded {{ document.uploaded }}{% endif %}</span>
+                  </div>
+                  <label class="document-remove">
+                    <input type="checkbox" name="remove_education" value="{{ document.file }}" />
+                    Remove
+                  </label>
+                </div>
+                {% endfor %}
+              </div>
+              {% endif %}
+            </div>
+            {% endif %}
+          </div>
+        </fieldset>
+
+        <fieldset class="employee-fieldset">
+          <legend><span class="employee-step">4</span> Documents &amp; additional details</legend>
+          <div class="employee-grid">
+            <div class="photo-field full">
+              <div class="photo-preview" id="photo-preview-box">
+                <img id="photo-preview" src="{{ photo_url }}" alt="Profile photo preview"
+                     data-original="{{ photo_url }}" {% if not photo_url %}hidden{% endif %} />
+                {% set name_parts = (form_data.full_name or 'New employee').split() %}
+                <span class="photo-placeholder" id="photo-placeholder" {% if photo_url %}hidden{% endif %}>
+                  {{ name_parts[0][0] | upper if name_parts else '?' }}{% if name_parts | length > 1 %}{{ name_parts[1][0] | upper }}{% endif %}
+                </span>
+              </div>
+              <div class="photo-controls">
+                <div class="form-group">
+                  <label for="profile_photo">Profile photo</label>
+                  <input id="profile_photo" name="profile_photo" type="file"
+                         accept="image/png,image/jpeg,image/webp" />
+                  <span class="employee-hint">PNG, JPG or WebP up to 3 MB. Shown on the organization chart.</span>
+                </div>
+                {% if editing and form_data.profile_photo %}
+                <label class="checkbox-item">
+                  <input type="checkbox" name="remove_photo" value="1" />
+                  <span>Remove the current photo</span>
+                </label>
+                {% endif %}
+              </div>
+            </div>
+
+            {% if can_view_documents %}
+            <div class="form-group full">
+              <span class="employee-label">Required documents received</span>
+              <div class="checkbox-grid">
+                {% for label in document_types %}
+                <label class="checkbox-item">
+                  <input type="checkbox" name="required_documents" value="{{ label }}"
+                         {% if label in form_data.required_documents %}checked{% endif %} />
+                  <span>{{ label }}</span>
+                </label>
+                {% endfor %}
+              </div>
+            </div>
+            <div class="form-group full">
+              <label for="supporting_documents">Upload supporting documents</label>
+              <input id="supporting_documents" name="supporting_documents" type="file" multiple
+                     accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.webp"
+                     data-file-note="#supporting-file-note" />
+              <span class="employee-hint" id="supporting-file-note">Contracts, references, pension papers · up to 5 files, 5 MB each.</span>
+              {% if editing and form_data.supporting_documents %}
+              <div class="document-list">
+                {% for document in form_data.supporting_documents %}
+                <div class="document-row">
+                  <span class="document-icon">{{ dash_icon('file') }}</span>
+                  <div class="document-body">
+                    <a href="{{ url_for('employee_document', employee_id=editing.id, filename=document.file) }}">{{ document.name }}</a>
+                    <span>{{ "%.1f" | format(document.size / 1024) }} KB{% if document.uploaded %} · uploaded {{ document.uploaded }}{% endif %}</span>
+                  </div>
+                  <label class="document-remove">
+                    <input type="checkbox" name="remove_supporting" value="{{ document.file }}" />
+                    Remove
+                  </label>
+                </div>
+                {% endfor %}
+              </div>
+              {% endif %}
+            </div>
+            {% endif %}
+
+            <div class="form-group full">
+              <label for="notes">Employee notes</label>
+              <textarea id="notes" name="notes" maxlength="1000"
+                        placeholder="Anything HR should know: contract terms, adjustments, internal notes">{{ form_data.notes or '' }}</textarea>
+            </div>
+          </div>
+        </fieldset>
+
+        <div class="employee-actions">
+          <button type="submit" class="employee-btn primary">
+            {{ 'Update employee' if editing else 'Save employee' }}
+          </button>
+          <button type="reset" class="employee-btn secondary">Reset form</button>
+          <a class="employee-btn secondary" href="{{ url_for('employees', _anchor='directory') }}">Cancel</a>
+          {% if editing %}
+          <span class="employee-hint employee-actions-note">Last saved values return if you cancel.</span>
+          {% endif %}
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+
+<section class="section bg-ivory" id="directory">
+  <div class="container employee-page">
+    <div class="employee-card employee-directory-card">
+      <div class="employee-table-heading">
+        <div>
+          <h2>Employee directory</h2>
+          <p>{{ records | length }} record{{ '' if records | length == 1 else 's' }} · {{ dept_rows | length }} department{{ '' if dept_rows | length == 1 else 's' }} · {{ document_total }} document{{ '' if document_total == 1 else 's' }} on file</p>
+        </div>
+        <a class="employee-btn primary small" href="#employee-form">{{ 'Edit above' if editing else 'Register employee' }}</a>
+      </div>
+
+      <div class="employee-table-wrap">
+        <table class="employee-table">
+          <thead>
+            <tr>
+              <th>Employee</th>
+              <th>Department</th>
+              <th>Contact</th>
+              <th>Employment</th>
+              <th>Reports to</th>
+              <th>Last modified</th>
+              <th>Documents</th>
+              {% if can_view_salary %}<th>Salary (ETB)</th>{% endif %}
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for employee in records %}
+            <tr>
+              <td>
+                <div class="employee-identity">
+                  <span class="employee-avatar">
+                    {% if employee.photo_url %}
+                    <img src="{{ employee.photo_url }}" alt="" />
+                    {% else %}
+                    {{ employee.initials }}
+                    {% endif %}
+                  </span>
+                  <div>
+                    <strong>{{ employee.full_name }}</strong>
+                    <span class="employee-code">{{ employee.employee_code }}</span>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <strong>{{ employee.department or '—' }}</strong>
+                <span class="employee-cell-note">{{ employee.job_title or 'No position' }}</span>
+              </td>
+              <td>
+                {{ employee.phone or '—' }}
+                <span class="employee-cell-note">{{ employee.email or 'No email' }}</span>
+              </td>
+              <td>
+                <span class="status-badge {{ 'active' if employee.employment_status == 'Active' else ('off' if employee.employment_status == 'Inactive' else 'neutral') }}">{{ employee.employment_status }}</span>
+                <span class="employee-cell-note">{{ employee.employment_type or 'Permanent' }}{% if employee.work_location %} · {{ employee.work_location }}{% endif %}</span>
+              </td>
+              <td>
+                {{ employee.manager_name or '—' }}
+                <span class="employee-cell-note">{{ employee.hire_date or 'No hire date' }}</span>
+              </td>
+              <td>
+                {{ employee.updated_by_name or '—' }}
+                <span class="employee-cell-note">{{ (employee.updated_at | audit_time) if employee.updated_at else 'Never changed' }}</span>
+              </td>
+              <td>
+                {% if can_view_documents %}
+                {% if employee.document_total %}On file ({{ employee.document_total }}){% else %}None{% endif %}
+                {% else %}
+                Restricted
+                {% endif %}
+              </td>
+              {% if can_view_salary %}
+              <td class="employee-salary">{{ "{:,.2f}".format(employee.salary or 0) }}</td>
+              {% endif %}
+              <td>
+                <div class="employee-row-actions">
+                  <a class="employee-btn small secondary"
+                     href="{{ url_for('edit_employee', employee_id=employee.id) }}"
+                     aria-label="Edit {{ employee.full_name }}">Edit</a>
+                  <form method="POST"
+                        action="{{ url_for('delete_employee', employee_id=employee.id) }}"
+                        onsubmit="return confirm('Delete this employee record? Attendance and payroll history will keep it from being removed.');">
+                    {{ csrf_field() }}
+                    <button class="employee-btn small danger" type="submit">Delete</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="{{ 9 if can_view_salary else 8 }}" class="employee-empty">
+                No employees registered yet. Use the form above to create the first record.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  var form = document.querySelector('.employee-form');
+  var photoInput = document.getElementById('profile_photo');
+  var preview = document.getElementById('photo-preview');
+  var placeholder = document.getElementById('photo-placeholder');
+  var objectUrl = null;
+
+  function resetPreview() {
+    if (!preview) return;
+    if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
+    var original = preview.getAttribute('data-original') || '';
+    if (original) {
+      preview.src = original;
+      preview.hidden = false;
+      if (placeholder) placeholder.hidden = true;
+    } else {
+      preview.removeAttribute('src');
+      preview.hidden = true;
+      if (placeholder) placeholder.hidden = false;
+    }
+  }
+
+  if (photoInput && preview) {
+    photoInput.addEventListener('change', function () {
+      var file = photoInput.files && photoInput.files[0];
+      if (!file) { resetPreview(); return; }
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      objectUrl = URL.createObjectURL(file);
+      preview.src = objectUrl;
+      preview.hidden = false;
+      if (placeholder) placeholder.hidden = true;
+    });
+  }
+
+  if (form) form.addEventListener('reset', function () {
+    window.setTimeout(resetPreview, 0);
+  });
+
+  document.querySelectorAll('input[type="file"][data-file-note]').forEach(function (input) {
+    var note = document.querySelector(input.getAttribute('data-file-note'));
+    if (!note) return;
+    var original = note.textContent;
+    input.addEventListener('change', function () {
+      var count = input.files ? input.files.length : 0;
+      note.textContent = count
+        ? count + ' file' + (count === 1 ? '' : 's') + ' selected. Save the record to store them.'
+        : original;
+    });
+    if (form) form.addEventListener('reset', function () {
+      window.setTimeout(function () { note.textContent = original; }, 0);
+    });
+  });
+
+  var summary = document.getElementById('form-errors');
+  if (summary) {
+    summary.focus({ preventScroll: true });
+    summary.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+})();
+</script>
+{% endblock %}

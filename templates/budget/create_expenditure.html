@@ -1,0 +1,677 @@
+
+{% extends "base.html" %}
+
+{% block title %}Record Expenditure | Dereje Wood & Kitchen Cabinet{% endblock %}
+
+{% block content %}
+<style>
+    .expenditure-page {
+        --green: #247653;
+        --green-dark: #18583d;
+        --green-light: #eaf5ee;
+        --text: #25352d;
+        --muted: #718078;
+        --border: #e2eae4;
+        --card: #ffffff;
+        --soft: #f5faf6;
+        --field-line: #dce5de;
+        --bad-bg: #ffebeb;
+        --bad-ink: #c03939;
+        --flash-bg: #eaf5ee;
+        --flash-ink: #18583d;
+        --notice-ink: #285c3e;
+        --notice-line: #d7eadc;
+        max-width: 1200px;
+        margin: auto;
+        padding: 25px;
+        color: var(--text);
+    }
+
+    .expenditure-page * {
+        box-sizing: border-box;
+    }
+
+    .expenditure-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 16px;
+        margin-bottom: 25px;
+    }
+
+    .expenditure-header h1 {
+        margin: 0 0 8px;
+        font-size: clamp(25px, 3vw, 32px);
+        font-weight: 800;
+    }
+
+    .expenditure-header p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.7;
+    }
+
+    .expenditure-button {
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        gap: 8px;
+        min-height: 43px;
+        padding: 11px 16px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: var(--card);
+        color: var(--text);
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: .2s ease;
+    }
+
+    .expenditure-button:hover {
+        transform: translateY(-1px);
+        background: var(--soft);
+    }
+
+    .expenditure-button-primary {
+        background: var(--green);
+        border-color: var(--green);
+        color: white;
+    }
+
+    .expenditure-button-primary:hover {
+        background: var(--green-dark);
+        color: white;
+    }
+
+    .expenditure-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.5fr) minmax(260px, .8fr);
+        gap: 22px;
+        align-items: start;
+    }
+
+    .expenditure-card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 17px;
+        overflow: hidden;
+        box-shadow: 0 8px 28px #183e280a;
+    }
+
+    .expenditure-card-header {
+        padding: 22px 24px;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .expenditure-card-header h2 {
+        margin: 0 0 7px;
+        font-size: 17px;
+        font-weight: 750;
+        color: var(--text);
+    }
+
+    .expenditure-card-header p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.6;
+    }
+
+    .expenditure-form {
+        padding: 24px;
+    }
+
+    .expenditure-form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 20px 16px;
+    }
+
+    .expenditure-field {
+        min-width: 0;
+    }
+
+    .expenditure-field.full-width {
+        grid-column: 1 / -1;
+    }
+
+    .expenditure-field label {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 12px;
+        font-weight: 750;
+    }
+
+    .expenditure-field label span {
+        color: var(--bad-ink);
+    }
+
+    .expenditure-field input,
+    .expenditure-field select,
+    .expenditure-field textarea {
+        width: 100%;
+        min-height: 45px;
+        padding: 12px 13px;
+        border: 1px solid var(--field-line);
+        border-radius: 10px;
+        background: var(--card);
+        color: var(--text);
+        font-family: inherit;
+        font-size: 13px;
+        outline: none;
+        transition: border-color .2s, box-shadow .2s;
+    }
+
+    .expenditure-field textarea {
+        min-height: 115px;
+        resize: vertical;
+        line-height: 1.6;
+    }
+
+    .expenditure-field input:focus,
+    .expenditure-field select:focus,
+    .expenditure-field textarea:focus {
+        border-color: var(--green);
+        box-shadow: 0 0 0 3px #24765318;
+    }
+
+    .expenditure-field small {
+        display: block;
+        margin-top: 7px;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.5;
+    }
+
+    .expenditure-amount-wrap {
+        display: grid;
+        grid-template-columns: 105px minmax(0, 1fr);
+        gap: 9px;
+    }
+
+    .expenditure-form-actions {
+        display: flex;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 25px;
+        padding-top: 20px;
+        border-top: 1px solid var(--border);
+    }
+
+    .expenditure-preview {
+        padding: 22px;
+        background: linear-gradient(145deg, var(--soft), var(--card));
+    }
+
+    .expenditure-preview-label {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+        margin-bottom: 12px;
+    }
+
+    .expenditure-preview-amount {
+        font-size: clamp(25px, 3vw, 34px);
+        font-weight: 850;
+        letter-spacing: -.8px;
+        overflow-wrap: anywhere;
+    }
+
+    .expenditure-preview-currency {
+        color: var(--green);
+        font-size: 12px;
+        font-weight: 750;
+        margin-top: 8px;
+    }
+
+    .expenditure-preview-divider {
+        height: 1px;
+        background: var(--border);
+        margin: 22px 0;
+    }
+
+    .expenditure-detail {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 15px;
+        padding: 12px 0;
+        border-bottom: 1px solid #eaf0eb;
+        font-size: 12px;
+    }
+
+    .expenditure-detail:last-child {
+        border-bottom: 0;
+    }
+
+    .expenditure-detail span:first-child {
+        color: var(--muted);
+    }
+
+    .expenditure-detail strong {
+        text-align: right;
+        overflow-wrap: anywhere;
+    }
+
+    .expenditure-notice {
+        margin-top: 18px;
+        padding: 15px;
+        border: 1px solid var(--notice-line);
+        border-radius: 12px;
+        background: var(--green-light);
+        color: var(--notice-ink);
+        font-size: 12px;
+        line-height: 1.7;
+    }
+
+    .expenditure-notice strong {
+        display: block;
+        margin-bottom: 5px;
+    }
+
+    .expenditure-flash {
+        padding: 13px 16px;
+        margin-bottom: 15px;
+        border-radius: 10px;
+        background: var(--flash-bg);
+        color: var(--flash-ink);
+        font-size: 13px;
+    }
+
+    .expenditure-flash.error,
+    .expenditure-flash.danger {
+        background: var(--bad-bg);
+        color: var(--bad-ink);
+    }
+
+    @media (max-width: 850px) {
+        .expenditure-layout {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 560px) {
+        .expenditure-page {
+            padding: 15px 10px;
+        }
+
+        .expenditure-form,
+        .expenditure-card-header,
+        .expenditure-preview {
+            padding: 18px;
+        }
+
+        .expenditure-form-grid {
+            grid-template-columns: 1fr;
+            gap: 17px;
+        }
+
+        .expenditure-field.full-width {
+            grid-column: auto;
+        }
+
+        .expenditure-amount-wrap {
+            grid-template-columns: 95px minmax(0, 1fr);
+        }
+
+        .expenditure-form-actions {
+            flex-direction: column-reverse;
+        }
+
+        .expenditure-form-actions .expenditure-button {
+            width: 100%;
+        }
+    }
+
+    /* Dark theme: swap this page's palette for the shared slate surfaces. */
+    [data-theme="dark"] .expenditure-page {
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+        --border: #263449;
+        --card: var(--white);
+        --soft: var(--table-hover-bg);
+        --field-line: var(--line-strong);
+        --bad-bg: var(--danger-bg);
+        --bad-ink: var(--danger-ink);
+        --flash-bg: var(--success-bg);
+        --flash-ink: var(--success-ink);
+        --notice-ink: #9fe0bd;
+        --notice-line: #2f5e34;
+        --green-light: #16233c;
+        color-scheme: dark;
+    }
+
+</style>
+
+<div class="expenditure-page">
+
+    <header class="expenditure-header">
+        <div>
+            <h1>Record Expenditure</h1>
+            <p>Record an expense against an existing budget allocation. The same
+               amount is posted to the Finance ledger.</p>
+        </div>
+
+        <a class="expenditure-button"
+           href="{{ url_for('dashboard') }}">
+            ← Back to Dashboard
+        </a>
+    </header>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="expenditure-flash {{ category }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="expenditure-layout">
+
+        <section class="expenditure-card">
+            <div class="expenditure-card-header">
+                <h2>Expenditure Details</h2>
+                <p>Enter the actual spending information accurately before saving.</p>
+            </div>
+
+            <form class="expenditure-form"
+                  method="POST"
+                  action="{{ url_for('budget.create_expenditure') }}"
+                  id="expenditureForm">
+
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <div class="expenditure-form-grid">
+
+                    <div class="expenditure-field full-width">
+                        <label for="allocation_id">
+                            Budget Allocation <span>*</span>
+                        </label>
+
+                        <select id="allocation_id"
+                                name="allocation_id"
+                                required>
+                            <option value="">Select an allocation</option>
+
+                            {% for allocation in allocations %}
+                                <option
+                                    value="{{ allocation.id }}"
+                                    data-currency="{{ allocation.currency or 'ETB' }}"
+                                    data-allocated="{{ allocation.allocated_amount or 0 }}"
+                                    {% if selected_allocation_id is defined
+                                          and selected_allocation_id|string == allocation.id|string %}
+                                        selected
+                                    {% endif %}
+                                >
+                                    {{ allocation.allocation_name
+                                       if allocation.allocation_name is defined
+                                       else 'Allocation #' ~ allocation.id }}
+                                    — {{ allocation.currency or 'ETB' }}
+                                    {{ "{:,.2f}".format(allocation.allocated_amount|float) }}
+                                </option>
+                            {% endfor %}
+                        </select>
+
+                        <small>
+                            Choose the allocation that should cover this expense.
+                        </small>
+                    </div>
+
+                    <div class="expenditure-field full-width">
+                        <label for="description">
+                            Expense Description <span>*</span>
+                        </label>
+
+                        <textarea id="description"
+                                  name="description"
+                                  maxlength="1000"
+                                  required
+                                  placeholder="Describe the goods, materials, services, or other expense."></textarea>
+                    </div>
+
+                    <div class="expenditure-field">
+                        <label for="amount">Amount <span>*</span></label>
+
+                        <div class="expenditure-amount-wrap">
+                            <select id="currency" name="currency" required>
+                                <option value="ETB" selected>ETB</option>
+                                <option value="USD">USD</option>
+                                <option value="EUR">EUR</option>
+                                <option value="GBP">GBP</option>
+                            </select>
+
+                            <input id="amount"
+                                   name="amount"
+                                   type="number"
+                                   min="0.01"
+                                   max="999999999999"
+                                   step="0.01"
+                                   required
+                                   placeholder="0.00">
+                        </div>
+
+                        <small>Enter the actual expenditure amount.</small>
+                    </div>
+
+                    <div class="expenditure-field">
+                        <label for="reference">Reference Number</label>
+
+                        <input id="reference"
+                               name="reference"
+                               type="text"
+                               maxlength="100"
+                               placeholder="e.g. INV-2026-001">
+
+                        <small>Invoice, receipt, voucher, or payment reference.</small>
+                    </div>
+
+                    <div class="expenditure-field" id="exchangeRateField">
+                        <label for="exchange_rate">Exchange Rate to ETB</label>
+
+                        <input id="exchange_rate"
+                               name="exchange_rate"
+                               type="number"
+                               min="0.000001"
+                               step="0.000001"
+                               inputmode="decimal"
+                               placeholder="e.g. 57.50">
+
+                        <small>
+                            Required for non-ETB expenses so Finance receives the
+                            correct ETB value.
+                        </small>
+                    </div>
+
+                </div>
+
+                <div class="expenditure-form-actions">
+                    <a class="expenditure-button"
+                       href="{{ url_for('dashboard') }}">
+                        Cancel
+                    </a>
+
+                    <button class="expenditure-button expenditure-button-primary"
+                            type="submit"
+                            id="saveExpenditure">
+                        Save Expenditure →
+                    </button>
+                </div>
+            </form>
+        </section>
+
+        <aside>
+            <section class="expenditure-card">
+                <div class="expenditure-card-header">
+                    <h2>Expense Preview</h2>
+                    <p>Review the information before submitting.</p>
+                </div>
+
+                <div class="expenditure-preview">
+                    <div class="expenditure-preview-label">
+                        Expenditure Amount
+                    </div>
+
+                    <div class="expenditure-preview-amount"
+                         id="previewAmount">
+                        0.00
+                    </div>
+
+                    <div class="expenditure-preview-currency"
+                         id="previewCurrency">
+                        ETB
+                    </div>
+
+                    <div class="expenditure-preview-divider"></div>
+
+                    <div class="expenditure-detail">
+                        <span>Allocation</span>
+                        <strong id="previewAllocation">Not selected</strong>
+                    </div>
+
+                    <div class="expenditure-detail">
+                        <span>Reference</span>
+                        <strong id="previewReference">Not provided</strong>
+                    </div>
+
+                    <div class="expenditure-detail">
+                        <span>Record type</span>
+                        <strong>Actual expenditure</strong>
+                    </div>
+
+                    <div class="expenditure-detail">
+                        <span>Finance posting</span>
+                        <strong id="previewFinance">—</strong>
+                    </div>
+                </div>
+            </section>
+
+            <div class="expenditure-notice">
+                <strong>Financial control reminder</strong>
+                Verify the allocation, amount, supporting documents, and currency
+                before submitting. The server must validate the user's permission,
+                available allocation balance, and duplicate references where applicable.
+            </div>
+        </aside>
+
+    </div>
+</div>
+
+<script>
+(() => {
+    const form = document.getElementById("expenditureForm");
+    const allocation = document.getElementById("allocation_id");
+    const amount = document.getElementById("amount");
+    const currency = document.getElementById("currency");
+    const description = document.getElementById("description");
+    const reference = document.getElementById("reference");
+    const exchangeRate = document.getElementById("exchange_rate");
+    const exchangeRateField = document.getElementById("exchangeRateField");
+
+    const previewAmount = document.getElementById("previewAmount");
+    const previewCurrency = document.getElementById("previewCurrency");
+    const previewAllocation = document.getElementById("previewAllocation");
+    const previewReference = document.getElementById("previewReference");
+    const previewFinance = document.getElementById("previewFinance");
+    const saveButton = document.getElementById("saveExpenditure");
+
+    function updatePreview() {
+        const value = Number(amount.value);
+        const safeValue = Number.isFinite(value) && value > 0 ? value : 0;
+        const isBirr = currency.value === "ETB";
+        const rate = Number(exchangeRate.value);
+        const hasRate = Number.isFinite(rate) && rate > 0;
+
+        exchangeRateField.style.display = isBirr ? "none" : "";
+        exchangeRate.required = !isBirr;
+
+        previewAmount.textContent = safeValue.toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+
+        previewCurrency.textContent = currency.value || "ETB";
+
+        const selectedOption =
+            allocation.options[allocation.selectedIndex];
+
+        previewAllocation.textContent =
+            selectedOption && selectedOption.value
+                ? selectedOption.textContent.trim()
+                : "Not selected";
+
+        previewReference.textContent =
+            reference.value.trim() || "Not provided";
+
+        const financeValue = isBirr
+            ? safeValue
+            : (hasRate ? safeValue * rate : null);
+        previewFinance.textContent = financeValue === null
+            ? "Enter an exchange rate"
+            : financeValue.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            }) + " ETB";
+    }
+
+    [allocation, amount, currency, reference, exchangeRate].forEach(element => {
+        element.addEventListener("input", updatePreview);
+        element.addEventListener("change", updatePreview);
+    });
+
+    allocation.addEventListener("change", () => {
+        const option = allocation.selectedOptions[0];
+        if (option && option.dataset.currency) {
+            currency.value = option.dataset.currency;
+            updatePreview();
+        }
+    });
+
+    form.addEventListener("submit", event => {
+        if (!allocation.value) {
+            event.preventDefault();
+            alert("Please select a budget allocation.");
+            allocation.focus();
+            return;
+        }
+
+        const value = Number(amount.value);
+
+        if (!Number.isFinite(value) || value <= 0) {
+            event.preventDefault();
+            alert("Please enter an amount greater than zero.");
+            amount.focus();
+            return;
+        }
+
+        if (!description.value.trim()) {
+            event.preventDefault();
+            alert("Please enter an expenditure description.");
+            description.focus();
+            return;
+        }
+
+        if (currency.value !== "ETB") {
+            const rate = Number(exchangeRate.value);
+            if (!Number.isFinite(rate) || rate <= 0) {
+                event.preventDefault();
+                alert("Enter the exchange rate so Finance can post this expense.");
+                exchangeRate.focus();
+                return;
+            }
+        }
+
+        saveButton.disabled = true;
+        saveButton.textContent = "Submitting...";
+    });
+
+    updatePreview();
+})();
+</script>
+{% endblock %}

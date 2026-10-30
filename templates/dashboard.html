@@ -1,0 +1,315 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi, bars, columns, feed, dash_icon with context %}
+
+{% block title %}Dashboard | Dereje Belay Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">{{ greeting }}</span>
+      <h1>{{ user.full_name.split(' ')[0] }} &mdash; {{ role_label }}</h1>
+      <p>{{ today_name }} &middot; Your dashboard shows only the modules your account can open.</p>
+    </div>
+    <nav class="stock-actions" aria-label="Dashboard actions">
+      {% if 'accounts' in permissions %}
+      <a class="btn btn-outline btn-sm" href="{{ url_for('admin_users') }}">User Management</a>
+      {% endif %}
+      {% if 'approvals' in permissions %}
+      <a class="btn btn-sm" href="{{ url_for('approvals.new_request') }}">
+        New Request <span class="arrow">→</span></a>
+      {% endif %}
+    </nav>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    <div class="hr-stats">
+      {% for tile in tiles %}
+      {{ kpi(tile.label, tile.value, tile.note, tile.tone, tile.icon, tile.href) }}
+      {% endfor %}
+    </div>
+
+    <div class="chart-grid">
+      {% for chart in charts %}
+        {% if chart.kind == 'columns' %}
+          {{ columns(chart.title, chart.rows, chart.hint) }}
+        {% else %}
+          {{ bars(chart.title, chart.rows, chart.hint) }}
+        {% endif %}
+      {% endfor %}
+      {{ feed('Awaiting your decision', attention, 'Routed to the modules you hold') }}
+      {{ feed('Recent activity', trail, 'Sign-ins, edits and decisions') }}
+    </div>
+  </div>
+</section>
+
+{% if budget %}
+<section class="section bg-white">
+  <div class="container">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow">Budget</span>
+        <h2>Budget overview</h2>
+        <p>Plan limits, allocations and spending requests across the budget desk.</p>
+      </div>
+      <nav class="stock-actions" aria-label="Budget actions">
+        <a class="btn btn-outline btn-sm" href="{{ url_for('reports_centre') }}">Budget reports</a>
+        <a class="btn btn-outline btn-sm" href="{{ url_for('budget.request_list') }}">View requests</a>
+        <a class="btn btn-sm" href="{{ url_for('budget.create_plan') }}">New plan <span class="arrow">→</span></a>
+      </nav>
+    </div>
+
+    <div class="hr-stats">
+      {{ kpi('Total Budget Plans', budget.plans|length, 'Plans currently available', 'flat', 'chart', url_for('budget.plan_list')) }}
+      {{ kpi('Total Allocations', budget.allocated_total|money, 'Active ETB allocations', 'flat', 'cash', url_for('budget.allocations')) }}
+      {{ kpi('Pending Requests', budget.request_counts.pending_requests or 0, 'Awaiting review', 'flat', 'clock', url_for('budget.request_list')) }}
+      {{ kpi('Approved Requests', budget.request_counts.approved_requests or 0, budget.request_counts.approved_note, 'up', 'check', url_for('budget.request_list')) }}
+      {{ kpi('Committed (ETB)', budget.committed_total|money, 'Reserved by open purchase commitments', 'flat', 'inbox', url_for('budget.expenditures')) }}
+      {{ kpi('Available (ETB)', budget.available_total|money, 'Allocated, less spent and committed', 'flat', 'file', url_for('budget.allocations')) }}
+    </div>
+
+    <div class="dash-grid">
+      <div class="dash-panel">
+        <h2>Budget plans</h2>
+        {% if budget.plans %}
+        <div class="dash-table-wrap">
+          <table>
+            <thead><tr><th>Plan</th><th>Fiscal year</th><th>Total budget</th><th>Status</th></tr></thead>
+            <tbody>
+              {% for plan in budget.plans %}
+              {% set state = (plan.status or 'Draft')|lower %}
+              <tr>
+                <td>{{ plan.plan_name }}<span class="cell-sub">Plan #{{ plan.id }}</span></td>
+                <td>{{ plan.fiscal_year or '—' }}</td>
+                <td>{{ plan.currency or 'ETB' }} {{ plan.total_budget|money }}</td>
+                <td><span class="status-badge {{ 'active' if state in ('active', 'approved') else ('off' if state in ('rejected', 'closed') else 'neutral') }}">{{ plan.status or 'Draft' }}</span></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="empty-state">No budget plans yet. <a href="{{ url_for('budget.create_plan') }}">Create the first plan</a>.</p>
+        {% endif %}
+      </div>
+
+      <div class="dash-panel">
+        <h2>Recent budget requests</h2>
+        {% if budget.recent_requests %}
+        <div class="dash-table-wrap">
+          <table>
+            <thead><tr><th>Request</th><th>Department</th><th>Amount</th><th>Status</th></tr></thead>
+            <tbody>
+              {% for item in budget.recent_requests %}
+              {% set state = (item.status or 'Pending')|lower %}
+              <tr>
+                <td>{{ item.request_title }}<span class="cell-sub">Request #{{ item.id }}</span></td>
+                <td>{{ item.department or '—' }}</td>
+                <td>{{ item.currency or 'ETB' }} {{ item.requested_amount|money }}</td>
+                <td><span class="status-badge {{ 'active' if state == 'approved' else ('off' if state == 'rejected' else 'neutral') }}">{{ item.status or 'Pending' }}</span></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <p class="cell-note">Latest {{ budget.recent_requests|length }} request(s). <a href="{{ url_for('budget.request_list') }}">Open the request register</a>.</p>
+        {% else %}
+        <p class="empty-state">No budget requests yet. <a href="{{ url_for('budget.create_request') }}">Submit the first request</a>.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<section class="section bg-white">
+  <div class="container">
+    <div class="dash-grid">
+      {% if employees %}
+      <div class="dash-panel">
+        <h2>Recent employees</h2>
+        <div class="dash-table-wrap">
+          <table>
+            <thead><tr><th>ID</th><th>Name</th><th>Department</th><th>Position</th><th>Status</th></tr></thead>
+            <tbody>
+              {% for e in employees %}
+              <tr>
+                <td>{{ e.code }}</td>
+                <td><a href="{{ e.href }}">{{ e.name }}</a></td>
+                <td>{{ e.department }}</td>
+                <td>{{ e.position }}</td>
+                <td><span class="status-badge {{ 'active' if e.status == 'Active' else 'neutral' }}">{{ e.status }}</span></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if accounts_recent %}
+      <div class="dash-panel">
+        <h2>Recent sign-in accounts</h2>
+        <div class="dash-table-wrap">
+          <table>
+            <thead><tr><th>Account</th><th>Primary role</th><th>Status</th><th>Last sign-in</th><th></th></tr></thead>
+            <tbody>
+              {% for a in accounts_recent %}
+              <tr>
+                <td><a href="{{ a.href }}">{{ a.name }}</a><span class="cell-sub">{{ a.username }}</span></td>
+                <td>{{ a.role }}</td>
+                <td>
+                  <span class="status-badge {{ 'active' if a.status == 'Active' else 'off' }}">{{ a.status }}</span>
+                  {% if a.gated %}<span class="cell-sub">password change due</span>{% endif %}
+                </td>
+                <td>{{ a.last_login }}</td>
+                <td><a class="btn btn-outline-dark btn-sm" href="{{ a.href }}">Access</a></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if requests %}
+      <div class="dash-panel">
+        <h2>Pending approvals</h2>
+        <div class="dash-table-wrap">
+          <table>
+            <thead><tr><th>Request</th><th>Department</th><th>Amount (ETB)</th><th>Step</th><th>Status</th></tr></thead>
+            <tbody>
+              {% for r in requests %}
+              <tr>
+                <td><a href="{{ r.href }}">{{ r.title }}</a><span class="cell-sub">{{ r.by }}</span></td>
+                <td>{{ r.department }}</td>
+                <td>{{ r.amount }}</td>
+                <td>{{ r.step }}</td>
+                <td><span class="status-badge {{ 'active' if r.status == 'Approved' else ('off' if r.status == 'Rejected' else 'neutral') }}">{{ r.status }}</span></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if stock %}
+      <div class="dash-panel">
+        <h2>Stock to cover</h2>
+        <div class="dash-table-wrap">
+          <table>
+            <thead><tr><th>Item</th><th>Category</th><th>Quantity</th><th>Reorder at</th><th></th></tr></thead>
+            <tbody>
+              {% for s in stock %}
+              <tr>
+                <td>{{ s.name }}<span class="cell-sub">{{ s.sku }}</span></td>
+                <td>{{ s.category }}</td>
+                <td>{% if s.quantity <= s.min_stock %}<span class="status-badge off">{% else %}<span class="status-badge neutral">{% endif %}{{ s.quantity }} {{ s.unit }}</span></td>
+                <td>{{ s.min_stock }} {{ s.unit }}</td>
+                <td><a class="btn btn-outline-dark btn-sm" href="{{ s.href }}">Open</a></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+{% if org and org.org_departments %}
+<section class="section bg-white">
+  <div class="container">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow">Organization</span>
+        <h2>Departments and teams</h2>
+      </div>
+      <a class="btn btn-outline-dark btn-sm" href="{{ url_for('organization') }}">
+        Open organization <span class="arrow">→</span>
+      </a>
+    </div>
+
+    <div class="org-team-grid">
+      {% for department in org.org_departments %}
+      <div class="org-team-card">
+        <header class="org-team-head">
+          <div>
+            <span class="org-team-label">{{ department.label }}</span>
+            <strong>{{ department.name }}</strong>
+          </div>
+          <span class="org-team-count">{{ department.count }}</span>
+        </header>
+        <ul class="org-member-list">
+          {% for member in department.members %}
+          <li>
+            <span class="org-member-name">{{ member.name }}</span>
+            {% if member.title %}<em>{{ member.title }}</em>{% endif %}
+            {% if member.is_me %}<span class="org-you">You</span>{% endif %}
+          </li>
+          {% else %}
+          <li class="org-member-empty">No one assigned yet</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% else %}
+      <p class="empty-state">Departments will appear here once they are created.</p>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% if actions %}
+<section class="section bg-ivory">
+  <div class="container">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow">Shortcuts</span>
+        <h2>Quick actions</h2>
+      </div>
+      <p>The tasks staff use most, kept to the modules this account can actually open.</p>
+    </div>
+    <div class="quick-grid">
+      {% for action in actions %}
+      <a class="quick-action" href="{{ action.href }}">
+        <span class="quick-icon">{{ dash_icon(action.icon) }}</span>
+        <span>{{ action.label }}</span>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% if modules %}
+<section class="section bg-white">
+  <div class="container">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow">Modules</span>
+        <h2>Go to a module</h2>
+      </div>
+      <p>Every module your role has access to, with the count it is currently holding.</p>
+    </div>
+    <div class="module-grid">
+      {% for m in modules %}
+      <a class="module-card" href="{{ m.href }}">
+        <span class="module-icon">{{ dash_icon(m.icon) }}</span>
+        <span class="module-body">
+          <span class="module-label">{{ m.label }}</span>
+          <span class="module-note">{{ m.note }}</span>
+        </span>
+        <span class="module-count">{{ m.count }}</span>
+        <span class="module-arrow">→</span>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

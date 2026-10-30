@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block title %}Letters &amp; Correspondence | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">CORRESPONDENCE</span>
+      <h1>Letters &amp; Correspondence</h1>
+      <p>General correspondence, memoranda and the departmental letter series,
+         filtered to the categories this account may open.</p>
+    </div>
+    <nav class="letter-actions">
+      <a class="btn btn-outline" href="{{ url_for('letters.inbox') }}">Inbox{% if unread %} · {{ unread }} new{% endif %}</a>
+      <a class="btn btn-outline" href="{{ url_for('letters.outbox') }}">Outbox</a>
+      {% if can_create %}
+      <a class="btn" href="{{ url_for('letters.create') }}">Create letter →</a>
+      {% endif %}
+    </nav>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    <div class="letter-stats">
+      {% for label, value in [
+        ('Total letters', counts['total'] or 0),
+        ('Official letters', counts['official'] or 0),
+        ('Incoming', counts['incoming'] or 0),
+        ('Outgoing', counts['outgoing'] or 0),
+        ('Approved', counts['approved'] or 0),
+        ('Unread inbox', unread)
+      ] %}
+      <div class="letter-stat">
+        <span>{{ label }}</span>
+        <strong>{{ value }}</strong>
+      </div>
+      {% endfor %}
+    </div>
+
+    {% if awaiting_signature %}
+    <div class="dash-panel">
+      <h2>Waiting for your signature · {{ awaiting_signature | length }}</h2>
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Reference</th>
+              <th>Subject</th>
+              <th>From</th>
+              <th>Now at</th>
+              <th>Updated</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in awaiting_signature %}
+            <tr>
+              <td class="nowrap">{{ item['reference_no'] }}</td>
+              <td class="wrap-cell">{{ item['subject'] }}</td>
+              <td>{{ item['sender'] or '—' }}</td>
+              <td class="nowrap">{{ step_labels.get(item['approval_step'], item['approval_step']) }}</td>
+              <td class="nowrap">
+                {{ item['updated_at'] | audit_time }}
+                {% if item['updated_by_name'] %}
+                <br><span class="feed-meta">{{ item['updated_by_name'] }}</span>
+                {% endif %}
+              </td>
+              <td>
+                <a class="btn btn-sm"
+                   href="{{ url_for('letters.detail', letter_id=item['id']) }}">Review &amp; sign</a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+
+    <form method="GET" class="stock-search">
+      <label for="q">Search</label>
+      <input id="q" name="q" value="{{ search }}" maxlength="120"
+             placeholder="Reference, subject, sender or recipient" />
+      <select name="type" class="letter-filter" aria-label="Letter category">
+        <option value="">All letter categories</option>
+        {% for value in letter_types %}
+        <option value="{{ value }}"{% if selected_type == value %} selected{% endif %}>{{ letter_type_label(value) }}</option>
+        {% endfor %}
+      </select>
+      <select name="status" class="letter-filter" aria-label="Letter status">
+        <option value="">All statuses</option>
+        {% for value in letter_statuses %}
+        <option value="{{ value }}"{% if selected_status == value %} selected{% endif %}>{{ value }}</option>
+        {% endfor %}
+      </select>
+      <button class="btn" type="submit">Search</button>
+      <a class="btn btn-outline" href="{{ url_for('letters.dashboard') }}">Reset</a>
+    </form>
+
+    <div class="dash-panel">
+      <h2>{{ letters | length }} letter{{ '' if letters | length == 1 else 's' }}</h2>
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Reference</th>
+              <th>Category</th>
+              <th>Subject</th>
+              <th>Date</th>
+              <th>Status</th>
+              <th>Last modified</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for letter in letters %}
+            <tr>
+              <td>{{ letter['reference_no'] }}</td>
+              <td>
+                {{ letter_type_label(letter['letter_type']) }}
+                {% if letter['letter_kind'] %}
+                <em class="letter-kind">{{ letter_kind_label(letter['letter_type'], letter['letter_kind']) }}</em>
+                {% endif %}
+              </td>
+              <td>{{ letter['subject'] }}</td>
+              <td>{{ letter['letter_date'] | friendly_date }}</td>
+              <td>
+                {% if letter['status'] in ('Sent', 'Received') %}
+                <span class="status-badge active">{{ letter['status'] }}</span>
+                {% elif letter['status'] == 'Archived' %}
+                <span class="status-badge off">{{ letter['status'] }}</span>
+                {% else %}
+                <span class="status-badge neutral">{{ letter['status'] }}</span>
+                {% endif %}
+              </td>
+              <td class="nowrap">
+                {{ letter['updated_by_name'] or '—' }}
+                {% if letter['updated_at'] %}
+                <br><span class="feed-meta">{{ letter['updated_at'] | audit_time }}</span>
+                {% endif %}
+              </td>
+              <td class="row-actions">
+                <a class="btn" href="{{ url_for('letters.detail', letter_id=letter['id']) }}">View</a>
+                {% if can_edit and letter['status'] == 'Draft' %}
+                <a class="btn btn-outline" href="{{ url_for('letters.edit', letter_id=letter['id']) }}">Edit</a>
+                {% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="7">
+                No letters found. {% if can_create %}Create a letter or adjust the search.{% else %}Adjust the search.{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

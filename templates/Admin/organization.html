@@ -1,0 +1,7 @@
+{% extends "HR/organization.html" %}
+
+{% block org_actions %}
+  {{ super() }}
+  <a class="btn btn-outline-dark btn-sm" href="{{ url_for('admin_users') }}">User management</a>
+  <a class="btn btn-outline-dark btn-sm" href="{{ url_for('admin_roles') }}">Role management</a>
+{% endblock %}

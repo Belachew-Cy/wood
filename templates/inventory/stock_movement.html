@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}Stock Movement | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">INVENTORY MANAGEMENT</span>
+      <h1>Stock In / Stock Out</h1>
+      <p>Record every receipt and issue of material against an item.</p>
+    </div>
+    <a class="btn btn-outline" href="{{ url_for('inventory.history') }}">Movement history</a>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="dash-panel">
+      <h2>New movement</h2>
+
+      <form method="POST" class="dash-form stock-grid">
+        {{ csrf_field() }}
+        <div>
+          <label for="item_id">Inventory item *</label>
+          <select id="item_id" name="item_id" required>
+            <option value="">Select an item</option>
+            {% for item in items %}
+            <option value="{{ item['id'] }}">
+              {{ item['sku'] }} — {{ item['name'] }}
+              ({{ item['quantity'] }} {{ item['unit'] }} available)
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label for="movement_type">Movement *</label>
+          <select id="movement_type" name="movement_type" required>
+            <option value="IN">Stock in — receive material</option>
+            <option value="OUT">Stock out — issue material</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="quantity">Quantity *</label>
+          <input id="quantity" type="number" step="0.001" min="0.001"
+                 name="quantity" required />
+        </div>
+
+        <div>
+          <label for="reference_type">Related module *</label>
+          <select id="reference_type" name="reference_type" required>
+            {% for option in references %}
+            <option value="{{ option }}">
+              {{ {
+                'Purchasing': 'Purchasing / goods receipt',
+                'Production': 'Production material issue',
+                'Sales': 'Sales / delivery',
+                'Adjustment': 'Approved stock adjustment',
+                'Manual': 'Manual entry',
+              }[option] }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label for="reference_no">Reference number</label>
+          <input id="reference_no" name="reference_no" maxlength="60"
+                 placeholder="e.g. PO-0001 or PROD-0001" />
+        </div>
+
+        <div class="stock-notes">
+          <label for="notes">Notes</label>
+          <textarea id="notes" name="notes" rows="3"
+                    placeholder="Reason, supplier, production order or remarks"></textarea>
+        </div>
+
+        <div class="stock-form-actions">
+          <button class="btn" type="submit">Record movement</button>
+          <a class="btn btn-outline" href="{{ url_for('inventory.dashboard') }}">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+
+{% block title %}Findings — {{ review.title }} | Dereje Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Audit review #{{ review.id }}</span>
+      <h1>{{ review.title }}</h1>
+      <p>
+        {{ review.department }}
+        {%- if review.review_period_start %} · {{ review.review_period_start }}
+        {%- if review.review_period_end %} → {{ review.review_period_end }}{% endif %}{% endif %}
+        · {{ review.status }}
+      </p>
+    </div>
+    <nav class="stock-actions" aria-label="Audit sections">
+      <a class="btn btn-outline btn-sm" href="{{ url_for('auditor_dashboard') }}">Console</a>
+      <a class="btn btn-outline btn-sm" href="{{ url_for('auditor_reviews') }}">All reviews</a>
+      <a class="btn btn-sm" href="{{ url_for('reports_centre') }}">Reports</a>
+    </nav>
+  </div>
+</section>
+
+<section class="container finance-page">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="finance-alert {{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  {% if review.summary %}
+  <div class="finance-panel">
+    <h2>Scope and method</h2>
+    <p class="panel-note">{{ review.summary }}</p>
+  </div>
+  {% endif %}
+
+  <div class="finance-panel">
+    <h2>Raise a finding</h2>
+    <form method="post" action="{{ url_for('auditor_findings', review_id=review.id) }}"
+          class="finance-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div class="finance-grid">
+        <div class="full">
+          <label>Title *</label>
+          <input name="title" maxlength="200" required
+                 value="{{ values.title if values else '' }}"
+                 placeholder="What was found?">
+        </div>
+
+        <div>
+          <label>Risk *</label>
+          <select name="risk_level" required>
+            {% for value in risk_levels %}
+            <option value="{{ value }}"
+                    {% if values and values.get('risk_level') == value %}selected{% endif %}>
+              {{ value }}
+            </option>
+            {% endfor %}
+          </select>
+          <small>High and Critical are what the console counts as exposure.</small>
+        </div>
+
+        <div class="full">
+          <label>What was found, and why it matters *</label>
+          <textarea name="description" rows="4" maxlength="4000" required>{{ values.description if values else '' }}</textarea>
+        </div>
+
+        <div class="full">
+          <label>Recommendation</label>
+          <textarea name="recommendation" rows="3" maxlength="4000">{{ values.recommendation if values else '' }}</textarea>
+        </div>
+      </div>
+
+      <div class="finance-form-actions">
+        <button class="finance-btn primary" type="submit">Record finding</button>
+        <a class="finance-btn secondary" href="{{ url_for('auditor_reviews') }}">Back to reviews</a>
+      </div>
+    </form>
+  </div>
+
+  <div class="dash-panel hr-table-panel" data-filter>
+    <h2>{{ findings | length }} finding{{ '' if findings | length == 1 else 's' }} on this review</h2>
+
+    <div class="report-filters no-print">
+      <div>
+        <label for="findingSearch">Search this review</label>
+        <input id="findingSearch" type="search" data-filter-search
+               placeholder="Title, finding or response">
+      </div>
+    </div>
+
+    <div class="hr-table-wrap table-scroll">
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th>Ref</th><th>Finding</th><th>Risk</th><th>Status</th>
+            <th>Recommendation</th><th>Management response</th><th>Raised</th>
+            <th>Last modified</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for finding in findings %}
+          <tr>
+            <td class="nowrap">#{{ finding.id }}</td>
+            <td class="wrap-cell">
+              {{ finding.title }}
+              {% if finding.description %}
+              <p class="cell-note">{{ finding.description }}</p>
+              {% endif %}
+            </td>
+            <td>
+              <span class="status-badge {{ finding.risk_level | lower }}">{{ finding.risk_level }}</span>
+            </td>
+            <td>
+              <span class="status-badge {{ 'active' if finding.status in ('Resolved', 'Closed') else 'neutral' }}">
+                {{ finding.status }}
+              </span>
+            </td>
+            <td class="wrap-cell">{{ finding.recommendation or '—' }}</td>
+            <td class="wrap-cell">{{ finding.management_response or '—' }}</td>
+            <td class="nowrap">{{ finding.created_at | audit_time }}</td>
+            <td class="nowrap">
+              {{ finding.updated_by_name or '—' }}
+              {% if finding.updated_at %}
+              <br><span class="feed-meta">{{ finding.updated_at | audit_time }}</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="8" class="report-empty">Nothing has been raised on this review yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <p class="report-empty" data-filter-empty hidden>
+      No finding on this review matches that search.
+    </p>
+    <p class="report-note"><span data-filter-count></span></p>
+  </div>
+
+  {% if findings %}
+  <div class="finance-panel">
+    <h2>Record the response</h2>
+    <form method="post" action="{{ url_for('auditor_finding_status') }}" class="finance-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div class="finance-grid">
+        <div>
+          <label>Finding *</label>
+          <select name="finding_id" required>
+            {% for finding in findings %}
+            <option value="{{ finding.id }}">#{{ finding.id }} · {{ finding.title }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label>Status *</label>
+          <select name="status" required>
+            {% for value in statuses %}
+            <option value="{{ value }}">{{ value }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="full">
+          <label>Management response</label>
+          <textarea name="management_response" rows="3" maxlength="4000"
+                    placeholder="What the department says it will do, and by when."></textarea>
+          <small>Leave this empty to keep the response already recorded.</small>
+        </div>
+      </div>
+
+      <div class="finance-form-actions">
+        <button class="finance-btn primary" type="submit">Save response</button>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+
+  <p class="report-note">
+    Findings and responses belong to the audit file. The records they describe stay
+    exactly as the department holds them.
+  </p>
+</section>
+{% endblock %}

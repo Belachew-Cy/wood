@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+{% from "base.html" import dash_icon with context %}
+
+{% block title %}Modules — {{ target.full_name }} | Dereje Belay Wood &amp; Kitchen{% endblock %}
+
+{% macro ui(name) -%}
+  {%- set paths = {
+    'shield': '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>',
+    'users': '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'
+  } -%}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ paths.get(name, paths['shield']) | safe }}</svg>
+{%- endmacro %}
+
+{% block content %}
+{% set deviations = ((granted - defaults) | length) + ((defaults - granted) | length) %}
+
+<section class="dir-page">
+  <div class="container">
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <header class="dir-head">
+      <div class="dir-head-copy">
+        <span class="dir-eyebrow">Role Management</span>
+        <h1>{{ target.full_name }}</h1>
+        <p class="dir-sub">{{ target.email }}{% if target.username %} · {{ target.username }}{% endif %}
+          · {% if target.last_login %}last sign-in {{ target.last_login | audit_time }}{% else %}never signed in{% endif %}
+          · {% if target.updated_at %}last modified by {{ target.updated_by_name or '—' }} {{ target.updated_at | audit_time }}{% else %}no recorded change{% endif %}</p>
+        <p class="dir-summary">
+          <span class="dir-pill role-{{ target.role }}">{{ role_labels.get(target.role, target.role) }}</span>
+          <span class="dir-pill status-{{ 'active' if target.status == 'Active' else 'disabled' }}">
+            <span class="status-dot"></span>{{ target.status }}
+          </span>
+          <span><span class="dir-swatch"></span><strong>{{ granted | length }}</strong>
+            of {{ modules | length }} modules open</span>
+          {% if target.role != 'admin' %}
+          <span><span class="dir-swatch success"></span><strong>{{ extra_keys | length }}</strong>
+            additional role{{ '' if extra_keys | length == 1 else 's' }}</span>
+          <span><span class="dir-swatch warning"></span><strong>{{ deviations }}</strong>
+            stored override{{ '' if deviations == 1 else 's' }}</span>
+          {% endif %}
+          <span><span class="dir-swatch muted"></span><strong>{{ assignment.department_name or 'Unassigned' }}</strong>
+            department</span>
+          <span><strong>{{ assignment.position_title or 'No position' }}</strong>
+            {% if assignment.position_level is not none %}
+            · {{ position_level_label.get(assignment.position_level, 'Staff') }}
+            {% endif %}</span>
+        </p>
+      </div>
+      <div class="dir-head-actions">
+        <a class="dir-quiet-link" href="{{ url_for('admin_roles') }}">{{ ui('shield') }} All roles</a>
+        <a class="dir-quiet-link" href="{{ url_for('admin_users') }}">{{ ui('users') }} User management</a>
+      </div>
+    </header>
+
+    <div class="dir-stack">
+
+      <section class="dir-card">
+        <div class="dir-card-head">
+          <div>
+            <span class="dir-eyebrow">Access</span>
+            <h2>Module permissions</h2>
+          </div>
+          <span class="cell-note">{{ granted | length }} of {{ modules | length }} open ·
+            {{ 'every module' if target.role == 'admin' else role_labels.get(target.role, target.role) }}</span>
+        </div>
+
+        {% if target.role != 'admin' %}
+        <form method="POST">
+          {{ csrf_field() }}
+          <input type="hidden" name="action" value="permissions" />
+          <div class="dir-card-body">
+            <fieldset class="perm-grid">
+              <legend>Modules this account may open</legend>
+              {% for m in modules %}
+              <label class="perm-item">
+                {% if m == 'approvals' and approver_desk %}
+                <input type="hidden" name="permissions" value="approvals" />
+                {% endif %}
+                <input type="checkbox" name="permissions" value="{{ m }}"
+                       {% if m in granted %}checked{% endif %}
+                       {% if m == 'approvals' and approver_desk %}disabled{% endif %} />
+                <span>{{ module_label.get(m, m) }}</span>
+                <em class="perm-default">
+                  {% if m == 'approvals' and approver_desk %}by position
+                  {% else %}{{ 'primary role' if m in primary_defaults else 'extra role' if m in defaults else 'override' if m in granted else 'blocked' }}{% endif %}
+                </em>
+              </label>
+              {% endfor %}
+            </fieldset>
+
+            <p class="perm-note">Only the cells that differ from the combined role defaults
+              are stored. Clearing a module an additional role grants blocks it for this
+              account until the role or the tick is changed.</p>
+          </div>
+          <div class="dir-card-foot">
+            <span class="dir-count">{{ deviations }} tick{{ '' if deviations == 1 else 's' }}
+              stored against the role defaults.</span>
+            <button type="submit" class="btn btn-sm">Save permissions</button>
+          </div>
+        </form>
+        {% else %}
+        <div class="dir-card-body">
+          <p class="perm-note">Administrators hold every module by definition, so there is
+            nothing to tick here. Their account, role and status are managed on User
+            Management.</p>
+          <ul class="chip-row">
+            {% for m in modules %}<li class="chip">{{ module_label.get(m, m) }}</li>{% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+      </section>
+
+      <section class="dir-card">
+        <div class="dir-card-head">
+          <div>
+            <span class="dir-eyebrow">Roles</span>
+            <h2>Additional roles</h2>
+          </div>
+          <span class="cell-note">{{ extra_keys | length }} assigned on top of the primary role</span>
+        </div>
+
+        {% if target.role != 'admin' %}
+        <form method="POST">
+          {{ csrf_field() }}
+          <input type="hidden" name="action" value="extra_roles" />
+          <div class="dir-card-body">
+            <fieldset class="perm-grid">
+              <legend>Roles this account also carries</legend>
+              {% for option in role_options %}
+              <label class="perm-item">
+                <input type="checkbox" name="extra_roles" value="{{ option.key }}"
+                       {% if option.key in extra_keys %}checked{% endif %} />
+                <span>{{ option.label }}</span>
+                <em class="perm-default">
+                  {{ option.modules | join(', ') if option.modules else 'landing only' }}
+                </em>
+              </label>
+              {% else %}
+              <p class="cell-note">No additional role is available to assign.</p>
+              {% endfor %}
+            </fieldset>
+
+            <p class="perm-note">Additional roles widen what the account can open, including
+              custom roles built on Role Management. The primary role still decides the
+              dashboard the account lands on.</p>
+          </div>
+          <div class="dir-card-foot">
+            <span class="dir-count">{{ extra_keys | length }} additional role{{ '' if extra_keys | length == 1 else 's' }}
+              widen this account's modules.</span>
+            <button type="submit" class="btn btn-sm">Save additional roles</button>
+          </div>
+        </form>
+        {% else %}
+        <div class="dir-card-body">
+          <p class="perm-note">An Administrator already answers every module and needs no
+            additional role.</p>
+        </div>
+        {% endif %}
+      </section>
+
+      <section class="dir-card">
+        <div class="dir-card-head">
+          <div>
+            <span class="dir-eyebrow">Organization</span>
+            <h2>Department and position</h2>
+          </div>
+          <span class="cell-note">{{ assignment.position_title or 'No position assigned' }}</span>
+        </div>
+        <div class="dir-card-body">
+          <div class="account-grid">
+            <div>
+              <label>Department</label>
+              <p class="dir-readonly">{{ assignment.department_name or 'Not assigned' }}</p>
+            </div>
+            <div>
+              <label>Position</label>
+              <p class="dir-readonly">
+                {{ assignment.position_title or 'Not assigned' }}
+                {% if assignment.position_level is not none %}
+                <span class="cell-note">{{ position_level_label.get(assignment.position_level, 'Staff') }}</span>
+                {% endif %}
+              </p>
+            </div>
+          </div>
+          <p class="perm-note">Department and position assignments are managed in
+            <a href="{{ url_for('manage_hierarchy') }}#accounts">Organization &amp; Hierarchy</a>.
+            The position decides which approval desks the account answers.</p>
+          {% if approver_desk %}
+          <div class="finance-alert success">
+            This seat signs the <strong>{{ approver_desk }} desk</strong> automatically:
+            the Approval workflow module and letter-signing right come with the
+            {{ assignment.position_title }} position and cannot be switched off here.
+            Removing or changing the position removes the right everywhere at once.
+          </div>
+          {% endif %}
+        </div>
+      </section>
+    </div>
+  </div>
+</section>
+{% endblock %}

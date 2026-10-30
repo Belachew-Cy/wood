@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Access Denied | Dereje Belay Wood &amp; Kitchen Cabinet Finishing{% endblock %}
+
+{% block content %}
+<section class="auth-section">
+  <div class="auth-card" style="max-width:540px;margin:0 auto;text-align:center;">
+    <div class="auth-brand">
+      <span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9V21h13V9"/><path d="M10 21v-6h4v6"/></svg></span>
+      <h1>403 — Access denied</h1>
+      <p>Your account (<strong>{{ role_label if role_label else user.role if user else 'guest' }}</strong>) is not allowed to open this module. Nothing was changed.</p>
+    </div>
+
+    <div class="hero-actions" style="justify-content:center;">
+      {% if user and dashboard_home %}
+      <a class="btn" href="{{ dashboard_home }}">Go to my dashboard <span class="arrow">→</span></a>
+      {% endif %}
+      <a class="btn btn-outline-dark" href="{{ url_for('index') }}">Back to Home</a>
+    </div>
+
+    <p class="auth-hint">
+      Need this module for your work? Ask an administrator to grant it under
+      Admin → Employee accounts → Module permissions.
+    </p>
+  </div>
+</section>
+{% endblock %}

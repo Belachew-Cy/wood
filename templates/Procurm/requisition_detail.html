@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% from "_workflow.html" import approval_route %}
+
+{% block title %}{{ request_row.request_number }} | Procurement{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Purchase requisition</span>
+      <h1>{{ request_row.request_number }}</h1>
+      <p>{{ request_row.department | title }} · raised by {{ request_row.requested_by_name }}
+        · {{ "{:,.2f}".format(total | float) }} ETB</p>
+    </div>
+    <nav class="stock-actions" aria-label="Requisition actions">
+      <a class="btn btn-outline btn-sm" href="{{ url_for('procurement.requisitions') }}">Back to requisitions</a>
+      {% if can_change %}
+      <a class="btn btn-outline btn-sm"
+         href="{{ url_for('procurement.requisition_edit', request_id=request_row.id) }}">Revise</a>
+      {% endif %}
+      {% if can_open_approval %}
+      <a class="btn btn-outline btn-sm"
+         href="{{ url_for('approvals.detail', request_id=chain.id) }}">Approval trail</a>
+      {% endif %}
+    </nav>
+  </div>
+</section>
+
+<section class="container finance-page">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="finance-alert {{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <div class="dash-grid">
+    <div class="dash-panel">
+      <h2>The requisition</h2>
+      <dl class="detail-list">
+        <dt>Status</dt>
+        <dd>
+          <span class="status-badge {{ 'active' if request_row.status == 'Approved' else 'off' if request_row.status == 'Rejected' else 'neutral' }}">
+            {{ state }}
+          </span>
+        </dd>
+        <dt>Department</dt><dd>{{ request_row.department | title }}</dd>
+        <dt>Raised by</dt><dd>{{ request_row.requested_by_name }}</dd>
+        <dt>Submitted</dt>
+        <dd>{{ (request_row.submitted_at or request_row.created_at or '—')[:10] }}</dd>
+        <dt>Last modified</dt>
+        <dd>{{ request_row.updated_by_name or '—' }}{% if request_row.updated_at %} · {{ request_row.updated_at | audit_time }}{% endif %}</dd>
+        <dt>Supplier</dt><dd>{{ supplier_name or 'Not chosen yet' }}</dd>
+        <dt>Item total</dt>
+        <dd><strong>{{ "{:,.2f}".format(total | float) }} ETB</strong></dd>
+        <dt>Why it is needed</dt>
+        <dd class="wrap-cell">{{ request_row.justification or '—' }}</dd>
+        {% if request_row.notes %}
+        <dt>Notes</dt><dd class="wrap-cell">{{ request_row.notes }}</dd>
+        {% endif %}
+      </dl>
+    </div>
+
+    <div class="dash-panel">
+      <h2>Budget</h2>
+      {% if allocation %}
+      <dl class="detail-list">
+        <dt>Allocation</dt><dd>{{ allocation.allocation_name }}</dd>
+        <dt>Department</dt><dd>{{ allocation.department | title }}</dd>
+        <dt>Plan</dt><dd>{{ allocation.plan_name or '—' }}</dd>
+        <dt>Available on allocation</dt>
+        <dd>{{ "{:,.2f}".format(allocation_available | float) }} ETB</dd>
+      </dl>
+      <p class="panel-note">The requisition's total stays reserved against this
+        allocation until it becomes a purchase order.</p>
+      {% else %}
+      <p class="panel-note">No budget allocation is linked, so nothing is reserved
+        for this requisition.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  {{ approval_route(trail, 'Approval workflow', workflow_note) }}
+
+  <div class="dash-panel hr-table-panel">
+    <h2>Items</h2>
+    <div class="hr-table-wrap table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Item</th>
+            <th>Quantity</th>
+            <th>Unit</th>
+            <th>Unit price (ETB)</th>
+            <th>Line total (ETB)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for line in lines %}
+          <tr>
+            <td class="nowrap">{{ loop.index }}</td>
+            <td class="wrap-cell">{{ line.item_name }}</td>
+            <td class="nowrap">{{ "{:g}".format(line.quantity | float) }}</td>
+            <td>{{ line.unit }}</td>
+            <td>{{ "{:,.2f}".format(line.unit_price | float) }}</td>
+            <td>{{ "{:,.2f}".format(line.line_total | float) }}</td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="6" class="employee-empty">
+              This requisition was recorded without item lines.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="dash-panel hr-table-panel">
+    <h2>Purchase orders</h2>
+    <div class="hr-table-wrap table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Order</th>
+            <th>Supplier</th>
+            <th>Placed</th>
+            <th>Total (ETB)</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for order in orders %}
+          <tr>
+            <td class="nowrap">
+              {% if can_open_order %}
+              <a href="{{ url_for('procurement.order_detail', order_id=order.id) }}">{{ order.order_number }}</a>
+              {% else %}{{ order.order_number }}{% endif %}
+            </td>
+            <td class="wrap-cell">{{ order.supplier_name or '—' }}</td>
+            <td class="nowrap">{{ (order.created_at or '—')[:10] }}</td>
+            <td>{{ "{:,.2f}".format(order.total_cost | float) }}</td>
+            <td>
+              <span class="status-badge {{ 'active' if order.status == 'Received' else 'off' if order.status == 'Cancelled' else 'neutral' }}">
+                {{ order.status }}
+              </span>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="5" class="employee-empty">
+              No purchase order has been placed against this requisition yet.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+{% endblock %}

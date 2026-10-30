@@ -1,0 +1,33 @@
+# Secrets
+.secret_key
+.env
+*.env
+
+# Databases
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+users_backup_*.db
+
+# Uploaded user data
+uploads/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Real business documents (add as needed)
+*.pdf

@@ -1,0 +1,256 @@
+
+{% extends "base.html" %}
+{% from "base.html" import bars, donut, feed with context %}
+
+{% block title %}Payroll Management | Dereje Wood & Kitchen{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Human Resources</span>
+            <h1>Payroll Management</h1>
+            <p>Manage employee salaries, deductions, and payment records.</p>
+        </div>
+        <a class="btn" href="{{ url_for('hr_dashboard') }}">Back to HR</a>
+    </div>
+</section>
+
+<section class="section bg-ivory">
+    <div class="container">
+
+        <nav class="hr-navigation" aria-label="HR navigation">
+            <a class="hr-nav-link"
+               href="{{ url_for('hr_dashboard') }}">Dashboard</a>
+            <a class="hr-nav-link"
+               href="{{ url_for('attendance') }}">Attendance</a>
+            <a class="hr-nav-link active"
+               href="{{ url_for('payroll') }}">Payroll</a>
+        </nav>
+
+        <!-- Payroll summary -->
+        <div class="hr-stats">
+            <div class="hr-card">
+                <span>Basic Salaries</span>
+                <strong>{{ "%.2f"|format(total_basic) }}</strong>
+            </div>
+            <div class="hr-card">
+                <span>Allowances</span>
+                <strong>{{ "%.2f"|format(total_allowances) }}</strong>
+            </div>
+            <div class="hr-card">
+                <span>Deductions</span>
+                <strong>{{ "%.2f"|format(total_deductions) }}</strong>
+            </div>
+            <div class="hr-card">
+                <span>Total Net Payroll</span>
+                <strong>{{ "%.2f"|format(total_net) }}</strong>
+            </div>
+            <div class="hr-card">
+                <span>Paid</span>
+                <strong>{{ paid_count }}</strong>
+            </div>
+            <div class="hr-card">
+                <span>Pending</span>
+                <strong>{{ pending_count }}</strong>
+            </div>
+        </div>
+
+        <!-- Select payroll month -->
+        {% set dept_net = [] %}
+            {% for name, rows in records | groupby('department') %}
+              {% set _ = dept_net.append({
+                'label': name or 'Unassigned',
+                'value': rows | map(attribute='net_salary') | map('float') | sum,
+                'display': '{} payslip{}'.format(rows | length, '' if rows | length == 1 else 's')
+              }) %}
+            {% endfor %}
+            {% set dept_net = dept_net | sort(reverse=true, attribute='value') %}
+            {% set lines_total = records | length %}
+            {% set not_payout = (paid_count / lines_total) if lines_total and paid_count <= lines_total else (1 if lines_total else 0) %}
+            {% set unsent = (employees | length) - lines_total %}
+
+            <div class="chart-grid">
+              {{ bars('Cost components for ' ~ selected_month, [
+                {'label': 'Basic', 'value': total_basic, 'display': '{:,.0f} ETB'.format(total_basic)},
+                {'label': 'Allowances', 'value': total_allowances, 'display': '{:,.0f} ETB'.format(total_allowances)},
+                {'label': 'Deductions', 'value': total_deductions, 'display': '{:,.0f} ETB'.format(total_deductions)},
+                {'label': 'Net pay', 'value': total_net, 'display': '{:,.0f} ETB'.format(total_net)}
+              ], 'ETB') }}
+              {{ bars('Net pay by department', dept_net, 'ETB') }}
+              {{ donut('Payslips released', not_payout,
+                      '{}%'.format((not_payout * 100) | round(0, 'common') | int),
+                      [
+                        {'label': 'Paid', 'color': 'var(--walnut)', 'value': paid_count},
+                        {'label': 'Pending', 'color': 'var(--ivory-2)', 'value': pending_count}
+                      ], 'of ' ~ selected_month ~ ' lines') }}
+              {{ feed('Before you close the month', [
+                {'icon': 'users', 'tone': 'warn' if unsent > 0 else 'ok',
+                 'title': '{} active employee{} on the payroll list'.format(employees | length, '' if (employees | length) == 1 else 's'),
+                 'meta': '{} line{} generated for {}.'.format(lines_total, '' if lines_total == 1 else 's', selected_month),
+                 'time': 'Check'},
+                {'icon': 'cash', 'tone': 'warn' if pending_count else 'ok',
+                 'title': '{} pending, {} paid'.format(pending_count, paid_count),
+                 'meta': 'Mark a line Paid once the money has left the account.',
+                 'href': url_for('payroll_dashboard'), 'time': 'Dashboard'}
+              ], 'Coverage and release') }}
+            </div>
+
+        <div class="dash-panel">
+            <h2>Payroll Period</h2>
+
+            <form method="GET"
+                  action="{{ url_for('payroll') }}"
+                  class="attendance-filter">
+                <label for="month">Select month</label>
+                <input id="month"
+                       type="month"
+                       name="month"
+                       value="{{ selected_month }}"
+                       required>
+                <button class="btn" type="submit">View Payroll</button>
+            </form>
+        </div>
+
+        <!-- Create payroll -->
+        <div class="dash-panel">
+            <h2>Create Payroll Record</h2>
+            <p>Enter the salary details for one employee and one month.</p>
+
+            {% if employees %}
+            <form method="POST"
+                  action="{{ url_for('payroll') }}"
+                  class="dash-form">
+              {{ csrf_field() }}
+
+                <label for="employee_id">Employee *</label>
+                <select id="employee_id" name="employee_id" required>
+                    <option value="">Select employee</option>
+                    {% for employee in employees %}
+                    <option value="{{ employee['id'] }}">
+                        {{ employee['employee_code'] }} —
+                        {{ employee['full_name'] }}
+                        ({{ employee['department'] }})
+                    </option>
+                    {% endfor %}
+                </select>
+
+                <label for="payroll_month">Payroll Month *</label>
+                <input id="payroll_month"
+                       type="month"
+                       name="payroll_month"
+                       value="{{ selected_month }}"
+                       required>
+
+                <label for="basic_salary">Basic Salary (ETB) *</label>
+                <input id="basic_salary"
+                       type="number"
+                       name="basic_salary"
+                       min="0"
+                       step="0.01"
+                       required>
+
+                <label for="allowances">Allowances (ETB)</label>
+                <input id="allowances"
+                       type="number"
+                       name="allowances"
+                       value="0"
+                       min="0"
+                       step="0.01">
+
+                <label for="deductions">Deductions (ETB)</label>
+                <input id="deductions"
+                       type="number"
+                       name="deductions"
+                       value="0"
+                       min="0"
+                       step="0.01">
+
+                <label for="notes">Notes</label>
+                <textarea id="notes"
+                          name="notes"
+                          rows="3"
+                          maxlength="500"
+                          placeholder="Optional payroll notes"></textarea>
+
+                <button class="btn" type="submit">
+                    Create Payroll
+                </button>
+            </form>
+            {% else %}
+            <p>No active employees found. Register an employee first.</p>
+            <a class="btn" href="{{ url_for('hr_dashboard') }}">
+                Register Employee
+            </a>
+            {% endif %}
+        </div>
+
+        <!-- Payroll records -->
+        <div class="dash-panel hr-table-panel">
+            <h2>Payroll Records — {{ selected_month }}</h2>
+
+            <div class="hr-table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Employee ID</th>
+                            <th>Employee</th>
+                            <th>Basic Salary</th>
+                            <th>Allowances</th>
+                            <th>Deductions</th>
+                            <th>Net Salary</th>
+                            <th>Payment Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for record in records %}
+                        <tr>
+                            <td>{{ record['employee_code'] }}</td>
+                            <td>{{ record['full_name'] }}</td>
+                            <td>{{ "%.2f"|format(record['basic_salary']) }}</td>
+                            <td>{{ "%.2f"|format(record['allowances']) }}</td>
+                            <td>{{ "%.2f"|format(record['deductions']) }}</td>
+                            <td><strong>{{ "%.2f"|format(record['net_salary']) }}</strong></td>
+                            <td>
+                                <span class="attendance-status">
+                                    {{ record['payment_status'] }}
+                                </span>
+                            </td>
+                            <td>
+                                <form method="POST"
+                                      action="{{ url_for('update_payroll_status', payroll_id=record['id']) }}">
+                                  {{ csrf_field() }}
+                                    <select name="payment_status"
+                                            aria-label="Payment status"
+                                            required>
+                                        <option value="Pending"
+                                            {% if record['payment_status'] == 'Pending' %}selected{% endif %}>
+                                            Pending
+                                        </option>
+                                        <option value="Paid"
+                                            {% if record['payment_status'] == 'Paid' %}selected{% endif %}>
+                                            Paid
+                                        </option>
+                                    </select>
+                                    <button class="btn" type="submit">
+                                        Update
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="8">
+                                No payroll records found for this month.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+</section>
+{% endblock %}

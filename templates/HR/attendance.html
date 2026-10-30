@@ -1,0 +1,206 @@
+
+{% extends "base.html" %}
+{% from "base.html" import bars, donut with context %}
+
+{% block title %}Attendance Management | Dereje Wood & Kitchen{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Human Resources</span>
+            <h1>Attendance Management</h1>
+            <p>Track daily attendance and employee working hours.</p>
+        </div>
+        <a class="btn" href="{{ url_for('hr_dashboard') }}">
+            Back to HR
+        </a>
+    </div>
+</section>
+
+<section class="section bg-ivory">
+    <div class="container">
+
+        <!-- Attendance navigation -->
+        <nav class="hr-navigation">
+            <a class="hr-nav-link"
+               href="{{ url_for('hr_dashboard') }}">Dashboard</a>
+            <a class="hr-nav-link active"
+               href="{{ url_for('attendance') }}">Attendance</a>
+        </nav>
+
+        <!-- Statistics -->
+        <div class="hr-stats">
+            <div class="hr-card">
+                <span>Records</span>
+                <strong>{{ total }}</strong>
+            </div>
+            <div class="hr-card">
+                <span>Present</span>
+                <strong>{{ present }}</strong>
+            </div>
+            <div class="hr-card">
+                <span>Absent</span>
+                <strong>{{ absent }}</strong>
+            </div>
+            <div class="hr-card">
+                <span>Late</span>
+                <strong>{{ late }}</strong>
+            </div>
+            <div class="hr-card">
+                <span>Half Day</span>
+                <strong>{{ half_day }}</strong>
+            </div>
+        </div>
+
+        {% set att_rows = [
+              {'label': 'Present', 'value': present},
+              {'label': 'Absent', 'value': absent},
+              {'label': 'Late', 'value': late},
+              {'label': 'Half day', 'value': half_day}
+            ] %}
+            {% set dept_att = [] %}
+            {% for name, rows in records | groupby('department') %}
+              {% set _ = dept_att.append({'label': name or 'Unassigned', 'value': rows | length}) %}
+            {% endfor %}
+            {% set dept_att = dept_att | sort(reverse=true, attribute='value') %}
+
+            <div class="chart-grid">
+              {{ bars('Status mix on ' ~ selected_date, att_rows, 'logged people') }}
+              {{ donut('Present rate', (present / total) if total else 0,
+                      '{}%'.format(((present / total) * 100 | round(0, 'common') | int) if total else 0),
+                      [
+                        {'label': 'Present', 'color': 'var(--walnut)', 'value': present},
+                        {'label': 'Other', 'color': 'var(--ivory-2)', 'value': total - present}
+                      ], 'of logged records') }}
+              {{ bars('Who is logged by department', dept_att, 'records') }}
+            </div>
+        <!-- Filter by date -->
+        <div class="dash-panel">
+            <h2>Attendance Date</h2>
+
+            <form method="GET"
+                  action="{{ url_for('attendance') }}"
+                  class="attendance-filter">
+                <label for="filter_date">Select date</label>
+                <input
+                    id="filter_date"
+                    type="date"
+                    name="date"
+                    value="{{ selected_date }}"
+                    required>
+                <button class="btn" type="submit">View Records</button>
+            </form>
+        </div>
+
+        <!-- Record attendance -->
+        <div class="dash-panel">
+            <h2>Record Attendance</h2>
+
+            {% if employees %}
+            <form method="POST"
+                  action="{{ url_for('attendance') }}"
+                  class="dash-form">
+              {{ csrf_field() }}
+
+                <label for="employee_id">Employee *</label>
+                <select id="employee_id" name="employee_id" required>
+                    <option value="">Select employee</option>
+                    {% for employee in employees %}
+                    <option value="{{ employee['id'] }}">
+                        {{ employee['employee_code'] }} -
+                        {{ employee['full_name'] }}
+                        ({{ employee['department'] }})
+                    </option>
+                    {% endfor %}
+                </select>
+
+                <label for="attendance_date">Attendance Date *</label>
+                <input
+                    id="attendance_date"
+                    type="date"
+                    name="attendance_date"
+                    value="{{ selected_date }}"
+                    required>
+
+                <label for="status">Attendance Status *</label>
+                <select id="status" name="status" required>
+                    <option value="Present">Present</option>
+                    <option value="Absent">Absent</option>
+                    <option value="Late">Late</option>
+                    <option value="Half Day">Half Day</option>
+                </select>
+
+                <label for="check_in">Check-in Time</label>
+                <input id="check_in" type="time" name="check_in">
+
+                <label for="check_out">Check-out Time</label>
+                <input id="check_out" type="time" name="check_out">
+
+                <label for="notes">Notes</label>
+                <textarea
+                    id="notes"
+                    name="notes"
+                    rows="3"
+                    maxlength="500"
+                    placeholder="Optional attendance notes"></textarea>
+
+                <button class="btn" type="submit">
+                    Save Attendance
+                </button>
+            </form>
+            {% else %}
+            <p>No active employees found. Register an employee first.</p>
+            <a class="btn" href="{{ url_for('hr_dashboard') }}">
+                Register Employee
+            </a>
+            {% endif %}
+        </div>
+
+        <!-- Attendance directory -->
+        <div class="dash-panel hr-table-panel">
+            <h2>Attendance Records — {{ selected_date }}</h2>
+
+            <div class="hr-table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Employee ID</th>
+                            <th>Employee Name</th>
+                            <th>Department</th>
+                            <th>Status</th>
+                            <th>Check-in</th>
+                            <th>Check-out</th>
+                            <th>Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for record in records %}
+                        <tr>
+                            <td>{{ record['employee_code'] }}</td>
+                            <td>{{ record['full_name'] }}</td>
+                            <td>{{ record['department'] }}</td>
+                            <td>
+                                <span class="attendance-status">
+                                    {{ record['status'] }}
+                                </span>
+                            </td>
+                            <td>{{ record['check_in'] or '-' }}</td>
+                            <td>{{ record['check_out'] or '-' }}</td>
+                            <td>{{ record['notes'] or '-' }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="7">
+                                No attendance records for this date.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+</section>
+{% endblock %}

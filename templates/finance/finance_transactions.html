@@ -1,0 +1,304 @@
+
+{% extends "base.html" %}
+{% from "base.html" import kpi, bars, columns with context %}
+
+{% block title %}Income & Expenses | Finance{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+    <div class="container">
+        <span class="eyebrow">FINANCE</span>
+        <h1>Income & Expenses</h1>
+        <p>Record business revenue and operating costs.</p>
+    </div>
+</section>
+
+<section class="container finance-page">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+            <div class="finance-alert {{ category }}">{{ message }}</div>
+        {% endfor %}
+    {% endwith %}
+
+    {% set listed = transactions | length %}
+        {% set income_total = transactions | selectattr('transaction_type', 'equalto', 'income')
+                                     | map(attribute='amount_etb') | map('float') | sum %}
+        {% set expense_total = transactions | selectattr('transaction_type', 'equalto', 'expense')
+                                      | map(attribute='amount_etb') | map('float') | sum %}
+        {% set cat_rows = [] %}
+        {% for name, rows in transactions | groupby('category') %}
+          {% set _ = cat_rows.append({
+            'label': name or 'Uncategorised',
+            'value': rows | map(attribute='amount_etb') | map('float') | sum,
+            'display': '{} entries · {:,.0f} ETB'.format(rows | length, rows | map(attribute='amount_etb') | map('float') | sum)
+          }) %}
+        {% endfor %}
+        {% set cat_rows = (cat_rows| sort(reverse=true, attribute='value'))[:6] %}
+        {% set day_cols = [] %}
+        {% for t in transactions[:12] | reverse %}
+          {% set _ = day_cols.append({
+            'label': t['transaction_date'][8:10] if t['transaction_date'] | length >= 10 else '',
+            'value': t['amount_etb'] | float if t['amount_etb'] | float > 0 else 0,
+            'display': '{} · {:,.0f} ETB'.format(t['transaction_date'], t['amount_etb'] | float)
+          }) %}
+        {% endfor %}
+
+        <div class="hr-stats">
+          {{ kpi('Entries listed', listed) }}
+          {{ kpi('Income (ETB)', "{:,.2f}".format(income_total), '', 'up') }}
+          {{ kpi('Expenses (ETB)', "{:,.2f}".format(expense_total), '', 'down') }}
+          {{ kpi('Net of list (ETB)', "{:,.2f}".format(income_total - expense_total),
+                 'Surplus' if income_total > expense_total else ('Deficit' if income_total < expense_total else 'Break even'),
+                 'up' if income_total > expense_total else 'flat') }}
+        </div>
+
+        <div class="chart-grid">
+          {{ bars('Income against expenses', [
+            {'label': 'Income', 'value': income_total, 'display': '{:,.0f} ETB'.format(income_total)},
+            {'label': 'Expenses', 'value': expense_total, 'display': '{:,.0f} ETB'.format(expense_total)}
+          ], 'ETB, listed entries') }}
+          {{ bars('Biggest categories', cat_rows, 'ETB') }}
+          {{ columns('Amount per entry', day_cols, 'ETB, latest 12') }}
+        </div>
+
+    <div class="finance-panel">
+        <h2>Record Transaction</h2>
+
+        <form method="post"
+              action="{{ url_for('finance.transactions') }}"
+              class="finance-form">
+          {{ csrf_field() }}
+
+            <div class="finance-grid">
+                <div>
+                    <label for="transaction_date">Date *</label>
+                    <input id="transaction_date" type="date"
+                           name="transaction_date"
+                           value="{{ today }}" required>
+                </div>
+
+                <div>
+                    <label for="transaction_type">Type *</label>
+                    <select id="transaction_type"
+                            name="transaction_type" required>
+                        <option value="income">Income</option>
+                        <option value="expense">Expense</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="category">Category *</label>
+                    <input id="category" name="category"
+                           maxlength="100"
+                           placeholder="Cabinet sales, materials, rent"
+                           required>
+                </div>
+
+                <div>
+                    <label for="description">Description *</label>
+                    <input id="description" name="description"
+                           maxlength="250" required>
+                </div>
+
+                <div>
+                    <label for="party_name">Customer / Supplier</label>
+                    <input id="party_name" name="party_name"
+                           maxlength="150">
+                </div>
+
+                <div>
+                    <label for="employee_id">Related HR Employee</label>
+                    <select id="employee_id" name="employee_id">
+                        <option value="">None</option>
+                        {% for employee in employees %}
+                        <option value="{{ employee.id }}">
+                            {{ employee.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <small>
+                        Uses existing HR records when the employee table
+                        has a supported ID and name column.
+                    </small>
+                </div>
+
+                <div id="allocationField" class="full">
+                    <label for="budget_allocation_id">Budget allocation</label>
+                    <select id="budget_allocation_id" name="budget_allocation_id">
+                        <option value="">No allocation (unbudgeted expense)</option>
+                        {% for allocation in allocations %}
+                        <option value="{{ allocation.id }}"
+                                data-currency="{{ allocation.currency }}">
+                            {{ allocation.allocation_name }} ·
+                            {{ allocation.department }} ·
+                            {{ allocation.currency }}
+                            ({{ "{:,.2f}".format(allocation.available_amount | float) }}
+                            available)
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <small>
+                        Expenses only. Recording against an allocation books the
+                        same spend in the Budget module.
+                    </small>
+                </div>
+
+                <div>
+                    <label for="currency">Currency *</label>
+                    <select id="currency" name="currency" required>
+                        <option value="ETB">ETB - Ethiopian Birr</option>
+                        <option value="USD">USD - US Dollar</option>
+                        <option value="EUR">EUR - Euro</option>
+                        <option value="GBP">GBP - British Pound</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="amount">Amount *</label>
+                    <input id="amount" type="number" name="amount"
+                           min="0.01" step="0.01" required>
+                </div>
+
+                <div>
+                    <label for="exchange_rate">
+                        Exchange Rate to ETB *
+                    </label>
+                    <input id="exchange_rate" type="number"
+                           name="exchange_rate" min="0.000001"
+                           step="0.000001" value="1" required>
+                    <small>For ETB, the rate is automatically set to 1.</small>
+                </div>
+
+                <div>
+                    <label for="payment_method">Payment Method *</label>
+                    <select id="payment_method" name="payment_method">
+                        <option>Cash</option>
+                        <option>Bank Transfer</option>
+                        <option>Card</option>
+                        <option>Mobile Money</option>
+                        <option>Other</option>
+                    </select>
+                </div>
+
+                <div class="full">
+                    <label for="reference">Reference Number</label>
+                    <input id="reference" name="reference"
+                           maxlength="100">
+                </div>
+            </div>
+
+            <div class="finance-form-actions">
+                <button class="finance-btn primary" type="submit">
+                    Save Transaction
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div class="finance-panel">
+        <h2>Transaction History</h2>
+
+        <div class="finance-table-wrap">
+            <table class="finance-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Category</th>
+                        <th>Description</th>
+                        <th>Employee ID</th>
+                        <th>Budget Allocation</th>
+                        <th>Currency</th>
+                        <th>Amount</th>
+                        <th>ETB Equivalent</th>
+                        <th>Last modified</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in transactions %}
+                    <tr>
+                        <td>{{ item.transaction_date }}</td>
+                        <td>{{ item.transaction_type|title }}</td>
+                        <td>{{ item.category }}</td>
+                        <td>{{ item.description }}</td>
+                        <td>{{ item.employee_id or "-" }}</td>
+                        <td>{{ item.allocation_name or "—" }}</td>
+                        <td>{{ item.currency }}</td>
+                        <td>{{ "{:,.2f}".format(item.amount) }}</td>
+                        <td>{{ "{:,.2f}".format(item.amount_etb) }}</td>
+                        <td>
+                            {{ item.updated_by_name or "—" }}
+                            {% if item.updated_at %}
+                            <br><span class="feed-meta">{{ item.updated_at | audit_time }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="10" class="empty">
+                            No transactions found.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<script>
+const currencyField = document.getElementById("currency");
+const rateField = document.getElementById("exchange_rate");
+const typeField = document.getElementById("transaction_type");
+const allocationField = document.getElementById("allocationField");
+const allocationSelect = document.getElementById("budget_allocation_id");
+
+function updateCurrencyRate() {
+    if (currencyField.value === "ETB") {
+        rateField.value = "1";
+        rateField.readOnly = true;
+    } else {
+        rateField.readOnly = false;
+        if (rateField.value === "1") {
+            rateField.value = "";
+        }
+    }
+}
+
+function updateAllocationField() {
+    const isExpense = typeField.value === "expense";
+    allocationField.style.display = isExpense ? "" : "none";
+    if (!isExpense) {
+        allocationSelect.value = "";
+        return;
+    }
+    const currency = currencyField.value;
+    Array.from(allocationSelect.options).forEach(option => {
+        if (!option.value) {
+            return;
+        }
+        const matches = option.dataset.currency === currency;
+        option.hidden = !matches;
+        option.disabled = !matches;
+    });
+    if (allocationSelect.selectedOptions[0]?.disabled) {
+        allocationSelect.value = "";
+    }
+}
+
+currencyField.addEventListener("change", () => {
+    updateCurrencyRate();
+    updateAllocationField();
+});
+typeField.addEventListener("change", updateAllocationField);
+allocationSelect.addEventListener("change", () => {
+    const option = allocationSelect.selectedOptions[0];
+    if (option && option.dataset.currency) {
+        currencyField.value = option.dataset.currency;
+        updateCurrencyRate();
+    }
+});
+updateCurrencyRate();
+updateAllocationField();
+</script>
+{% endblock %}

@@ -1,0 +1,405 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi_head, kpi, bars, donut, feed, dash_icon
+    with context %}
+
+{% block title %}HR Dashboard | Dereje Wood & Kitchen Cabinet{% endblock %}
+
+{% block content %}
+{% set dept_rows = [] %}
+{% for name, rows in employees | groupby('department') %}
+  {% set _ = dept_rows.append({'label': name or 'Unassigned', 'value': rows | length}) %}
+{% endfor %}
+{% set dept_rows = dept_rows | sort(reverse=true, attribute='value') %}
+
+{% set status_rows = [] %}
+{% for name, rows in employees | groupby('employment_status') %}
+  {% set _ = status_rows.append({'label': name or 'Unknown', 'value': rows | length}) %}
+{% endfor %}
+{% set status_rows = status_rows | sort(reverse=true, attribute='value') %}
+
+{% set no_phone = employees | rejectattr('phone') | list %}
+{% set no_email = employees | rejectattr('email') | list %}
+{% set no_hire = employees | rejectattr('hire_date') | list %}
+{% set contactable = employees | selectattr('phone') | list | length %}
+
+{% set newest = [] %}
+{% for e in employees[:5] %}
+  {% set _ = newest.append({
+    'icon': 'user', 'tone': 'ok',
+    'title': e.full_name,
+    'meta': "{} · {}".format(e.job_title or 'No position', e.department or 'No department'),
+    'time': (e.created_at or '')[:10],
+    'href': url_for('employees')
+  }) %}
+{% endfor %}
+
+{% set attention = [] %}
+{% if no_phone %}
+  {% set _ = attention.append({
+    'icon': 'phone', 'tone': 'warn',
+    'title': "{} employee{} without a phone number".format(no_phone | length, '' if no_phone | length == 1 else 's'),
+    'meta': 'Attendance and payroll notices cannot reach them.',
+    'href': url_for('employees'), 'time': 'Update'
+  }) %}
+{% endif %}
+{% if no_email %}
+  {% set _ = attention.append({
+    'icon': 'mail', 'tone': 'warn',
+    'title': "{} employee{} have no email on file".format(no_email | length, '' if no_email | length == 1 else 's'),
+    'meta': 'Payslips and letters need a working address.',
+    'href': url_for('employees'), 'time': 'Update'
+  }) %}
+{% endif %}
+{% if no_hire %}
+  {% set _ = attention.append({
+    'icon': 'calendar', 'tone': 'bad',
+    'title': "{} employee{} missing a joining date".format(no_hire | length, '' if no_hire | length == 1 else 's'),
+    'meta': 'Length of service and leave entitlement depend on it.',
+    'href': url_for('employees'), 'time': 'Fix'
+  }) %}
+{% endif %}
+{% if on_leave %}
+  {% set _ = attention.append({
+    'icon': 'clock', 'tone': '',
+    'title': "{} on leave today".format(on_leave),
+    'meta': 'Check site cover before you commit new installation dates.',
+    'href': url_for('attendance'), 'time': 'Plan'
+  }) %}
+{% endif %}
+{% if not employees %}
+  {% set _ = attention.append({
+    'icon': 'users', 'tone': '',
+    'title': 'No employees registered yet',
+    'meta': 'Open Employee Management to add your first crew member.',
+    'href': url_for('employees'), 'time': 'Start'
+  }) %}
+{% endif %}
+
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Human Resources</span>
+      <h1>HR Dashboard</h1>
+      <p>{{ today_name }} · Signed in as {{ user.full_name }} · {{ role_label }} access</p>
+    </div>
+    {% if 'accounts' in permissions %}
+    <a class="btn" href="{{ url_for('admin') }}">Back to Admin</a>
+    {% endif %}
+    <div class="dash-stats">
+      {{ kpi_head('Employees', total) }}
+      {{ kpi_head('Active', active) }}
+      {{ kpi_head('On leave', on_leave) }}
+      {{ kpi_head('Departments', dept_rows | length) }}
+    </div>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <nav class="hr-navigation" aria-label="HR Management">
+      <a class="hr-nav-link active" href="{{ url_for('hr_dashboard') }}">Dashboard</a>
+      <a class="hr-nav-link" href="{{ url_for('employees') }}">Employees</a>
+      <a class="hr-nav-link" href="{{ url_for('attendance') }}">Attendance</a>
+      {% if 'payroll' in permissions %}
+      <a class="hr-nav-link" href="{{ url_for('payroll') }}">Payroll</a>
+      {% endif %}
+      <a class="hr-nav-link" href="{{ url_for('recruitment') }}">Recruitment</a>
+      <a class="hr-nav-link" href="{{ url_for('leave_management') }}">Leave</a>
+      <a class="hr-nav-link" href="{{ url_for('training_performance') }}">Training &amp; Performance</a>
+      <a class="hr-nav-link" href="{{ url_for('manage_hierarchy') }}">Organization</a>
+      <a class="hr-nav-link" href="{{ url_for('reports_centre') }}">Reports</a>
+      <a class="hr-nav-link" href="{{ url_for('hr_settings.index') }}">HR Settings</a>
+    </nav>
+
+    <div class="hr-stats">
+      {{ kpi('Total Employees', total, '{} departments'.format(dept_rows | length),
+             'flat', 'users', url_for('employees')) }}
+      {{ kpi('Active Employees', active,
+             '{}% of workforce'.format(((active / total * 100) | round(0, 'common') | int) if total else 0),
+             'up', 'check', url_for('employees')) }}
+      {{ kpi('On Leave', on_leave,
+             '{}% away'.format(((on_leave / total * 100) | round(0, 'common') | int) if total else 0),
+             'warn' if on_leave else 'flat', 'clock', url_for('employees')) }}
+      {{ kpi('Present Today', ops.attendance.present,
+             '{} of {} marked · {} late'.format(ops.attendance.marked, active, ops.attendance.late),
+             'up' if ops.attendance.marked else 'flat', 'calendar', url_for('attendance')) }}
+      {{ kpi('Pending Leave', ops.leave.pending,
+             '{} request{} on file'.format(ops.leave.total, '' if ops.leave.total == 1 else 's'),
+             'warn' if ops.leave.pending else 'flat', 'file', url_for('leave_management')) }}
+      {{ kpi('Open Vacancies', ops.recruitment.vacancies,
+             '{} applicant{} in the pipeline'.format(ops.recruitment.applicants,
+               '' if ops.recruitment.applicants == 1 else 's'),
+             'flat', 'inbox', url_for('recruitment')) }}
+      {% if 'payroll' in permissions %}
+      {{ kpi('Payslips Pending', ops.payroll.pending,
+             ('{:,.2f} ETB net for {}'.format(ops.payroll.net, ops.payroll_month)
+              if ops.salary_visible else '{} paid this month'.format(ops.payroll.paid)),
+             'down' if ops.payroll.pending else 'flat', 'cash', url_for('payroll')) }}
+      {% else %}
+      {{ kpi('Approved Leave', ops.leave.approved,
+             '{}% of requests'.format(((ops.leave.approved / ops.leave.total * 100) | round(0, 'common') | int) if ops.leave.total else 0),
+             'flat', 'check', url_for('leave_management')) }}
+      {% endif %}
+      {{ kpi('With Phone Number', contactable,
+             '{}% reachable'.format(((contactable / total * 100) | round(0, 'common') | int) if total else 0),
+             'flat', 'phone', url_for('employees')) }}
+    </div>
+
+    <div class="chart-grid hr-chart-grid">
+      {{ bars('Workforce by department', dept_rows, 'Headcount') }}
+      {{ bars('Employment status', status_rows, 'Headcount') }}
+      {{ donut('Active workforce', (active / total) if total else 0,
+              '{}%'.format(((active / total * 100) | round(0, 'common') | int) if total else 0),
+              [
+                {'label': 'Active', 'color': 'var(--walnut)', 'value': active},
+                {'label': 'On leave / off', 'color': 'var(--ivory-2)', 'value': total - active}
+              ], 'Share of headcount') }}
+    </div>
+
+    <div class="hr-section-line">
+      <div>
+        <span class="eyebrow">Operations</span>
+        <h2>Today's work queue</h2>
+      </div>
+      <p>Requests waiting on this account, taken straight from the live HR records.</p>
+    </div>
+
+    <div class="hr-queue-grid">
+      {% if 'approvals' in permissions %}
+      <article class="dash-panel hr-queue-panel">
+        <h2>Approvals waiting on you</h2>
+        <p class="queue-note">{{ ops.approval_count }} request{{ '' if ops.approval_count == 1 else 's' }} at your step.</p>
+        {% if ops.approvals %}
+        <div class="dash-table-wrap">
+          <table>
+            <thead>
+              <tr><th>Request</th><th>Type</th><th>Amount (ETB)</th><th>Step</th></tr>
+            </thead>
+            <tbody>
+              {% for r in ops.approvals %}
+              <tr>
+                <td>
+                  <a href="{{ url_for('approvals.detail', request_id=r.id) }}">{{ r.title }}</a>
+                  <span class="cell-sub">{{ r.by }}</span>
+                </td>
+                <td data-label="Type">{{ r.type }}</td>
+                <td data-label="Amount (ETB)">{{ '{:,.2f}'.format(r.amount) }}</td>
+                <td data-label="Step">{{ r.step }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <a class="btn btn-outline-dark btn-sm" href="{{ url_for('approvals.dashboard') }}">Open approval queue</a>
+        {% else %}
+        <p class="empty-state"><strong>All clear</strong> No request is waiting on your decision.</p>
+        {% endif %}
+      </article>
+      {% endif %}
+
+      <article class="dash-panel hr-queue-panel">
+        <h2>Leave requests to review</h2>
+        <p class="queue-note">{{ ops.leave.pending }} pending · {{ ops.leave.approved }} approved.</p>
+        {% if ops.leave_queue %}
+        <div class="dash-table-wrap">
+          <table>
+            <thead>
+              <tr><th>Employee</th><th>Type</th><th>Dates</th><th>Days</th></tr>
+            </thead>
+            <tbody>
+              {% for leave in ops.leave_queue %}
+              <tr>
+                <td>{{ leave.full_name }}<span class="cell-sub">{{ leave.department }}</span></td>
+                <td data-label="Type">{{ leave.leave_type }}</td>
+                <td data-label="Dates">{{ leave.start_date }} → {{ leave.end_date }}</td>
+                <td data-label="Days">{{ leave.days_requested }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <a class="btn btn-outline-dark btn-sm" href="{{ url_for('leave_management') }}">Review leave</a>
+        {% else %}
+        <p class="empty-state"><strong>All clear</strong> No leave request is waiting for review.</p>
+        {% endif %}
+      </article>
+    </div>
+
+    <div class="dash-grid hr-feeds">
+      {{ feed('Needs attention', attention, 'Data quality and cover') }}
+      {{ feed('Newest registrations', newest, 'Latest records added') }}
+    </div>
+
+    <div class="hr-module-grid">
+      <article class="dash-panel hr-module-card">
+        <span class="module-ic">{{ dash_icon('calendar') }}</span>
+        <h2>Attendance</h2>
+        <p>Record daily attendance, check-in/check-out times and working hours.</p>
+        <a class="btn btn-sm" href="{{ url_for('attendance') }}">Manage Attendance</a>
+        <span class="hr-module-status">
+          {% if ops.attendance.marked %}{{ ops.attendance.marked }} marked today{% if ops.attendance.late %} · {{ ops.attendance.late }} late{% endif %}{% else %}No entries today{% endif %}
+        </span>
+      </article>
+
+      {% if 'payroll' in permissions %}
+      <article class="dash-panel hr-module-card">
+        <span class="module-ic">{{ dash_icon('cash') }}</span>
+        <h2>Payroll</h2>
+        <p>Manage salaries, allowances, deductions and payment status.</p>
+        <a class="btn btn-sm" href="{{ url_for('payroll') }}">Manage Payroll</a>
+        <span class="hr-module-status">{{ ops.payroll.pending }} pending · {{ ops.payroll.paid }} paid for {{ ops.payroll_month }}</span>
+      </article>
+      {% endif %}
+
+      <article class="dash-panel hr-module-card">
+        <span class="module-ic">{{ dash_icon('inbox') }}</span>
+        <h2>Recruitment</h2>
+        <p>Manage job vacancies, applicants, interviews and hiring decisions.</p>
+        <a class="btn btn-sm" href="{{ url_for('recruitment') }}">Manage Recruitment</a>
+        <span class="hr-module-status">{{ ops.recruitment.vacancies }} open · {{ ops.recruitment.applicants }} applicant{{ '' if ops.recruitment.applicants == 1 else 's' }}</span>
+      </article>
+
+      <article class="dash-panel hr-module-card">
+        <span class="module-ic">{{ dash_icon('file') }}</span>
+        <h2>Leave Requests</h2>
+        <p>File leave requests and approve or reject the ones waiting on you.</p>
+        <a class="btn btn-sm" href="{{ url_for('leave_management') }}">Manage Leave</a>
+        <span class="hr-module-status">{{ ops.leave.pending }} pending review</span>
+      </article>
+
+      <article class="dash-panel hr-module-card">
+        <span class="module-ic">{{ dash_icon('check') }}</span>
+        <h2>Training &amp; Performance</h2>
+        <p>Log employee training and record performance reviews with ratings.</p>
+        <a class="btn btn-sm" href="{{ url_for('training_performance') }}">Open Training</a>
+        <span class="hr-module-status">{{ ops.training.total }} training record{{ '' if ops.training.total == 1 else 's' }} · {{ ops.reviews }} review{{ '' if ops.reviews == 1 else 's' }}</span>
+      </article>
+
+      <article class="dash-panel hr-module-card">
+        <span class="module-ic">{{ dash_icon('users') }}</span>
+        <h2>Organization</h2>
+        <p>Build departments and positions, then place staff into reporting lines.</p>
+        <a class="btn btn-sm" href="{{ url_for('manage_hierarchy') }}">Open Hierarchy</a>
+        <span class="hr-module-status">{{ dept_rows | length }} department{{ '' if dept_rows | length == 1 else 's' }} · {{ org.org_stats.lines }} reporting line{{ '' if org.org_stats.lines == 1 else 's' }}</span>
+      </article>
+
+      <article class="dash-panel hr-module-card">
+        <span class="module-ic">{{ dash_icon('chart') }}</span>
+        <h2>Reports</h2>
+        <p>Review employee statistics, attendance, payroll and workforce performance.</p>
+        <a class="btn btn-sm" href="{{ url_for('reports_centre') }}">Open Reports</a>
+        <span class="hr-module-status">Workforce and payroll summaries</span>
+      </article>
+
+      <article class="dash-panel hr-module-card">
+        <span class="module-ic">{{ dash_icon('lock') }}</span>
+        <h2>HR Settings</h2>
+        <p>Configure company details, working hours and payroll day.</p>
+        <a class="btn btn-sm" href="{{ url_for('hr_settings.index') }}">Open HR Settings</a>
+        <span class="hr-module-status">Company and payroll rules</span>
+      </article>
+    </div>
+
+    <div class="dash-panel hr-table-panel" id="directory">
+      <div class="hr-directory-head">
+        <div>
+          <h2>Employee Directory</h2>
+          <p class="cell-note">{{ total }} registered · Register and update records in Employee Management.</p>
+        </div>
+        <a class="btn" href="{{ url_for('employees') }}">Open Employee Management
+          <span class="arrow">→</span></a>
+      </div>
+
+      <div class="hr-table-wrap table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Employee ID</th>
+              <th>Name</th>
+              <th>Department</th>
+              <th>Job Title</th>
+              <th>Phone</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for employee in employees %}
+            <tr>
+              <td>{{ employee["employee_code"] }}</td>
+              <td>{{ employee["full_name"] }}</td>
+              <td>{{ employee["department"] }}</td>
+              <td>{{ employee["job_title"] }}</td>
+              <td>{{ employee["phone"] }}</td>
+              <td>
+                <span class="status-badge {{ 'active' if employee['employment_status'] == 'Active' else ('off' if employee['employment_status'] == 'Inactive' else 'neutral') }}">
+                  {{ employee["employment_status"] }}
+                </span>
+              </td>
+              <td>
+                <div class="row-actions">
+                  <a class="btn btn-outline-dark" href="{{ url_for('edit_employee', employee_id=employee['id']) }}">Edit</a>
+                </div>
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="7" class="employee-empty">No employees registered yet. Add the first one in Employee Management.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="hr-org-block">
+      <div class="hr-section-line">
+        <div>
+          <span class="eyebrow">Organization</span>
+          <h2>Department teams</h2>
+        </div>
+        <a class="btn btn-outline-dark btn-sm" href="{{ url_for('manage_hierarchy') }}">
+          Manage assignments <span class="arrow">→</span>
+        </a>
+      </div>
+
+      <div class="org-team-grid">
+        {% for department in org.org_departments %}
+        <div class="org-team-card">
+          <header class="org-team-head">
+            <div>
+              <span class="org-team-label">{{ department.label }}</span>
+              <strong>{{ department.name }}</strong>
+            </div>
+            <span class="org-team-count">{{ department.count }}</span>
+          </header>
+          <ul class="org-member-list">
+            {% for member in department.members %}
+            <li>
+              <span class="org-member-name">{{ member.name }}</span>
+              {% if member.title %}<em>{{ member.title }}</em>{% endif %}
+              {% if member.role_label %}<span class="org-role">{{ member.role_label }}</span>{% endif %}
+              {% if member.is_me %}<span class="org-you">You</span>{% endif %}
+            </li>
+            {% else %}
+            <li class="org-member-empty">No one assigned yet</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% else %}
+        <p class="empty-state">No departments yet. Create the first one in
+          Organization &amp; Hierarchy.</p>
+        {% endfor %}
+      </div>
+      <p class="perm-note">The leadership chart and the full team roster are published on the
+        <a href="{{ url_for('organization') }}">Organization page</a>.</p>
+    </div>
+  </div>
+</section>
+{% endblock %}
