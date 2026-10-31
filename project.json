@@ -46,11 +46,5 @@
     "title": "Open Plan Interior",
     "category": "Interior",
     "image": "/static/img/living-tv.jpg"
-  },
-  {
-    "id": 9,
-    "title": "ZZ button check",
-    "category": "Interior",
-    "image": "static/images/projects/p1.jpg"
   }
 ]

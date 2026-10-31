@@ -455,6 +455,62 @@ def init_db():
             )
         """)
 
+        # HR leave, training and appraisal records. These used to be built by the
+        # stand-alone add_hr_tables.py script, which left a fresh database
+        # without them and made the startup index pass fail on leave_requests.
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS leave_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                employee_id INTEGER NOT NULL,
+                leave_type TEXT NOT NULL,
+                start_date TEXT NOT NULL,
+                end_date TEXT NOT NULL,
+                days_requested INTEGER NOT NULL,
+                reason TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'Pending'
+                    CHECK (status IN ('Pending', 'Approved', 'Rejected')),
+                reviewed_by TEXT DEFAULT '',
+                review_comment TEXT DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (employee_id) REFERENCES employees(id)
+            )
+        """)
+
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS employee_training (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                employee_id INTEGER NOT NULL,
+                course_title TEXT NOT NULL,
+                provider TEXT DEFAULT '',
+                start_date TEXT NOT NULL,
+                end_date TEXT,
+                status TEXT NOT NULL DEFAULT 'Planned'
+                    CHECK (status IN (
+                        'Planned', 'In Progress', 'Completed', 'Cancelled'
+                    )),
+                certificate TEXT DEFAULT '',
+                notes TEXT DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (employee_id) REFERENCES employees(id)
+            )
+        """)
+
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS performance_reviews (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                employee_id INTEGER NOT NULL,
+                review_date TEXT NOT NULL,
+                review_period TEXT NOT NULL,
+                rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+                strengths TEXT DEFAULT '',
+                improvements TEXT DEFAULT '',
+                goals TEXT DEFAULT '',
+                reviewer TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (employee_id) REFERENCES employees(id)
+            )
+        """)
+
         existing_columns = {row[1] for row in db.execute("PRAGMA table_info(employees)")}
         for column, definition in (
             ("gender", "TEXT DEFAULT ''"),
