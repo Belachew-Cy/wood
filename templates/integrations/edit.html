@@ -1,0 +1,359 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi with context %}
+{% from "integrations/_module_nav.html" import module_tabs with context %}
+
+{% block title %}{{ row.name }} | System Integrations{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">System Integration</span>
+      <h1>{{ row.name }}</h1>
+      <p>{{ row.integration_type }} · {{ row.endpoint or 'no endpoint set' }}
+        {%- if row.username %} · binds as {{ row.username }}{% endif %}
+        {%- if row.description %} · {{ row.description }}{% endif %}</p>
+    </div>
+    <div class="dash-stats">
+      <div class="stat"><strong>{{ row.status }}</strong><span>Status</span></div>
+      <div class="stat"><strong>{{ stored | length }}</strong><span>Credentials</span></div>
+      <div class="stat"><strong>{{ row.last_sync_at | audit_time or 'never' }}</strong><span>Last sync</span></div>
+      <div class="stat"><strong>{{ row.next_run_at | audit_time or 'off' }}</strong><span>Next run</span></div>
+    </div>
+    <nav class="stock-actions" aria-label="Connection actions">
+      <a class="btn btn-outline btn-sm"
+         href="{{ url_for('integrations.connection_history', integration_id=row.id) }}">Test history</a>
+      {% if directory %}
+      <a class="btn btn-outline btn-sm"
+         href="{{ url_for('integrations.directory_connection', connection_id=directory.id) }}">
+        Directory settings</a>
+      <a class="btn btn-sm"
+         href="{{ url_for('integrations.directory_sync', connection_id=directory.id) }}">
+        Directory desk</a>
+      {% elif row.integration_type == 'Active Directory / LDAP' %}
+      <a class="btn btn-sm" href="{{ url_for('integrations.ad_mapping', integration_id=row.id) }}">
+        Mapping desk</a>
+      {% endif %}
+    </nav>
+    {{ module_tabs('registry') }}
+  </div>
+</section>
+
+<section class="section bg-white">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="emp-panel">
+
+      <div class="account-card">
+        <header class="account-head">
+          <div>
+            <h3 class="account-name">Connection</h3>
+            <span class="cell-note">Saved to the registry row; the schedule and the credential
+              below are saved separately.</span>
+          </div>
+          <span class="status-badge {{ 'active' if row.status == 'active' else 'off' }}">
+            {{ row.status }}</span>
+        </header>
+
+        <form method="POST" class="dash-form account-form">
+          {{ csrf_field() }}
+          <div class="account-grid">
+            <div>
+              <label for="name">Name</label>
+              <input id="name" name="name" type="text" maxlength="120" required
+                     value="{{ row.name }}" />
+            </div>
+            <div>
+              <label for="integration_type">Integration type</label>
+              {% if directory %}
+              <input type="hidden" name="integration_type" value="{{ row.integration_type }}" />
+              <input id="integration_type" type="text" value="{{ row.integration_type }}"
+                     readonly aria-describedby="type-note" />
+              <p class="cell-note" id="type-note">Fixed by the directory profile; change the
+                profile kind on the directory settings screen.</p>
+              {% else %}
+              <select id="integration_type" name="integration_type" required>
+                {% for kind in integration_types %}
+                <option value="{{ kind }}" {% if row.integration_type == kind %}selected{% endif %}>
+                  {{ kind }}</option>
+                {% endfor %}
+              </select>
+              <p class="cell-note" id="type-note"
+                     {% if row.integration_type != 'Active Directory / LDAP' %}hidden{% endif %}>
+                Changing this away from Active Directory leaves the accounts already read on the
+                mapping desk.</p>
+              {% endif %}
+            </div>
+            <div>
+              <label for="endpoint">Endpoint</label>
+              <input id="endpoint" name="endpoint" type="text" maxlength="300"
+                     value="{{ row.endpoint }}" placeholder="ldaps://dc.example.local:636" />
+            </div>
+            <div>
+              <label for="username">Bind account</label>
+              <input id="username" name="username" type="text" maxlength="300"
+                     value="{{ row.username }}" />
+            </div>
+            <div id="search-base-field">
+              <label for="search_base">Directory search base</label>
+              <input id="search_base" name="search_base" type="text" maxlength="512"
+                     value="{{ row.search_base }}" placeholder="OU=Staff,DC=example,DC=local" />
+              <p class="cell-note">A scheduled read uses this base; a manual read may overrule it
+                once.{% if directory %} The directory profile's own user and group bases take
+                precedence when they are set.{% endif %}</p>
+            </div>
+            <div class="full">
+              <label for="description">What it is for</label>
+              <input id="description" name="description" type="text" maxlength="500"
+                     value="{{ row.description }}" />
+            </div>
+          </div>
+
+          <div class="finance-form-actions">
+            <button class="btn" type="submit">Save settings <span class="arrow">→</span></button>
+          </div>
+        </form>
+
+        <div class="row-actions" style="margin-top: 1rem;">
+          <form method="POST"
+                action="{{ url_for('integrations.check_connection', integration_id=row.id) }}">
+            {{ csrf_field() }}
+            <button class="btn btn-outline-dark btn-sm" type="submit">Test connection</button>
+          </form>
+          {% if can_sync %}
+          <form method="POST" action="{{ url_for('integrations.sync', integration_id=row.id) }}">
+            {{ csrf_field() }}
+            <button class="btn btn-outline-dark btn-sm" type="submit">Synchronize now</button>
+          </form>
+          {% endif %}
+          <form method="POST" action="{{ url_for('integrations.toggle', integration_id=row.id) }}">
+            {{ csrf_field() }}
+            <button class="btn btn-outline-dark btn-sm" type="submit">
+              {{ 'Stand down' if row.status == 'active' else 'Activate' }}</button>
+          </form>
+          <form method="POST" action="{{ url_for('integrations.delete', integration_id=row.id) }}"
+                onsubmit="return confirm('Delete this connection? Its sealed credential, its directory accounts and its history are removed with it.');">
+            {{ csrf_field() }}
+            <button class="btn-danger btn-sm" type="submit">Delete connection</button>
+          </form>
+        </div>
+      </div>
+
+      {% if directory %}
+      <div class="account-card">
+        <header class="account-head">
+          <div>
+            <h3 class="account-name">Directory profile</h3>
+            <span class="cell-note">This row is driven by the directory desk: bind, filters,
+              provisioning and role mapping are edited there, while its identity, schedule,
+              credential and test history stay on this registry screen.</span>
+          </div>
+          <span class="status-badge {{ 'active' if directory.last_status == 'ok'
+                                        else ('off' if directory.last_status == 'failed'
+                                        else 'neutral') }}">
+            {{ directory.last_status or 'untested' }}</span>
+        </header>
+
+        <div class="dash-table-wrap">
+          <table>
+            <thead><tr><th>Setting</th><th>Value</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>Provider</td>
+                <td>{{ 'Active Directory (LDAP)' if directory.kind == 'ldap'
+                       else 'Microsoft Entra ID' }}</td>
+              </tr>
+              {% if directory.kind == 'ldap' %}
+              <tr><td>Base DN</td><td>{{ directory.base_dn or 'not set' }}</td></tr>
+              <tr><td>User base</td><td>{{ directory.user_base_dn or directory.base_dn or '—' }}</td></tr>
+              <tr><td>Group base</td><td>{{ directory.group_base_dn or directory.base_dn or '—' }}</td></tr>
+              <tr><td>User filter</td><td>{{ directory.user_filter or '—' }}</td></tr>
+              <tr><td>Group filter</td><td>{{ directory.group_filter or '—' }}</td></tr>
+              {% else %}
+              <tr><td>Domain</td><td>{{ directory.domain or '—' }}</td></tr>
+              <tr><td>Client ID</td><td>{{ directory.client_id or '—' }}</td></tr>
+              <tr><td>Tenant ID</td><td>{{ directory.tenant_id or '—' }}</td></tr>
+              <tr><td>Allowed domains</td><td>{{ directory.allowed_domains or '—' }}</td></tr>
+              {% endif %}
+              <tr>
+                <td>Provisioning</td>
+                <td><span class="status-badge {{ 'active' if directory.provision else 'neutral' }}">
+                  {{ 'on' if directory.provision else 'off' }}</span>
+                  · deprovision
+                  <span class="status-badge {{ 'active' if directory.deprovision else 'neutral' }}">
+                    {{ 'on' if directory.deprovision else 'off' }}</span>
+                  · sign-in
+                  <span class="status-badge {{ 'active' if directory.allow_signin else 'neutral' }}">
+                    {{ 'on' if directory.allow_signin else 'off' }}</span></td>
+              </tr>
+              <tr>
+                <td>Default role</td>
+                <td>{{ directory.default_role or '—' }}</td>
+              </tr>
+              <tr><td>Nested groups</td><td>{{ 'on' if directory.group_nested else 'off' }}</td></tr>
+              <tr><td>Last preview</td><td>{{ directory.last_preview_at | audit_time or 'never' }}</td></tr>
+              {% if directory.last_error %}
+              <tr><td>Last error</td><td>{{ directory.last_error }}</td></tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="row-actions" style="margin-top: 1rem;">
+          <a class="btn btn-outline-dark btn-sm"
+             href="{{ url_for('integrations.directory_sync', connection_id=directory.id) }}">
+            Open directory desk</a>
+          <a class="btn btn-outline-dark btn-sm"
+             href="{{ url_for('integrations.directory_groups', connection_id=directory.id) }}">
+            Group mappings</a>
+          <a class="btn btn-outline-dark btn-sm"
+             href="{{ url_for('integrations.directory_connection', connection_id=directory.id) }}">
+            Edit profile</a>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="account-card">
+        <header class="account-head">
+          <div>
+            <h3 class="account-name">Synchronization schedule</h3>
+            <span class="cell-note">
+              {% if row.sync_enabled %}
+              Every {{ row.sync_interval }} minutes, whenever the worker is started with
+              <code>flask integration-scheduler</code>.
+              {% else %}
+              Nothing runs on its own; synchronize by hand from this screen.
+              {% endif %}
+            </span>
+          </div>
+          <span class="status-badge {{ 'active' if row.sync_enabled else 'neutral' }}">
+            {{ 'scheduled' if row.sync_enabled else 'manual' }}</span>
+        </header>
+
+        {% if can_sync %}
+        <form method="POST" action="{{ url_for('integrations.schedule', integration_id=row.id) }}"
+              class="dash-form account-form">
+          {{ csrf_field() }}
+          <div class="account-grid">
+            <div>
+              <label for="sync_interval">Interval (minutes)</label>
+              <input id="sync_interval" name="sync_interval" type="number"
+                     min="{{ min_interval }}" max="{{ max_interval }}" step="1"
+                     value="{{ row.sync_interval }}" required />
+              <p class="cell-note">{{ min_interval }} to {{ max_interval }} minutes.</p>
+            </div>
+            <div>
+              <label for="sync_enabled">Automatic runs</label>
+              <select id="sync_enabled" name="sync_enabled">
+                <option value="0" {% if not row.sync_enabled %}selected{% endif %}>Off - manual only</option>
+                <option value="1" {% if row.sync_enabled %}selected{% endif %}>On - every interval</option>
+              </select>
+              <p class="cell-note">Only an active connection is ever picked up, and the search base
+                above must be filled in.</p>
+            </div>
+          </div>
+          <div class="finance-form-actions">
+            <button class="btn" type="submit">Save schedule <span class="arrow">→</span></button>
+          </div>
+        </form>
+        {% else %}
+        <p class="dir-form-note warn">{{ row.integration_type }} has no data adapter, so there is
+          nothing to schedule. Use the connection test to prove the endpoint answers.</p>
+        {% endif %}
+      </div>
+
+      <div class="account-card">
+        <header class="account-head">
+          <div>
+            <h3 class="account-name">Credentials</h3>
+            <span class="cell-note">Stored sealed with the application key. The value cannot be
+              read back - to change it, store it again.</span>
+          </div>
+          <span class="cell-note">{{ stored | length }} stored</span>
+        </header>
+
+        <div class="dash-table-wrap">
+          <table>
+            <thead><tr><th>Credential</th><th>On file</th><th></th></tr></thead>
+            <tbody>
+              {% for name in credential_names %}
+              <tr>
+                <td>{{ credential_label[name] }}</td>
+                <td>
+                  <span class="status-badge {{ 'active' if name in stored else 'neutral' }}">
+                    {{ 'stored' if name in stored else 'none' }}</span>
+                </td>
+                <td>
+                  {% if name in stored %}
+                  <form method="POST" action="{{ url_for('integrations.credentials', integration_id=row.id) }}"
+                        onsubmit="return confirm('Remove the stored credential? The connection cannot bind until a new one is saved.');">
+                    {{ csrf_field() }}
+                    <input type="hidden" name="credential_name" value="{{ name }}" />
+                    <input type="hidden" name="action" value="clear" />
+                    <button class="btn-danger btn-sm" type="submit">Remove</button>
+                  </form>
+                  {% else %}
+                  <span class="cell-note">Not used yet.</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <form method="POST" action="{{ url_for('integrations.credentials', integration_id=row.id) }}"
+              class="dash-form account-form" style="margin-top: 1rem;">
+          {{ csrf_field() }}
+          <div class="account-grid">
+            <div>
+              <label for="credential_name">Credential</label>
+              <select id="credential_name" name="credential_name" required>
+                {% for name in credential_names %}
+                <option value="{{ name }}">{{ credential_label[name] }}
+                  {{ '(replace the stored one)' if name in stored }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label for="credential_value">Value</label>
+              <input id="credential_value" name="credential_value" type="password"
+                     autocomplete="new-password" maxlength="4096"
+                     placeholder="Typed once, sealed, never shown again" />
+            </div>
+          </div>
+          <div class="finance-form-actions">
+            <button class="btn" type="submit">Store credential</button>
+          </div>
+        </form>
+        <p class="perm-note">What is logged is the name of the credential and who stored it; the
+          value never reaches the activity log, a flash message or a template.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    var type = document.getElementById('integration_type');
+    var field = document.getElementById('search-base-field');
+    var note = document.getElementById('type-note');
+    if (!type || !field) return;
+    function refresh() {
+      var directory = type.value === 'Active Directory / LDAP';
+      field.hidden = !directory;
+      if (note) note.hidden = !directory;
+    }
+    type.addEventListener('change', refresh);
+    refresh();
+  })();
+</script>
+{% endblock %}

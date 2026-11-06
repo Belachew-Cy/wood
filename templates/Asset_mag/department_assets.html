@@ -1,0 +1,84 @@
+
+{% extends "base.html" %}
+
+{% block title %}Department Asset Management{% endblock %}
+
+{% block content %}
+
+<div class="asset-dashboard">
+
+    <div class="asset-page-header">
+        <div>
+            <h2>Department Asset Management</h2>
+            <p>Monitor assets allocated across organizational departments.</p>
+        </div>
+
+        <a href="{{ url_for('asset_management.allocate_department_asset') }}"
+           class="asset-btn asset-btn-primary">
+            <i class="fas fa-plus"></i> Allocate Asset
+        </a>
+    </div>
+
+    <div class="asset-panel">
+
+        <div class="asset-panel-header">
+            <div>
+                <h3>Department Asset Summary</h3>
+                <p>Asset allocation by department</p>
+            </div>
+        </div>
+
+        <div class="asset-table-wrapper">
+
+            <table class="asset-table">
+
+                <thead>
+                    <tr>
+                        <th>Department ID</th>
+                        <th>Total Assets</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for item in department_summary %}
+
+                    <tr>
+                        <td>Department #{{ item.department_id }}</td>
+
+                        <td>
+                            <strong>{{ item.total_assets }}</strong>
+                        </td>
+
+                        <td>
+                            <a href="{{ url_for(
+                                'asset_management.department_asset_list',
+                                department_id=item.department_id
+                            ) }}" class="asset-view-link">
+                                Manage Assets
+                            </a>
+                        </td>
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="3" class="asset-empty">
+                            No department asset records found.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

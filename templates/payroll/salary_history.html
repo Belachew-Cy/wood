@@ -1,0 +1,206 @@
+
+{% extends "base.html" %}
+
+{% block title %}Salary History{% endblock %}
+
+{% block content %}
+<div class="container-fluid payroll-page">
+
+    <!-- Page Header -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1">Salary History</h2>
+            <p class="text-muted mb-0">
+                Review employee salary adjustments and historical records.
+            </p>
+        </div>
+    </div>
+
+    <!-- Search and Filter -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+
+            <form method="GET"
+                  action="{{ url_for('payroll.salary_history') }}">
+
+                <div class="row g-3 align-items-end">
+
+                    <div class="col-md-4">
+                        <label class="form-label" for="employee_id">
+                            Employee
+                        </label>
+
+                        <select class="form-select" name="employee_id" id="employee_id">
+                            <option value="">All Employees</option>
+
+                            {% for employee in employees %}
+                            <option value="{{ employee.id }}"
+                                {% if selected_employee_id|string == employee.id|string %}selected{% endif %}>
+                                {{ employee.employee_code }} -
+                                {{ employee.full_name }}
+                            </option>
+                            {% endfor %}
+
+                        </select>
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label" for="start_date">
+                            Start Date
+                        </label>
+
+                        <input type="date"
+                               class="form-control"
+                               id="start_date"
+                               name="start_date"
+                               value="{{ start_date or '' }}">
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label" for="end_date">
+                            End Date
+                        </label>
+
+                        <input type="date"
+                               class="form-control"
+                               id="end_date"
+                               name="end_date"
+                               value="{{ end_date or '' }}">
+                    </div>
+
+                    <div class="col-md-2 d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-search"></i> Search
+                        </button>
+
+                        <a href="{{ url_for('payroll.salary_history') }}"
+                           class="btn btn-outline-secondary">
+                            <i class="fas fa-redo"></i>
+                        </a>
+                    </div>
+
+                </div>
+            </form>
+
+        </div>
+    </div>
+
+    <!-- Salary History Table -->
+    <div class="card shadow-sm">
+
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Salary Adjustment Records</h5>
+
+            <span class="badge bg-secondary">
+                {{ history|length }} Records
+            </span>
+        </div>
+
+        <div class="card-body p-0">
+
+            <div class="table-responsive">
+
+                <table class="table table-hover align-middle mb-0">
+
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Employee</th>
+                            <th>Previous Salary</th>
+                            <th>New Salary</th>
+                            <th>Difference</th>
+                            <th>Effective Date</th>
+                            <th>Reason</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+
+                        {% for record in history %}
+                        {% set previous = record.previous_salary|float %}
+                        {% set new = record.new_salary|float %}
+                        {% set difference = new - previous %}
+
+                        <tr>
+
+                            <td>{{ loop.index }}</td>
+
+                            <td>
+                                <strong>
+                                    {{ record.employee_name or 'Employee' }}
+                                </strong>
+                                <div class="small text-muted">
+                                    {{ record.employee_code or '-' }}
+                                </div>
+                            </td>
+
+                            <td>
+                                {{ "{:,.2f}".format(previous) }} ETB
+                            </td>
+
+                            <td>
+                                <strong>
+                                    {{ "{:,.2f}".format(new) }} ETB
+                                </strong>
+                            </td>
+
+                            <td>
+                                {% if difference > 0 %}
+                                    <span class="text-success">
+                                        +{{ "{:,.2f}".format(difference) }} ETB
+                                    </span>
+                                {% elif difference < 0 %}
+                                    <span class="text-danger">
+                                        {{ "{:,.2f}".format(difference) }} ETB
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted">0.00 ETB</span>
+                                {% endif %}
+                            </td>
+
+                            <td>{{ record.effective_date or '-' }}</td>
+
+                            <td>
+                                {{ record.reason or '-' }}
+                            </td>
+
+                            <td>
+                                {% if record.status == 'Approved' %}
+                                    <span class="badge bg-success">Approved</span>
+                                {% elif record.status == 'Rejected' %}
+                                    <span class="badge bg-danger">Rejected</span>
+                                {% elif record.status == 'Pending' %}
+                                    <span class="badge bg-warning text-dark">Pending</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">
+                                        {{ record.status or 'Unknown' }}
+                                    </span>
+                                {% endif %}
+                            </td>
+
+                        </tr>
+
+                        {% else %}
+                        <tr>
+                            <td colspan="8" class="text-center py-5">
+                                <i class="fas fa-history fa-2x text-muted mb-3"></i>
+
+                                <p class="mb-1">No salary history found.</p>
+
+                                <small class="text-muted">
+                                    Salary adjustment records will appear here.
+                                </small>
+                            </td>
+                        </tr>
+                        {% endfor %}
+
+                    </tbody>
+                </table>
+
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

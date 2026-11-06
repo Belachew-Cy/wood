@@ -1,0 +1,238 @@
+
+{% extends "base.html" %}
+
+{% block title %}Checklist Details | Audit Management{% endblock %}
+
+{% block content %}
+
+{% set current_checklist = checklist | default({}, true) %}
+
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Audit Management / Checklists</span>
+            <h1>
+                {{ current_checklist.name
+                   | default(current_checklist.title
+                   | default('Checklist Details')) }}
+            </h1>
+            <p>
+                Review checklist requirements and record audit results.
+            </p>
+        </div>
+
+        <a class="btn btn-outline btn-sm"
+           href="{{ url_for('audit.checklist_templates') }}">
+            Back to Checklists
+        </a>
+    </div>
+</section>
+
+<section class="container finance-page">
+
+    <!-- CHECKLIST SUMMARY -->
+
+    <div class="hr-stats">
+
+        <div class="dash-panel">
+            <span class="eyebrow">Department</span>
+            <h2>{{ current_checklist.department | default('—') }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Audit Type</span>
+            <h2>{{ current_checklist.audit_type | default('General') }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Total Items</span>
+            <h2>{{ stats.total | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Completed Items</span>
+            <h2>{{ stats.completed | default(0) }}</h2>
+        </div>
+
+    </div>
+
+
+    <!-- CHECKLIST DESCRIPTION -->
+
+    <div class="dash-panel">
+        <h2>Checklist Information</h2>
+
+        <p>
+            {{ current_checklist.description
+               | default('No checklist description provided.') }}
+        </p>
+
+        <p>
+            <strong>Status:</strong>
+            {{ current_checklist.status | default('Active') }}
+        </p>
+    </div>
+
+
+    <!-- CHECKLIST ITEMS AND RESULTS -->
+
+    <div class="dash-panel hr-table-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Checklist Items</h2>
+                <p>
+                    Record the result of each audit verification.
+                </p>
+            </div>
+        </div>
+
+        <form method="POST"
+              action="{{ url_for(
+                  'audit.save_checklist_results',
+                  checklist_id=current_checklist.id
+              ) }}">
+
+            {% if csrf_token is defined %}
+                {{ csrf_token() }}
+            {% endif %}
+
+            <div class="table-scroll">
+
+                <table class="report-table">
+
+                    <thead>
+                        <tr>
+                            <th>No.</th>
+                            <th>Audit Requirement</th>
+                            <th>Result</th>
+                            <th>Observation</th>
+                            <th>Evidence Reference</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+
+                        {% for item in items | default([]) %}
+
+                        <tr>
+
+                            <td>
+                                {{ loop.index }}
+                            </td>
+
+                            <td>
+                                <strong>
+                                    {{ item.title
+                                       | default(item.question
+                                       | default('Untitled Requirement')) }}
+                                </strong>
+
+                                {% if item.description %}
+                                    <span class="feed-meta">
+                                        {{ item.description }}
+                                    </span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                <select
+                                    name="result_{{ item.id }}"
+                                    aria-label="Result for checklist item {{ loop.index }}"
+                                >
+                                    <option value="">Not Reviewed</option>
+
+                                    {% for result in [
+                                        'Compliant',
+                                        'Partially Compliant',
+                                        'Non-Compliant',
+                                        'Not Applicable'
+                                    ] %}
+
+                                    <option
+                                        value="{{ result }}"
+                                        {% if item.result | default('') == result %}
+                                            selected
+                                        {% endif %}
+                                    >
+                                        {{ result }}
+                                    </option>
+
+                                    {% endfor %}
+                                </select>
+                            </td>
+
+                            <td>
+                                <textarea
+                                    name="observation_{{ item.id }}"
+                                    rows="2"
+                                    placeholder="Enter audit observation"
+                                >{{ item.observation | default('') }}</textarea>
+                            </td>
+
+                            <td>
+                                <input
+                                    type="text"
+                                    name="evidence_{{ item.id }}"
+                                    value="{{ item.evidence_reference | default('') }}"
+                                    placeholder="Evidence reference"
+                                >
+                            </td>
+
+                        </tr>
+
+                        {% else %}
+
+                        <tr>
+                            <td colspan="5" class="report-empty">
+                                No checklist items have been configured
+                                for this template.
+                            </td>
+                        </tr>
+
+                        {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+            {% if items %}
+
+            <div class="stock-actions">
+                <button type="submit" class="btn btn-sm">
+                    Save Checklist Results
+                </button>
+
+                <a class="btn btn-outline btn-sm"
+                   href="{{ url_for('audit.checklist_templates') }}">
+                    Cancel
+                </a>
+            </div>
+
+            {% endif %}
+
+        </form>
+
+    </div>
+
+
+    <!-- RESULT GUIDANCE -->
+
+    <div class="dash-panel">
+
+        <h2>Result Definitions</h2>
+
+        <ul>
+            <li><strong>Compliant:</strong> The requirement has been satisfied.</li>
+            <li><strong>Partially Compliant:</strong> The requirement has been partly satisfied.</li>
+            <li><strong>Non-Compliant:</strong> The requirement has not been satisfied.</li>
+            <li><strong>Not Applicable:</strong> The requirement does not apply to the audited activity.</li>
+        </ul>
+
+    </div>
+
+</section>
+
+{% endblock %}

@@ -1,0 +1,290 @@
+
+{% extends "base.html" %}
+
+{% block title %}Payroll Reports{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+        <div>
+            <h2>Payroll Reports</h2>
+            <p class="text-muted">Payroll costs, deductions and payment analysis.</p>
+        </div>
+
+        <button class="btn btn-outline-primary no-print"
+                onclick="window.print()">
+            <i class="fas fa-print"></i> Print Report
+        </button>
+    </div>
+
+    <!-- Month Filter -->
+    <form method="GET"
+          action="{{ url_for('payroll.payroll_reports') }}"
+          class="card card-body mb-4 no-print">
+
+        <div class="row align-items-end g-3">
+            <div class="col-md-4">
+                <label class="form-label">Payroll Month</label>
+                <input type="month"
+                       name="month"
+                       class="form-control"
+                       value="{{ selected_month }}"
+                       required>
+            </div>
+
+            <div class="col-md-2">
+                <button class="btn btn-primary w-100">
+                    Generate Report
+                </button>
+            </div>
+        </div>
+    </form>
+
+    <!-- Summary Cards -->
+    <div class="row g-3 mb-4">
+
+        <div class="col-md-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <p class="text-muted">Employees</p>
+                    <h3>{{ summary.employee_count or 0 }}</h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <p class="text-muted">Gross Payroll</p>
+                    <h4>{{ "{:,.2f}".format(summary.total_gross|float) }} ETB</h4>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <p class="text-muted">Overtime Paid</p>
+                    <h4>{{ "{:,.2f}".format(summary.total_overtime|default(0)|float) }} ETB</h4>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <p class="text-muted">Total Deductions</p>
+                    <h4>{{ "{:,.2f}".format(summary.total_deductions|float) }} ETB</h4>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <p class="text-muted">Net Payroll</p>
+                    <h4>{{ "{:,.2f}".format(summary.total_net|float) }} ETB</h4>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Payment Summary -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Payment Summary</h5>
+        </div>
+
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <p>Paid Employees:
+                        <strong>{{ summary.paid_count or 0 }}</strong>
+                    </p>
+                </div>
+
+                <div class="col-md-6">
+                    <p>Unpaid Employees:
+                        <strong>{{ summary.unpaid_count or 0 }}</strong>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Department Report -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Department Payroll Costs</h5>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Department</th>
+                        <th>Employees</th>
+                        <th>Basic Salary</th>
+                        <th>Allowances</th>
+                        <th>Overtime</th>
+                        <th>Deductions</th>
+                        <th>Net Salary</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for item in departments %}
+                    <tr>
+                        <td>{{ item.department }}</td>
+                        <td>{{ item.employee_count }}</td>
+                        <td>{{ "{:,.2f}".format(item.total_basic|float) }}</td>
+                        <td>{{ "{:,.2f}".format(item.total_allowances|float) }}</td>
+                        <td>{{ "{:,.2f}".format(item.total_overtime|default(0)|float) }}</td>
+                        <td>{{ "{:,.2f}".format(item.total_deductions|float) }}</td>
+                        <td class="fw-bold">
+                            {{ "{:,.2f}".format(item.total_net|float) }} ETB
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-4">
+                            No department payroll records found.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Payment Details -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Payment Details</h5>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Employee</th>
+                        <th>Department</th>
+                        <th>Net Salary</th>
+                        <th>Method</th>
+                        <th>Reference</th>
+                        <th>Payment Date</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for item in payment_records %}
+                    <tr>
+                        <td>
+                            {{ item.full_name }}
+                            <small class="text-muted d-block">
+                                {{ item.employee_code }}
+                            </small>
+                        </td>
+                        <td>{{ item.department or '-' }}</td>
+                        <td>{{ "{:,.2f}".format(item.net_salary|float) }}</td>
+                        <td>{{ item.payment_method or '-' }}</td>
+                        <td>{{ item.payment_reference or '-' }}</td>
+                        <td>{{ item.payment_date or '-' }}</td>
+                        <td>{{ item.payment_status }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-4">
+                            No payment records found.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Deduction Report -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Employee Deduction Report</h5>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Employee</th>
+                        <th>Department</th>
+                        <th>Basic Salary</th>
+                        <th>Deductions</th>
+                        <th>Net Salary</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for item in deduction_records %}
+                    <tr>
+                        <td>
+                            {{ item.full_name }}
+                            <small class="text-muted d-block">
+                                {{ item.employee_code }}
+                            </small>
+                        </td>
+                        <td>{{ item.department or '-' }}</td>
+                        <td>{{ "{:,.2f}".format(item.basic_salary|float) }}</td>
+                        <td>{{ "{:,.2f}".format(item.deductions|float) }}</td>
+                        <td>{{ "{:,.2f}".format(item.net_salary|float) }} ETB</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="text-center text-muted py-4">
+                            No deduction records found.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+@media print {
+    @page {
+        size: A4 landscape;
+        margin: 10mm;
+    }
+
+    .no-print,
+    .sidebar,
+    .navbar,
+    .footer {
+        display: none !important;
+    }
+
+    body {
+        background: white !important;
+    }
+
+    .card {
+        box-shadow: none !important;
+        break-inside: avoid;
+    }
+
+    .table-responsive {
+        overflow: visible !important;
+    }
+
+    table {
+        font-size: 10px;
+    }
+}
+</style>
+{% endblock %}

@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container-fluid py-4">
+
+    <h3>Employee Asset Assignment</h3>
+
+    <p class="text-muted">
+        Assign department assets to authorized employees.
+    </p>
+
+    <div class="card shadow-sm p-4">
+
+        <form method="POST">
+
+            <input
+                type="hidden"
+                name="csrf_token"
+                value="{{ csrf_token() }}"
+            >
+
+            <div class="mb-3">
+                <label class="form-label">Select Asset</label>
+
+                <select name="asset_id" class="form-select" required>
+                    <option value="">Select Asset</option>
+
+                    {% for asset in assets %}
+                    <option value="{{ asset.id }}">
+                        {{ asset.asset_code }} - {{ asset.name }}
+                    </option>
+                    {% endfor %}
+
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Department</label>
+
+                <select name="department_id" class="form-select" required>
+                    <option value="">Select Department</option>
+
+                    {% for department in departments %}
+                    <option value="{{ department.id }}">
+                        {{ department.name }}
+                    </option>
+                    {% endfor %}
+
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Employee</label>
+
+                <select name="employee_id" class="form-select" required>
+                    <option value="">Select Employee</option>
+
+                    {% for employee in employees %}
+                    <option value="{{ employee.id }}">
+                        {{ employee.full_name }}
+                    </option>
+                    {% endfor %}
+
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Remarks</label>
+
+                <textarea
+                    name="remarks"
+                    class="form-control"
+                    rows="3"
+                    placeholder="Enter assignment details">
+                </textarea>
+            </div>
+
+            <button type="submit" class="btn btn-success">
+                Assign Asset
+            </button>
+
+            <a
+                href="{{ url_for('asset_management.employee_asset_history') }}"
+                class="btn btn-secondary">
+                Cancel
+            </a>
+
+        </form>
+
+    </div>
+
+</div>
+
+{% endblock %}

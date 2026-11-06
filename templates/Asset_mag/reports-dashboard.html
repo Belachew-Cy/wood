@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container-fluid py-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3>Asset Reports & Analytics</h3>
+            <p class="text-muted">
+                Monitor asset allocation, maintenance, depreciation and disposal.
+            </p>
+        </div>
+
+        <a href="{{ url_for('asset_management.export_asset_inventory') }}"
+           class="btn btn-success">
+            Export Asset Register
+        </a>
+    </div>
+
+    <div class="row g-3">
+
+        {% set statistics = [
+            ('Total Assets', total_assets),
+            ('Active Assets', active_assets),
+            ('Assigned Assets', assigned_assets),
+            ('Available Assets', available_assets),
+            ('Under Maintenance', maintenance_assets),
+            ('Disposed Assets', disposed_assets)
+        ] %}
+
+        {% for label, value in statistics %}
+        <div class="col-xl-4 col-md-6 col-12">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                    <p class="text-muted mb-2">{{ label }}</p>
+                    <h3 class="fw-bold mb-0">{{ value }}</h3>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+
+    </div>
+
+    <div class="row g-3 mt-2">
+
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <h6>Total Maintenance Cost</h6>
+                    <h3>{{ "{:,.2f}".format(total_maintenance_cost) }} ETB</h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <h6>Total Recorded Depreciation</h6>
+                    <h3>{{ "{:,.2f}".format(total_depreciation) }} ETB</h3>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="card border-0 shadow-sm mt-4">
+        <div class="card-body">
+
+            <h5 class="mb-3">Available Reports</h5>
+
+            <div class="list-group">
+
+                <a href="{{ url_for('asset_management.asset_inventory_report') }}"
+                   class="list-group-item list-group-item-action">
+                    Asset Inventory Register
+                </a>
+
+                <a href="{{ url_for('asset_management.department_asset_report') }}"
+                   class="list-group-item list-group-item-action">
+                    Department Asset Report
+                </a>
+
+                <a href="{{ url_for('asset_management.maintenance_cost_report') }}"
+                   class="list-group-item list-group-item-action">
+                    Maintenance Cost Report
+                </a>
+
+                <a href="{{ url_for('asset_management.export_asset_inventory') }}"
+                   class="list-group-item list-group-item-action">
+                    Export Asset Inventory (CSV)
+                </a>
+
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}

@@ -1,5 +1,6 @@
 """Employee records, uploads and employee page helpers."""
 
+from core.access import account_role_keys
 from core.access import current_user
 from core.access import effective_permissions
 from core.config import EDUCATION_LEVELS
@@ -16,6 +17,7 @@ from core.config import EMPLOYEE_PHOTO_LIMIT
 from core.config import EMPLOYEE_STATUS
 from core.config import EMPLOYEE_UPLOAD_DIR
 from core.config import EMPLOYMENT_TYPES
+from core.db import get_db
 from datetime import date
 from datetime import timedelta
 from decimal import Decimal
@@ -159,8 +161,10 @@ def can_view_documents(user):
     """Personal documents stay with HR itself and the administrator."""
     if user is None:
         return False
-    return user["role"] == "admin" or (
-        user["role"] == "hr" and "hr" in effective_permissions(user))
+    if user["role"] == "admin":
+        return True
+    return ("hr" in account_role_keys(get_db(), user)
+            and "hr" in effective_permissions(user))
 
 
 def employee_phone_problem(phone):
@@ -707,7 +711,8 @@ def employee_page_records(db, salary_allowed, documents_allowed):
     return records
 
 
-def render_employee_page(db, editing=None, form_data=None, errors=None, uploads=None):
+def render_employee_page(db, editing=None, form_data=None, errors=None,
+                         uploads=None, hiring_from=None):
     user = current_user()
     salary_allowed = can_view_salary(user)
     documents_allowed = can_view_documents(user)
@@ -733,6 +738,7 @@ def render_employee_page(db, editing=None, form_data=None, errors=None, uploads=
         editing=editing,
         form_data=form_data,
         errors=errors or [],
+        hiring_from=hiring_from,
         departments=employee_departments(db),
         managers=managers,
         can_view_salary=salary_allowed,

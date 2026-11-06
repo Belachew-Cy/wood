@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi with context %}
+
+{% block title %}Customers | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+{% set ns = namespace(invoices=0, revenue=0.0, open=0) %}
+{% for customer in customers %}
+  {% set ns.invoices = ns.invoices + customer["invoice_count"] | int %}
+  {% set ns.revenue = ns.revenue + (customer["total_etb"] | float) %}
+  {% set ns.open = ns.open + (customer["open_invoices"] or 0) | int %}
+{% endfor %}
+
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">MARKETING MANAGEMENT</span>
+      <h1>Customers</h1>
+      <p>Read from the invoices the Finance desk has already issued — the same
+        registry, not a second copy of it.</p>
+    </div>
+    <div class="row-actions">
+      <a class="btn btn-outline" href="{{ url_for('marketing.dashboard') }}">
+        ← Marketing desk
+      </a>
+      {% if 'marketing_leads' in granted_permissions %}
+      <a class="btn" href="{{ url_for('marketing.leads') }}">Leads →</a>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="hr-stats">
+      {{ kpi('Customers', customers | length, 'billed at least once') }}
+      {{ kpi('Invoices', ns.invoices, 'customer invoices') }}
+      {{ kpi('Revenue', "{:,.2f}".format(ns.revenue), 'ETB invoiced') }}
+      {{ kpi('Open invoices', ns.open, 'still unpaid', 'warn' if ns.open else 'flat') }}
+    </div>
+
+    <form method="GET" class="stock-search">
+      <label for="search">Search</label>
+      <input id="search" name="search" value="{{ search }}" placeholder="Customer name" />
+      <button class="btn" type="submit">Search</button>
+      <a class="btn btn-outline" href="{{ url_for('marketing.customers') }}">Reset</a>
+      {% if 'marketing_reports' in granted_permissions %}
+      <a class="btn btn-outline"
+         href="{{ url_for('marketing.export', kind='customers', search=search) }}">
+        Export CSV
+      </a>
+      {% endif %}
+    </form>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>{% if customers %}{{ customers | length }} customer{{ '' if customers | length == 1 else 's' }}{% else %}Customers{% endif %}</h2>
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Customer</th><th>Contact on the invoice</th><th>Invoices</th>
+              <th>Total invoiced</th><th>First order</th><th>Latest order</th>
+              <th>Open</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for customer in customers %}
+            <tr>
+              <td>{{ customer["name"] }}</td>
+              <td>{{ customer["contact"] or '—' }}</td>
+              <td>{{ customer["invoice_count"] }}</td>
+              <td class="nowrap">
+                {{ "{:,.2f}".format(customer["total_etb"] | float) }} ETB
+                <br><span class="feed-meta">
+                  {{ "{:,.2f}".format(customer["total_amount"] | float) }} recorded</span>
+              </td>
+              <td class="nowrap">{{ customer["first_order"] or '—' }}</td>
+              <td class="nowrap">{{ customer["last_order"] or '—' }}</td>
+              <td>
+                <span class="status-badge {{ 'off' if customer["open_invoices"]
+                      else 'active' }}">
+                  {{ customer["open_invoices"] or 0 }} open
+                </span>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7">
+              No customer invoice is on the Finance register yet.
+            </td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="dash-panel">
+      <h2>Why this page has no buttons</h2>
+      <p>Marketing reads this list and never writes it. An invoice belongs to the
+        Finance desk, so correcting a name or a figure happens there and both
+        desks see the same customer the next time the page opens. A lead becomes a
+        customer when Finance bills the person — not when a second register says
+        so.</p>
+    </div>
+  </div>
+</section>
+{% endblock %}

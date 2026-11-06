@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+{% from "Admin/_directory_page.html" import directory_head, directory_flash with context %}
+
+{% set editing = connection is not none %}
+
+{% block title %}{{ 'Edit' if editing else 'New' }} directory connection | Dereje Belay Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+{{ directory_head(
+     'Edit ' ~ connection.name if editing else 'New directory connection',
+     kind_label[kind] ~ ' · accounts, groups and sign-in are read from the domain; nothing is written back.',
+     connection) }}
+
+<section class="section bg-white">
+  <div class="container">
+    {{ directory_flash() }}
+
+    {% if missing_package %}
+    <div class="dir-form-note warn">Install the {{ missing_package }} package on this server
+      before this connection can be tested.</div>
+    {% endif %}
+
+    {% if not editing %}
+    <div class="row-actions" style="margin-bottom: 1rem;">
+      {% for code in ['ldap', 'entra'] %}
+      <a class="btn {{ 'btn-outline-dark' if code == kind else 'btn-outline' }} btn-sm"
+         href="{{ url_for('admin_directory_connection', kind=code) }}">{{ kind_label[code] }}</a>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="emp-panel">
+      <div class="account-card">
+        <header class="account-head">
+          <div>
+            <h3 class="account-name">Connection</h3>
+            <span class="cell-note">{{ kind_label[kind] }} · the credential is sealed and this
+              screen only says whether one is stored.</span>
+          </div>
+          {% if editing %}
+          <span class="status-badge {{ 'active' if connection.enabled else 'off' }}">
+            {{ 'enabled' if connection.enabled else 'disabled' }}</span>
+          {% endif %}
+        </header>
+
+        <form method="POST" class="dash-form account-form"
+              action="{{ url_for('admin_directory_connection', connection_id=connection.id) if editing
+                        else url_for('admin_directory_connection', kind=kind) }}">
+          {{ csrf_field() }}
+          <div class="account-grid">
+            <div>
+              <label for="name">Name</label>
+              <input id="name" name="name" type="text" maxlength="80" required
+                     value="{{ connection.name if editing else '' }}"
+                     placeholder="Head office Active Directory" />
+              <p class="cell-note">Two connections cannot share a name.</p>
+            </div>
+
+            {% if kind == 'ldap' %}
+            <div>
+              <label for="server_url">Server address</label>
+              <input id="server_url" name="server_url" type="text" maxlength="512" required
+                     value="{{ connection.server_url if editing else '' }}"
+                     placeholder="ldaps://dc01.corp.local:636" />
+              <p class="cell-note">A full ldaps:// URL; plain ldap:// is only accepted with
+                StartTLS.</p>
+            </div>
+            <div>
+              <label for="domain">NetBIOS domain</label>
+              <input id="domain" name="domain" type="text" maxlength="512"
+                     value="{{ connection.domain if editing else '' }}" placeholder="CORP" />
+            </div>
+            <div>
+              <label for="bind_dn">Bind account DN</label>
+              <input id="bind_dn" name="bind_dn" type="text" maxlength="512" required
+                     value="{{ connection.bind_dn if editing else '' }}"
+                     placeholder="CN=svc-app,OU=Service Accounts,DC=corp,DC=local" />
+            </div>
+            <div>
+              <label for="base_dn">Search base DN</label>
+              <input id="base_dn" name="base_dn" type="text" maxlength="512" required
+                     value="{{ connection.base_dn if editing else '' }}"
+                     placeholder="DC=corp,DC=local" />
+              <p class="cell-note">The user and group bases default to this one when left
+                empty.</p>
+            </div>
+            <div>
+              <label for="user_base_dn">User search base</label>
+              <input id="user_base_dn" name="user_base_dn" type="text" maxlength="512"
+                     value="{{ connection.user_base_dn if editing else '' }}"
+                     placeholder="OU=Staff,DC=corp,DC=local" />
+            </div>
+            <div>
+              <label for="group_base_dn">Group search base</label>
+              <input id="group_base_dn" name="group_base_dn" type="text" maxlength="512"
+                     value="{{ connection.group_base_dn if editing else '' }}"
+                     placeholder="OU=Groups,DC=corp,DC=local" />
+            </div>
+            <div>
+              <label for="user_filter">Extra user filter</label>
+              <input id="user_filter" name="user_filter" type="text" maxlength="512"
+                     value="{{ connection.user_filter if editing else '' }}"
+                     placeholder="(department=Workshop)" />
+              <p class="cell-note">Added to the fixed object-class filter.</p>
+            </div>
+            <div>
+              <label for="group_filter">Extra group filter</label>
+              <input id="group_filter" name="group_filter" type="text" maxlength="512"
+                     value="{{ connection.group_filter if editing else '' }}"
+                     placeholder="(cn=WK-*)" />
+            </div>
+            <div>
+              <label for="ca_bundle_path">CA bundle path</label>
+              <input id="ca_bundle_path" name="ca_bundle_path" type="text" maxlength="512"
+                     value="{{ connection.ca_bundle_path if editing else '' }}"
+                     placeholder="C:\certs\corp-root.pem" />
+              <p class="cell-note">Only needed when the domain controller uses a private
+                certificate authority.</p>
+            </div>
+            {% else %}
+            <div>
+              <label for="tenant_id">Tenant id or domain</label>
+              <input id="tenant_id" name="tenant_id" type="text" maxlength="512" required
+                     value="{{ connection.tenant_id if editing else '' }}"
+                     placeholder="contoso.onmicrosoft.com" />
+            </div>
+            <div>
+              <label for="client_id">Application (client) id</label>
+              <input id="client_id" name="client_id" type="text" maxlength="512" required
+                     value="{{ connection.client_id if editing else '' }}"
+                     placeholder="00000000-0000-0000-0000-000000000000" />
+            </div>
+            <div class="full">
+              <label for="allowed_domains">Domain allow list</label>
+              <input id="allowed_domains" name="allowed_domains" type="text" maxlength="254"
+                     value="{{ connection.allowed_domains if editing else '' }}"
+                     placeholder="corp.local, contoso.com" />
+              <p class="cell-note">Comma separated. Every mailbox outside this list is ignored;
+                empty means the whole tenant is in scope.</p>
+            </div>
+            {% endif %}
+
+            <div>
+              <label for="secret">Credential</label>
+              <input id="secret" name="secret" type="password" maxlength="512"
+                     autocomplete="new-password" placeholder="{{ secret_state }}" />
+              <p class="cell-note">Currently {{ secret_state | lower }}. Leave blank to keep the
+                stored value.</p>
+            </div>
+            <div>
+              <label for="default_role">Default role</label>
+              <select id="default_role" name="default_role">
+                {% set chosen_role = connection.default_role if editing else 'member' %}
+                {% for key, label in roles %}
+                <option value="{{ key }}" {% if key == chosen_role %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+              <p class="cell-note">Used when a group mapping has not given the account a role.</p>
+            </div>
+            <div>
+              <label for="interval_minutes">Scheduled sync interval</label>
+              <input id="interval_minutes" name="interval_minutes" type="number" min="0" max="10080"
+                     value="{{ connection.interval_minutes if editing else 0 }}" />
+              <p class="cell-note">Minutes; 0 means manual only.</p>
+            </div>
+          </div>
+
+          <div class="account-grid">
+            <label class="dir-check-line">
+              <input type="checkbox" name="enabled" value="1"
+                     {% if (connection.enabled if editing else 0) %}checked{% endif %} />
+              Enabled
+            </label>
+            {% if kind == 'ldap' %}
+            <label class="dir-check-line">
+              <input type="checkbox" name="verify_tls" value="1"
+                     {% if (connection.verify_tls if editing else 1) %}checked{% endif %} />
+              Verify the TLS certificate
+            </label>
+            <label class="dir-check-line">
+              <input type="checkbox" name="use_starttls" value="1"
+                     {% if (connection.use_starttls if editing else 0) %}checked{% endif %} />
+              Use StartTLS
+            </label>
+            {% else %}
+            <input type="hidden" name="verify_tls" value="1" />
+            {% endif %}
+            <label class="dir-check-line">
+              <input type="checkbox" name="provision" value="1"
+                     {% if (connection.provision if editing else 1) %}checked{% endif %} />
+              Create accounts the directory has
+            </label>
+            <label class="dir-check-line">
+              <input type="checkbox" name="deprovision" value="1"
+                     {% if (connection.deprovision if editing else 1) %}checked{% endif %} />
+              Disable accounts the directory dropped
+            </label>
+            <label class="dir-check-line">
+              <input type="checkbox" name="allow_signin" value="1"
+                     {% if (connection.allow_signin if editing else 0) %}checked{% endif %} />
+              Allow sign-in against the directory
+            </label>
+            <label class="dir-check-line">
+              <input type="checkbox" name="group_nested" value="1"
+                     {% if (connection.group_nested if editing else 1) %}checked{% endif %} />
+              Count nested group members
+            </label>
+          </div>
+
+          <p class="perm-note">Saving a connection never reads the directory. Test it from the
+            connections screen: a wrong base DN or credential is reported there before the first
+            synchronization.</p>
+
+          <div class="finance-form-actions">
+            <a class="btn btn-outline-dark" href="{{ url_for('admin_directory') }}">Cancel</a>
+            <button class="btn" type="submit">{{ 'Save connection' if editing else 'Create connection' }}
+              <span class="arrow">→</span></button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

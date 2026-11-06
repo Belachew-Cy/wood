@@ -104,51 +104,88 @@
 
     <nav class="hr-navigation" aria-label="HR Management">
       <a class="hr-nav-link active" href="{{ url_for('hr_dashboard') }}">Dashboard</a>
+      {% if 'hr_employees' in granted_permissions %}
       <a class="hr-nav-link" href="{{ url_for('employees') }}">Employees</a>
+      {% endif %}
+      {% if 'hr_attendance' in granted_permissions %}
       <a class="hr-nav-link" href="{{ url_for('attendance') }}">Attendance</a>
-      {% if 'payroll' in permissions %}
+      {% endif %}
+      {% if 'hr_overtime_view' in granted_permissions %}
+      <a class="hr-nav-link" href="{{ url_for('hr.overtime_dashboard') }}">Overtime</a>
+      {% endif %}
+      {% if 'hr_overtime_approve' in granted_permissions %}
+      <a class="hr-nav-link" href="{{ url_for('hr.overtime_approvals') }}">Overtime approvals</a>
+      {% endif %}
+      {% if 'hr_overtime_verify' in granted_permissions %}
+      <a class="hr-nav-link" href="{{ url_for('hr.overtime_hr_verification') }}">Overtime verification</a>
+      {% endif %}
+      {% if 'payroll_processing' in granted_permissions %}
       <a class="hr-nav-link" href="{{ url_for('payroll') }}">Payroll</a>
       {% endif %}
-      <a class="hr-nav-link" href="{{ url_for('recruitment') }}">Recruitment</a>
+      {% if 'recruitment_vacancies' in granted_permissions %}
+      <a class="hr-nav-link" href="{{ url_for('recruitment.hr_vacancies') }}">Hiring desk</a>
+      {% endif %}
+      {% if 'recruitment_applicants' in granted_permissions %}
+      <a class="hr-nav-link" href="{{ url_for('recruitment.hr_applicants') }}">Candidates</a>
+      {% endif %}
+      {% if 'recruitment_exams' in granted_permissions %}
+      <a class="hr-nav-link" href="{{ url_for('recruitment.hr_exams') }}">Examinations</a>
+      {% endif %}
+      {% if 'recruitment_selection' in granted_permissions %}
+      <a class="hr-nav-link" href="{{ url_for('recruitment.hr_interviews') }}">Interviews</a>
+      {% endif %}
+      {% if 'hr_leave' in granted_permissions %}
       <a class="hr-nav-link" href="{{ url_for('leave_management') }}">Leave</a>
+      {% endif %}
+      {% if 'hr_reports' in granted_permissions %}
       <a class="hr-nav-link" href="{{ url_for('training_performance') }}">Training &amp; Performance</a>
+      {% endif %}
+      {% if 'hr_organization' in granted_permissions %}
       <a class="hr-nav-link" href="{{ url_for('manage_hierarchy') }}">Organization</a>
+      {% endif %}
+      {% if 'hr_reports' in granted_permissions %}
       <a class="hr-nav-link" href="{{ url_for('reports_centre') }}">Reports</a>
+      {% endif %}
       <a class="hr-nav-link" href="{{ url_for('hr_settings.index') }}">HR Settings</a>
     </nav>
 
+    {% set kpi_employees = url_for('employees') if 'hr_employees' in granted_permissions else '' %}
+    {% set kpi_attendance = url_for('attendance') if 'hr_attendance' in granted_permissions else '' %}
+    {% set kpi_leave = url_for('leave_management') if 'hr_leave' in granted_permissions else '' %}
+    {% set kpi_hiring = url_for('recruitment.hr_vacancies') if 'recruitment_vacancies' in granted_permissions else '' %}
+    {% set kpi_payroll = url_for('payroll') if 'payroll_processing' in granted_permissions else '' %}
     <div class="hr-stats">
       {{ kpi('Total Employees', total, '{} departments'.format(dept_rows | length),
-             'flat', 'users', url_for('employees')) }}
+             'flat', 'users', kpi_employees) }}
       {{ kpi('Active Employees', active,
              '{}% of workforce'.format(((active / total * 100) | round(0, 'common') | int) if total else 0),
-             'up', 'check', url_for('employees')) }}
+             'up', 'check', kpi_employees) }}
       {{ kpi('On Leave', on_leave,
              '{}% away'.format(((on_leave / total * 100) | round(0, 'common') | int) if total else 0),
-             'warn' if on_leave else 'flat', 'clock', url_for('employees')) }}
+             'warn' if on_leave else 'flat', 'clock', kpi_employees) }}
       {{ kpi('Present Today', ops.attendance.present,
              '{} of {} marked · {} late'.format(ops.attendance.marked, active, ops.attendance.late),
-             'up' if ops.attendance.marked else 'flat', 'calendar', url_for('attendance')) }}
+             'up' if ops.attendance.marked else 'flat', 'calendar', kpi_attendance) }}
       {{ kpi('Pending Leave', ops.leave.pending,
              '{} request{} on file'.format(ops.leave.total, '' if ops.leave.total == 1 else 's'),
-             'warn' if ops.leave.pending else 'flat', 'file', url_for('leave_management')) }}
+             'warn' if ops.leave.pending else 'flat', 'file', kpi_leave) }}
       {{ kpi('Open Vacancies', ops.recruitment.vacancies,
              '{} applicant{} in the pipeline'.format(ops.recruitment.applicants,
                '' if ops.recruitment.applicants == 1 else 's'),
-             'flat', 'inbox', url_for('recruitment')) }}
-      {% if 'payroll' in permissions %}
+             'flat', 'inbox', kpi_hiring) }}
+      {% if 'payroll_management' in granted_permissions %}
       {{ kpi('Payslips Pending', ops.payroll.pending,
              ('{:,.2f} ETB net for {}'.format(ops.payroll.net, ops.payroll_month)
               if ops.salary_visible else '{} paid this month'.format(ops.payroll.paid)),
-             'down' if ops.payroll.pending else 'flat', 'cash', url_for('payroll')) }}
+             'down' if ops.payroll.pending else 'flat', 'cash', kpi_payroll) }}
       {% else %}
       {{ kpi('Approved Leave', ops.leave.approved,
              '{}% of requests'.format(((ops.leave.approved / ops.leave.total * 100) | round(0, 'common') | int) if ops.leave.total else 0),
-             'flat', 'check', url_for('leave_management')) }}
+             'flat', 'check', kpi_leave) }}
       {% endif %}
       {{ kpi('With Phone Number', contactable,
              '{}% reachable'.format(((contactable / total * 100) | round(0, 'common') | int) if total else 0),
-             'flat', 'phone', url_for('employees')) }}
+             'flat', 'phone', kpi_employees) }}
     </div>
 
     <div class="chart-grid hr-chart-grid">
@@ -224,7 +261,9 @@
             </tbody>
           </table>
         </div>
+        {% if 'hr_leave' in granted_permissions %}
         <a class="btn btn-outline-dark btn-sm" href="{{ url_for('leave_management') }}">Review leave</a>
+        {% endif %}
         {% else %}
         <p class="empty-state"><strong>All clear</strong> No leave request is waiting for review.</p>
         {% endif %}
@@ -241,13 +280,15 @@
         <span class="module-ic">{{ dash_icon('calendar') }}</span>
         <h2>Attendance</h2>
         <p>Record daily attendance, check-in/check-out times and working hours.</p>
+        {% if 'hr_attendance' in granted_permissions %}
         <a class="btn btn-sm" href="{{ url_for('attendance') }}">Manage Attendance</a>
+        {% endif %}
         <span class="hr-module-status">
           {% if ops.attendance.marked %}{{ ops.attendance.marked }} marked today{% if ops.attendance.late %} · {{ ops.attendance.late }} late{% endif %}{% else %}No entries today{% endif %}
         </span>
       </article>
 
-      {% if 'payroll' in permissions %}
+      {% if 'payroll_processing' in granted_permissions %}
       <article class="dash-panel hr-module-card">
         <span class="module-ic">{{ dash_icon('cash') }}</span>
         <h2>Payroll</h2>
@@ -259,17 +300,22 @@
 
       <article class="dash-panel hr-module-card">
         <span class="module-ic">{{ dash_icon('inbox') }}</span>
-        <h2>Recruitment</h2>
-        <p>Manage job vacancies, applicants, interviews and hiring decisions.</p>
-        <a class="btn btn-sm" href="{{ url_for('recruitment') }}">Manage Recruitment</a>
-        <span class="hr-module-status">{{ ops.recruitment.vacancies }} open · {{ ops.recruitment.applicants }} applicant{{ '' if ops.recruitment.applicants == 1 else 's' }}</span>
+        <h2>Recruitment &amp; Examinations</h2>
+        <p>Post vacancies, screen applicants, set examinations, run interview panels
+          and register the selected candidates as staff.</p>
+        {% if 'recruitment_vacancies' in granted_permissions %}
+        <a class="btn btn-sm" href="{{ url_for('recruitment.hr_vacancies') }}">Open the hiring desk</a>
+        {% endif %}
+        <span class="hr-module-status">{{ ops.recruitment.vacancies }} open · {{ ops.recruitment.applicants }} applicant{{ '' if ops.recruitment.applicants == 1 else 's' }} · {{ ops.recruitment.interviewing }} in interview</span>
       </article>
 
       <article class="dash-panel hr-module-card">
         <span class="module-ic">{{ dash_icon('file') }}</span>
         <h2>Leave Requests</h2>
         <p>File leave requests and approve or reject the ones waiting on you.</p>
+        {% if 'hr_leave' in granted_permissions %}
         <a class="btn btn-sm" href="{{ url_for('leave_management') }}">Manage Leave</a>
+        {% endif %}
         <span class="hr-module-status">{{ ops.leave.pending }} pending review</span>
       </article>
 
@@ -277,7 +323,9 @@
         <span class="module-ic">{{ dash_icon('check') }}</span>
         <h2>Training &amp; Performance</h2>
         <p>Log employee training and record performance reviews with ratings.</p>
+        {% if 'hr_reports' in granted_permissions %}
         <a class="btn btn-sm" href="{{ url_for('training_performance') }}">Open Training</a>
+        {% endif %}
         <span class="hr-module-status">{{ ops.training.total }} training record{{ '' if ops.training.total == 1 else 's' }} · {{ ops.reviews }} review{{ '' if ops.reviews == 1 else 's' }}</span>
       </article>
 
@@ -285,7 +333,9 @@
         <span class="module-ic">{{ dash_icon('users') }}</span>
         <h2>Organization</h2>
         <p>Build departments and positions, then place staff into reporting lines.</p>
+        {% if 'hr_organization' in granted_permissions %}
         <a class="btn btn-sm" href="{{ url_for('manage_hierarchy') }}">Open Hierarchy</a>
+        {% endif %}
         <span class="hr-module-status">{{ dept_rows | length }} department{{ '' if dept_rows | length == 1 else 's' }} · {{ org.org_stats.lines }} reporting line{{ '' if org.org_stats.lines == 1 else 's' }}</span>
       </article>
 
@@ -293,7 +343,9 @@
         <span class="module-ic">{{ dash_icon('chart') }}</span>
         <h2>Reports</h2>
         <p>Review employee statistics, attendance, payroll and workforce performance.</p>
+        {% if 'hr_reports' in granted_permissions %}
         <a class="btn btn-sm" href="{{ url_for('reports_centre') }}">Open Reports</a>
+        {% endif %}
         <span class="hr-module-status">Workforce and payroll summaries</span>
       </article>
 

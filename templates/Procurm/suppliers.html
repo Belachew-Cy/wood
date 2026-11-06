@@ -1,0 +1,321 @@
+
+{% extends "base.html" %}
+
+{% block title %}Supplier Management | Dereje Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Procurement</span>
+            <h1>Supplier Management</h1>
+            <p>Manage supplier information, contacts, status and procurement history.</p>
+        </div>
+
+        <nav class="stock-actions" aria-label="Supplier actions">
+            <a href="{{ url_for('procurement.dashboard') }}"
+               class="btn btn-outline btn-sm">
+                Procurement Dashboard
+            </a>
+
+            {% if can_manage_suppliers %}
+            <a href="#supplier-form"
+               class="btn btn-primary btn-sm">
+                <i class="fas fa-plus"></i> Add Supplier
+            </a>
+            {% endif %}
+        </nav>
+    </div>
+</section>
+
+<section class="container finance-page">
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+            <div class="finance-alert {{ category }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endwith %}
+
+    {% if not can_manage_suppliers %}
+    <div class="finance-alert info">
+        You have read-only access to supplier records.
+    </div>
+    {% endif %}
+
+    <!-- Supplier Statistics -->
+    <div class="hr-stats">
+        {{ kpi('Total suppliers', stats.total) }}
+        {{ kpi('Active suppliers', stats.active) }}
+        {{ kpi('Inactive suppliers', stats.inactive) }}
+        {{ kpi('Suppliers with orders', stats.with_orders) }}
+    </div>
+
+    <!-- Search and Filters -->
+    <div class="dash-panel">
+        <h2>Search Suppliers</h2>
+
+        <form method="get"
+              action="{{ url_for('procurement.suppliers') }}"
+              class="finance-form">
+
+            <div class="finance-grid">
+
+                <div>
+                    <label for="search">Supplier name</label>
+                    <input type="search"
+                           id="search"
+                           name="search"
+                           value="{{ filters.search }}"
+                           placeholder="Search supplier...">
+                </div>
+
+                <div>
+                    <label for="status">Supplier status</label>
+                    <select name="status" id="status">
+                        <option value="">All statuses</option>
+                        <option value="Active"
+                            {% if filters.status == 'Active' %}selected{% endif %}>
+                            Active
+                        </option>
+                        <option value="Inactive"
+                            {% if filters.status == 'Inactive' %}selected{% endif %}>
+                            Inactive
+                        </option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="sort">Sort by</label>
+                    <select name="sort" id="sort">
+                        <option value="name"
+                            {% if filters.sort == 'name' %}selected{% endif %}>
+                            Supplier name
+                        </option>
+                        <option value="recent"
+                            {% if filters.sort == 'recent' %}selected{% endif %}>
+                            Recently added
+                        </option>
+                        <option value="orders"
+                            {% if filters.sort == 'orders' %}selected{% endif %}>
+                            Most orders
+                        </option>
+                    </select>
+                </div>
+
+            </div>
+
+            <div class="finance-form-actions">
+                <button type="submit" class="finance-btn primary">
+                    Search
+                </button>
+
+                <a href="{{ url_for('procurement.suppliers') }}"
+                   class="finance-btn secondary">
+                    Clear filters
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Add Supplier -->
+    {% if can_manage_suppliers %}
+    <div class="finance-panel" id="supplier-form">
+
+        <h2>Add New Supplier</h2>
+
+        <form method="post"
+              action="{{ url_for('procurement.add_supplier') }}"
+              class="finance-form">
+
+            {{ csrf_field() }}
+
+            <div class="finance-grid">
+
+                <div>
+                    <label for="name">Supplier name *</label>
+                    <input type="text"
+                           id="name"
+                           name="name"
+                           maxlength="150"
+                           required>
+                </div>
+
+                <div>
+                    <label for="contact_person">Contact person</label>
+                    <input type="text"
+                           id="contact_person"
+                           name="contact_person"
+                           maxlength="120">
+                </div>
+
+                <div>
+                    <label for="phone">Phone number</label>
+                    <input type="tel"
+                           id="phone"
+                           name="phone"
+                           maxlength="40">
+                </div>
+
+                <div>
+                    <label for="email">Email address</label>
+                    <input type="email"
+                           id="email"
+                           name="email"
+                           maxlength="150">
+                </div>
+
+                <div>
+                    <label for="tax_number">Tax identification number</label>
+                    <input type="text"
+                           id="tax_number"
+                           name="tax_number"
+                           maxlength="80">
+                </div>
+
+                <div>
+                    <label for="supplier_type">Supplier category</label>
+                    <select name="supplier_type" id="supplier_type">
+                        <option value="Materials">Materials</option>
+                        <option value="Equipment">Equipment</option>
+                        <option value="Services">Services</option>
+                        <option value="Maintenance">Maintenance</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+
+                <div class="full">
+                    <label for="address">Address</label>
+                    <textarea name="address"
+                              id="address"
+                              rows="2"
+                              maxlength="400"></textarea>
+                </div>
+
+                <div class="full">
+                    <label for="notes">Additional notes</label>
+                    <textarea name="notes"
+                              id="notes"
+                              rows="3"
+                              maxlength="1000"></textarea>
+                </div>
+
+            </div>
+
+            <div class="finance-form-actions">
+                <button type="submit" class="finance-btn primary">
+                    Save Supplier
+                </button>
+            </div>
+
+        </form>
+    </div>
+    {% endif %}
+
+    <!-- Supplier List -->
+    <div class="dash-panel hr-table-panel">
+
+        <h2>Registered Suppliers</h2>
+
+        <div class="hr-table-wrap table-scroll">
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Supplier</th>
+                        <th>Contact person</th>
+                        <th>Phone</th>
+                        <th>Email</th>
+                        <th>Category</th>
+                        <th>Orders</th>
+                        <th>Ordered value (ETB)</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for row in suppliers %}
+                    <tr>
+
+                        <td>
+                            <strong>{{ row.name }}</strong>
+                            {% if row.tax_number %}
+                            <br>
+                            <small>{{ row.tax_number }}</small>
+                            {% endif %}
+                        </td>
+
+                        <td>{{ row.contact_person or '—' }}</td>
+                        <td>{{ row.phone or '—' }}</td>
+                        <td>{{ row.email or '—' }}</td>
+                        <td>{{ row.supplier_type or 'Other' }}</td>
+                        <td>{{ row.order_count or 0 }}</td>
+
+                        <td>
+                            {{ "{:,.2f}".format(row.ordered_value | float) }}
+                        </td>
+
+                        <td>
+                            <span class="status-badge
+                                {{ 'active' if row.status == 'Active' else 'off' }}">
+                                {{ row.status }}
+                            </span>
+                        </td>
+
+                        <td>
+                            <div class="stock-actions">
+
+                                <a class="finance-btn secondary"
+                                   href="{{ url_for('procurement.supplier_details',
+                                                    supplier_id=row.id) }}">
+                                    View
+                                </a>
+
+                                {% if can_manage_suppliers %}
+                                <a class="finance-btn secondary"
+                                   href="{{ url_for('procurement.edit_supplier',
+                                                    supplier_id=row.id) }}">
+                                    Edit
+                                </a>
+
+                                <form method="post"
+                                      action="{{ url_for('procurement.toggle_supplier',
+                                                         supplier_id=row.id) }}"
+                                      onsubmit="return confirm('Change this supplier status?');">
+
+                                    {{ csrf_field() }}
+
+                                    <button type="submit"
+                                            class="finance-btn secondary">
+                                        {{ 'Deactivate' if row.status == 'Active'
+                                           else 'Activate' }}
+                                    </button>
+                                </form>
+                                {% endif %}
+
+                            </div>
+                        </td>
+
+                    </tr>
+
+                    {% else %}
+                    <tr>
+                        <td colspan="9" class="employee-empty">
+                            No suppliers found.
+                        </td>
+                    </tr>
+                    {% endfor %}
+
+                </tbody>
+            </table>
+
+        </div>
+    </div>
+
+</section>
+
+{% endblock %}

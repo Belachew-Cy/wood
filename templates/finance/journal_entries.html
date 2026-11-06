@@ -1,0 +1,320 @@
+
+{% extends "base.html" %}
+
+{% block title %}Journal Entries | Finance{% endblock %}
+
+{% block content %}
+{% set journals = journals|default([], true) %}
+
+<div class="finance-journals-page">
+
+    <header class="page-header finance-page-header">
+        <div>
+            <h1>Journal Entries</h1>
+            <p>Create, review, approve and manage financial journal entries.</p>
+        </div>
+
+        <div class="finance-header-actions">
+            <a href="{{ url_for('finance.dashboard') }}"
+               class="btn btn-secondary">
+                Back to Dashboard
+            </a>
+
+            {% if can_create_journal|default(false) %}
+                <a href="{{ url_for('finance.create_journal') }}"
+                   class="btn btn-primary">
+                    <span>+</span> Create Journal
+                </a>
+            {% endif %}
+        </div>
+    </header>
+
+    {% if error %}
+        <div class="alert alert-danger" role="alert">
+            {{ error }}
+        </div>
+    {% endif %}
+
+    {% if success %}
+        <div class="alert alert-success" role="alert">
+            {{ success }}
+        </div>
+    {% endif %}
+
+    <section class="finance-panel">
+        <div class="finance-panel-header">
+            <h2>Filter Journal Entries</h2>
+        </div>
+
+        <form method="GET"
+              action="{{ url_for('finance.journals') }}"
+              class="finance-filter-form">
+
+            <div class="finance-form-grid">
+
+                <div class="form-group">
+                    <label for="search">Search</label>
+                    <input type="text"
+                           id="search"
+                           name="search"
+                           value="{{ search|default('') }}"
+                           placeholder="Journal number or description">
+                </div>
+
+                <div class="form-group">
+                    <label for="status">Journal Status</label>
+                    <select id="status" name="status">
+                        <option value="">All Statuses</option>
+
+                        {% for status in [
+                            'Draft',
+                            'Pending Approval',
+                            'Approved',
+                            'Posted',
+                            'Rejected',
+                            'Reversed'
+                        ] %}
+                            <option value="{{ status }}"
+                                {% if selected_status|default('') == status %}
+                                    selected
+                                {% endif %}>
+                                {{ status }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="start_date">Start Date</label>
+                    <input type="date"
+                           id="start_date"
+                           name="start_date"
+                           value="{{ start_date|default('') }}">
+                </div>
+
+                <div class="form-group">
+                    <label for="end_date">End Date</label>
+                    <input type="date"
+                           id="end_date"
+                           name="end_date"
+                           value="{{ end_date|default('') }}">
+                </div>
+
+            </div>
+
+            <div class="finance-form-actions">
+                <a href="{{ url_for('finance.journals') }}"
+                   class="btn btn-secondary">
+                    Reset
+                </a>
+
+                <button type="submit" class="btn btn-primary">
+                    Search Journals
+                </button>
+            </div>
+        </form>
+    </section>
+
+    <section class="finance-panel">
+        <div class="finance-panel-header">
+            <div>
+                <h2>Journal Register</h2>
+                <p>Review journal entry details and available actions.</p>
+            </div>
+
+            <span class="finance-record-count">
+                {{ journals|length }} Records
+            </span>
+        </div>
+
+        <div class="finance-table-wrapper">
+            <table class="table finance-table">
+                <thead>
+                    <tr>
+                        <th>Journal Number</th>
+                        <th>Date</th>
+                        <th>Description</th>
+                        <th>Currency</th>
+                        <th>Total Debit</th>
+                        <th>Total Credit</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for journal in journals %}
+                    <tr>
+                        <td>
+                            <strong>{{ journal.get('entry_number', '—') }}</strong>
+                        </td>
+
+                        <td>{{ journal.get('journal_date', '—') }}</td>
+
+                        <td>{{ journal.get('description', '—') }}</td>
+
+                        <td>{{ journal.get('currency', 'ETB') }}</td>
+
+                        <td>
+                            {{ "%.2f"|format(journal.get('total_debit', 0)|float) }}
+                        </td>
+
+                        <td>
+                            {{ "%.2f"|format(journal.get('total_credit', 0)|float) }}
+                        </td>
+
+                        <td>
+                            {% set status = journal.get('status', 'Unknown') %}
+
+                            <span class="status-badge
+                                {% if status == 'Posted' %}
+                                    status-active
+                                {% elif status == 'Rejected' %}
+                                    status-inactive
+                                {% elif status == 'Pending Approval' %}
+                                    status-pending
+                                {% else %}
+                                    status-neutral
+                                {% endif %}">
+                                {{ status }}
+                            </span>
+                        </td>
+
+                        <td>
+                            <div class="finance-action-group">
+
+                                <a href="{{ url_for(
+                                    'finance.journal_detail',
+                                    journal_id=journal['id']
+                                ) }}"
+                                   class="btn btn-sm btn-secondary">
+                                    View
+                                </a>
+
+                                {% if status == 'Draft'
+                                      and journal.get('created_by')|string
+                                          == current_user_id|string
+                                      and can_edit_journal|default(false) %}
+                                    <a href="{{ url_for(
+                                        'finance.edit_journal',
+                                        journal_id=journal['id']
+                                    ) }}"
+                                       class="btn btn-sm btn-secondary">
+                                        Edit
+                                    </a>
+                                {% endif %}
+
+                                {% if status == 'Draft'
+                                      and journal.get('created_by')|string
+                                          == current_user_id|string
+                                      and can_create_journal|default(false) %}
+                                    <form method="POST"
+                                          action="{{ url_for(
+                                              'finance.submit_journal',
+                                              journal_id=journal['id']
+                                          ) }}">
+
+                                        {% if csrf_token is defined %}
+                                            <input type="hidden"
+                                                   name="csrf_token"
+                                                   value="{{ csrf_token() }}">
+                                        {% endif %}
+
+                                        <button type="submit"
+                                                class="btn btn-sm btn-primary">
+                                            Submit
+                                        </button>
+                                    </form>
+                                {% endif %}
+
+                                {% if status == 'Pending Approval'
+                                      and can_approve_journal|default(false) %}
+                                    <form method="POST"
+                                          action="{{ url_for(
+                                              'finance.approve_journal',
+                                              journal_id=journal['id']
+                                          ) }}">
+
+                                        {% if csrf_token is defined %}
+                                            <input type="hidden"
+                                                   name="csrf_token"
+                                                   value="{{ csrf_token() }}">
+                                        {% endif %}
+
+                                        <button type="submit"
+                                                class="btn btn-sm btn-primary">
+                                            Approve
+                                        </button>
+                                    </form>
+
+                                    <form method="POST"
+                                          action="{{ url_for(
+                                              'finance.reject_journal',
+                                              journal_id=journal['id']
+                                          ) }}">
+                                        {% if csrf_token is defined %}
+                                            <input type="hidden"
+                                                   name="csrf_token"
+                                                   value="{{ csrf_token() }}">
+                                        {% endif %}
+
+                                        <input type="hidden"
+                                               name="reason"
+                                               value="Rejected during journal review">
+
+                                        <button type="submit"
+                                                class="btn btn-sm btn-danger">
+                                            Reject
+                                        </button>
+                                    </form>
+                                {% endif %}
+
+                                {% if status == 'Approved'
+                                      and can_post_journal|default(false) %}
+                                    <form method="POST"
+                                          action="{{ url_for(
+                                              'finance.post_journal',
+                                              journal_id=journal['id']
+                                          ) }}">
+                                        {% if csrf_token is defined %}
+                                            <input type="hidden"
+                                                   name="csrf_token"
+                                                   value="{{ csrf_token() }}">
+                                        {% endif %}
+
+                                        <button type="submit"
+                                                class="btn btn-sm btn-primary">
+                                            Post
+                                        </button>
+                                    </form>
+                                {% endif %}
+
+                                {% if status == 'Posted'
+                                      and can_reverse_journal|default(false) %}
+                                    <a href="{{ url_for(
+                                        'finance.reverse_journal',
+                                        journal_id=journal['id']
+                                    ) }}"
+                                       class="btn btn-sm btn-danger">
+                                        Reverse
+                                    </a>
+                                {% endif %}
+
+                            </div>
+                        </td>
+                    </tr>
+
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="finance-empty-state">
+                            No journal entries found.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+</div>
+{% endblock %}

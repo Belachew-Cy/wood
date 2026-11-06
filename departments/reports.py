@@ -1,18 +1,18 @@
 """Central report centre and legacy report screens."""
 
 from core.access import current_user
+from core.access import account_role_keys
 from core.access import effective_permissions
 from core.access import login_required
 from core.access import perm
 from core.access import role_name_for
-from core.access import user_extra_roles
 from core.config import DATE_PATTERN
 from core.db import get_db
 from core.formatting import money_etb
 from core.formatting import recent_month_keys
 from core.routing import route
 from datetime import date
-from departments.hr import DEFAULT_SETTINGS
+from departments.HR.hr import DEFAULT_SETTINGS
 from flask import abort
 from flask import current_app
 from flask import render_template
@@ -262,7 +262,7 @@ def report_access():
     user = current_user()
     db = get_db()
     granted = effective_permissions(user)
-    ctx = reporting.context(db, user, user_extra_roles(db, user["id"]))
+    ctx = reporting.context(db, user, account_role_keys(db, user)[1:])
     items = reporting.catalogue(ctx, granted, auditor_table_names(db))
     return db, user, granted, ctx, items
 
@@ -271,7 +271,7 @@ REPORT_GROUP_BY_ROLE = {
     "hr": "Workforce",
     "finance": "Finance",
     "budget": "Budget",
-    "procurement": "Purchasing",
+    "procurement": "Procurement Management",
     "inventory": "Inventory",
     "payroll": "Payroll",
     "auditor": "Administration",

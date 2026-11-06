@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi with context %}
+
+{% block title %}Overtime | Dereje Belay Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Human Resources</span>
+      <h1>Overtime</h1>
+      <p>Request extra hours, follow the manager decision and the HR verification, and see what payroll will pay.</p>
+    </div>
+    <nav class="stock-actions" aria-label="Overtime actions">
+      {% if has_hr_permission is defined and has_hr_permission("hr_overtime_approve") %}
+      <a class="btn btn-outline btn-sm" href="{{ url_for('hr.overtime_approvals') }}">Approvals</a>
+      {% endif %}
+      {% if has_hr_permission is defined and has_hr_permission("hr_overtime_verify") %}
+      <a class="btn btn-outline btn-sm" href="{{ url_for('hr.overtime_hr_verification') }}">HR Verification</a>
+      {% endif %}
+      <a class="btn btn-outline btn-sm" href="{{ url_for('hr.overtime_reports') }}">Reports</a>
+      <a class="btn btn-outline btn-sm" href="{{ url_for('hr.overtime_audit') }}">Audit</a>
+      <a class="btn btn-outline btn-sm" href="{{ url_for('hr_dashboard') }}">Back to HR</a>
+    </nav>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    <nav class="hr-navigation" aria-label="HR Management">
+      <a class="hr-nav-link" href="{{ url_for('hr_dashboard') }}">Dashboard</a>
+      <a class="hr-nav-link" href="{{ url_for('employees') }}">Employees</a>
+      <a class="hr-nav-link" href="{{ url_for('attendance') }}">Attendance</a>
+      <a class="hr-nav-link" href="{{ url_for('recruitment.hr_vacancies') }}">Hiring desk</a>
+      <a class="hr-nav-link" href="{{ url_for('leave_management') }}">Leave</a>
+      <a class="hr-nav-link active" href="{{ url_for('hr.overtime_dashboard') }}">Overtime</a>
+      <a class="hr-nav-link" href="{{ url_for('training_performance') }}">Training &amp; Performance</a>
+      <a class="hr-nav-link" href="{{ url_for('manage_hierarchy') }}">Organization</a>
+      <a class="hr-nav-link" href="{{ url_for('reports_centre') }}">Reports</a>
+      <a class="hr-nav-link" href="{{ url_for('hr_settings.index') }}">HR Settings</a>
+    </nav>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="hr-stats">
+      {{ kpi('Total requests', summary.total|default(0), 'All overtime filed') }}
+      {{ kpi('Waiting', summary.pending|default(0), 'Waiting on a decision', 'warn' if summary.pending else 'flat') }}
+      {{ kpi('Approved', summary.approved|default(0), 'Cleared for overtime', 'up') }}
+      {{ kpi('Approved hours', "%.2f"|format(summary.approved_hours|default(0)|float), 'Hours cleared for payroll') }}
+    </div>
+  </div>
+</section>
+
+<section class="section bg-white">
+  <div class="container">
+    <div class="dash-panel">
+      <h2>Submit an overtime request</h2>
+
+      {% if employee is none %}
+        <p class="empty-state">This account is not linked to an employee record, so overtime cannot be requested from it.</p>
+      {% elif overtime_enabled is defined and overtime_enabled %}
+        <form method="POST" action="{{ url_for('hr.submit_overtime_request') }}" class="dash-form">
+          {{ csrf_field() }}
+          <div class="account-grid">
+            <div>
+              <label for="overtime_date">Date *</label>
+              <input type="date" id="overtime_date" name="overtime_date" required />
+            </div>
+            <div>
+              <label for="start_time">Start time *</label>
+              <input type="time" id="start_time" name="start_time" required />
+            </div>
+            <div>
+              <label for="end_time">End time *</label>
+              <input type="time" id="end_time" name="end_time" required />
+            </div>
+            <div>
+              <label for="break_minutes">Break (minutes)</label>
+              <input type="number" id="break_minutes" name="break_minutes" min="0" max="720" step="5" value="0" />
+            </div>
+            <div class="full">
+              <label for="reason">Reason *</label>
+              <textarea id="reason" name="reason" rows="3" minlength="5" maxlength="500" required
+                        placeholder="Explain why the extra hours are needed…"></textarea>
+              <p class="cell-note">Hours are calculated automatically and checked against attendance before HR approves them.</p>
+            </div>
+          </div>
+
+          <div class="finance-form-actions">
+            <button type="submit" class="btn">Submit for Manager Approval <span class="arrow">→</span></button>
+          </div>
+        </form>
+      {% else %}
+        <p class="empty-state">Overtime requests are currently disabled by HR settings.</p>
+      {% endif %}
+    </div>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>Overtime requests</h2>
+
+      {% if overtime_requests %}
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Employee</th>
+              <th>Date</th>
+              <th>Start</th>
+              <th>End</th>
+              <th>Break</th>
+              <th>Requested</th>
+              <th>Approved</th>
+              <th>Status</th>
+              <th>Comments</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in overtime_requests %}
+            <tr>
+              <td>
+                <strong>{{ item.full_name }}</strong><br />
+                <span class="cell-note">{{ item.employee_code }} · {{ item.department }}</span>
+              </td>
+              <td>{{ item.overtime_date }}</td>
+              <td>{{ item.start_time }}</td>
+              <td>{{ item.end_time }}</td>
+              <td>{{ item.break_minutes }} min</td>
+              <td>{{ "%.2f"|format(item.requested_hours|default(0)|float) }}</td>
+              <td>{{ "%.2f"|format(item.approved_hours|default(0)|float) }}</td>
+              <td>
+                <span class="status-badge {{ 'active' if item.status == 'Approved' else ('off' if item.status == 'Rejected' else 'neutral') }}">{{ item.status }}</span>
+              </td>
+              <td>
+                {% if item.manager_comment %}
+                <div><span class="cell-note">Manager:</span> {{ item.manager_comment }}</div>
+                {% endif %}
+                {% if item.hr_comment %}
+                <div><span class="cell-note">HR:</span> {{ item.hr_comment }}</div>
+                {% endif %}
+                {% if not item.manager_comment and not item.hr_comment %}
+                <span class="cell-note">—</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="empty-state">No overtime requests yet.</p>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    var startInput = document.getElementById("start_time");
+    var endInput = document.getElementById("end_time");
+    if (!startInput || !endInput) return;
+    startInput.addEventListener("change", function () {
+      if (endInput.value && endInput.value < startInput.value) {
+        endInput.value = startInput.value;
+      }
+    });
+  })();
+</script>
+{% endblock %}

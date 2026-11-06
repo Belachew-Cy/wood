@@ -8,9 +8,12 @@ SEARCH_SCOPES = (
     (("hr", "accounts"), "Employees", "employees",
      ("full_name", "employee_code", "department", "job_title")),
     (("accounts",), "Sign-in accounts", "users",
-     ("full_name", "email", "phone")),
+     ("full_name", "username", "email", "phone")),
     (("inventory",), "Inventory items", "inventory_items",
      ("name", "sku", "category", "supplier")),
+    (("inventory",), "Stocktakes", "inventory_stocktakes",
+     ("number", "title", "created_by_name"),
+     ("inventory_stocktake", "inventory_stocktake_approve")),
     (("procurement",), "Suppliers", "procurement_suppliers",
      ("name", "contact_person", "email")),
     (("procurement",), "Purchase requests", "procurement_requests",
@@ -23,6 +26,17 @@ SEARCH_SCOPES = (
      ("title", "department", "created_by_name")),
     (("letters",), "Letters", "letters",
      ("reference_no", "subject", "sender", "recipient")),
+    (("marketing",), "Marketing plans", "marketing_plans",
+     ("title", "description", "status")),
+    (("marketing",), "Marketing campaigns", "marketing_campaigns",
+     ("name", "channel", "target_audience")),
+    (("marketing",), "Marketing leads", "marketing_leads",
+     ("name", "phone", "email")),
+    (("project",), "Projects", "projects",
+     ("project_code", "project_name", "client_name", "location")),
+    (("asset",), "Assets", "assets",
+     ("asset_code", "name", "serial_number", "model_number", "location",
+      "department_name")),
     (("audit", "accounts"), "Activity log", "audit_logs",
      ("description", "username", "module")),
 )
@@ -44,6 +58,8 @@ def search_href(table, row):
         return url_for("admin_role_account", user_id=row["id"])
     if table == "inventory_items":
         return url_for("inventory.edit_item", item_id=row["id"])
+    if table == "inventory_stocktakes":
+        return url_for("inventory.stocktake_detail", stocktake_id=row["id"])
     if table == "finance_transactions":
         return url_for("finance.transactions", month=row["transaction_date"][:7])
     if table == "finance_invoices":
@@ -52,14 +68,24 @@ def search_href(table, row):
         return url_for("approvals.detail", request_id=row["id"])
     if table == "letters":
         return url_for("letters.detail", letter_id=row["id"])
+    if table == "marketing_plans":
+        return url_for("marketing.plans")
+    if table == "marketing_campaigns":
+        return url_for("marketing.campaigns")
+    if table == "marketing_leads":
+        return url_for("marketing.leads")
+    if table == "projects":
+        return url_for("project.project_detail", project_id=row["id"])
+    if table == "assets":
+        return url_for("asset.asset_detail", asset_id=row["id"])
     if table == "audit_logs":
         return url_for("audit.audit_dashboard", username=row["username"])
     return url_for("procurement.dashboard")
 
 
 def search_title(row):
-    for key in ("full_name", "name", "title", "description", "invoice_number",
-                "request_number", "subject"):
+    for key in ("full_name", "name", "title", "project_name", "description",
+                "invoice_number", "request_number", "subject"):
         value = row[key] if key in row.keys() else None
         if value:
             return value

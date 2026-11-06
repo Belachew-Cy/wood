@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit' if lead else 'Register' }} Lead | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">MARKETING MANAGEMENT</span>
+      <h1>{{ lead["name"] if lead else 'Register a Lead' }}</h1>
+      <p>{% if lead %}
+          {{ lead["status"] }} · {{ lead["source"] or 'source to be set' }}
+          · follow-up {{ lead["follow_up_date"] or 'not dated' }}
+        {% else %}
+          A lead is the person a channel brought in. Phone or email is required so
+          the desk can reach them back.
+        {% endif %}</p>
+    </div>
+    <a class="btn btn-outline" href="{{ url_for('marketing.leads') }}">
+      ← Back to leads
+    </a>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="dash-panel">
+      <h2>{{ 'Lead details' if lead else 'New lead' }}</h2>
+
+      <form method="POST" class="dash-form stock-grid">
+        {{ csrf_field() }}
+        <div>
+          <label for="name">Name *</label>
+          <input id="name" name="name" maxlength="150" required
+                 value="{{ lead['name'] if lead else '' }}" />
+        </div>
+
+        <div>
+          <label for="phone">Phone</label>
+          <input id="phone" name="phone" maxlength="30"
+                 value="{{ (lead['phone'] or '') if lead else '' }}"
+                 placeholder="e.g. +251 911 000 000" />
+        </div>
+
+        <div>
+          <label for="email">Email</label>
+          <input id="email" type="email" name="email" maxlength="150"
+                 value="{{ (lead['email'] or '') if lead else '' }}" />
+        </div>
+
+        <div>
+          <label for="product_interest">Product interest</label>
+          <input id="product_interest" name="product_interest" maxlength="150"
+                 value="{{ (lead['product_interest'] or '') if lead else '' }}"
+                 placeholder="e.g. Kitchen cabinet, wardrobe, office desk" />
+        </div>
+
+        <div>
+          <label for="source">Source</label>
+          <select id="source" name="source">
+            <option value="">Not recorded</option>
+            {% for value in lead_sources %}
+            <option value="{{ value }}"
+              {% if lead and lead['source'] == value %}selected{% endif %}>
+              {{ value }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label for="assigned_to">Assigned to</label>
+          <select id="assigned_to" name="assigned_to">
+            <option value="">Unassigned</option>
+            {% for account in accounts %}
+            <option value="{{ account['id'] }}"
+              {% if lead and lead['assigned_to'] == account['id'] %}selected{% endif %}>
+              {{ account['full_name'] }} ({{ account['username'] }})</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label for="follow_up_date">Follow-up date</label>
+          <input id="follow_up_date" type="date" name="follow_up_date"
+                 value="{{ (lead['follow_up_date'] or '') if lead else '' }}" />
+        </div>
+
+        {% if lead %}
+        <div>
+          <label for="status">Status</label>
+          <select id="status" name="status">
+            {% for value in lead_statuses %}
+            <option value="{{ value }}"
+              {% if lead['status'] == value %}selected{% endif %}>
+              {{ value }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endif %}
+
+        <div class="stock-notes">
+          <label for="notes">Notes</label>
+          <textarea id="notes" name="notes" rows="4" maxlength="2000"
+                    placeholder="What they asked for, what was promised, when to call back.">{{ (lead['notes'] or '') if lead else '' }}</textarea>
+        </div>
+
+        <div class="stock-form-actions">
+          <button class="btn" type="submit">Save lead</button>
+          <a class="btn btn-outline" href="{{ url_for('marketing.leads') }}">Cancel</a>
+        </div>
+      </form>
+    </div>
+
+    {% if lead %}
+    <div class="dash-panel">
+      <h2>Record</h2>
+      <dl class="detail-list">
+        <dt>Registered by</dt><dd>{{ lead["created_by_name"] or '—' }}</dd>
+        <dt>Registered on</dt><dd>{{ lead["created_at"] | audit_time }}</dd>
+        <dt>Last modified</dt>
+        <dd>{{ lead["updated_by_name"] or '—' }} ·
+            {{ lead["updated_at"] | audit_time }}</dd>
+      </dl>
+      <p class="panel-note">The register refuses a duplicate: the same name with
+        the same phone, or a phone or email already on another lead, is turned
+        back with the id of the record that exists.</p>
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

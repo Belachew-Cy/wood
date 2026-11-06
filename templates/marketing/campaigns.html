@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi with context %}
+
+{% block title %}Marketing Campaigns | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+{% set active = campaigns | selectattr("status", "equalto", "Active") | list | length %}
+{% set planned = campaigns | selectattr("status", "equalto", "Planned") | list | length %}
+{% set spend = campaigns | rejectattr("status", "equalto", "Cancelled")
+                  | map(attribute="budget") | map('float') | sum %}
+
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">MARKETING MANAGEMENT</span>
+      <h1>Marketing Campaigns</h1>
+      <p>One campaign, one channel, one owner. It hangs from a plan the approval
+        desk has signed.</p>
+    </div>
+    <div class="row-actions">
+      <a class="btn btn-outline" href="{{ url_for('marketing.dashboard') }}">
+        ← Marketing desk
+      </a>
+      {% if 'marketing_campaigns' in granted_permissions %}
+      <a class="btn" href="{{ url_for('marketing.create_campaign') }}">
+        New campaign →
+      </a>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="hr-stats">
+      {{ kpi('Campaigns listed', campaigns | length, 'matching this filter') }}
+      {{ kpi('Running', active, 'on air now') }}
+      {{ kpi('Planned', planned, 'not started') }}
+      {{ kpi('Budget carried', "{:,.2f}".format(spend), 'ETB, cancellations out') }}
+    </div>
+
+    <form method="GET" class="stock-search">
+      <label for="search">Search</label>
+      <input id="search" name="search" value="{{ search }}"
+             placeholder="Campaign name, channel or audience" />
+      <label for="status">Status</label>
+      <select id="status" name="status">
+        <option value="">All statuses</option>
+        {% for value in campaign_statuses %}
+        <option value="{{ value }}" {% if status == value %}selected{% endif %}>
+          {{ value }}</option>
+        {% endfor %}
+      </select>
+      <label for="plan">Plan</label>
+      <select id="plan" name="plan">
+        <option value="">Any plan</option>
+        {% for option in plans %}
+        <option value="{{ option['id'] }}"
+          {% if plan_id == option['id'] %}selected{% endif %}>
+          {{ option['title'] }} ({{ option['status'] }})</option>
+        {% endfor %}
+      </select>
+      <button class="btn" type="submit">Search</button>
+      <a class="btn btn-outline" href="{{ url_for('marketing.campaigns') }}">Reset</a>
+      {% if 'marketing_reports' in granted_permissions %}
+      <a class="btn btn-outline"
+         href="{{ url_for('marketing.export', kind='campaigns', status=status, search=search) }}">
+        Export CSV
+      </a>
+      {% endif %}
+    </form>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>{% if campaigns %}{{ campaigns | length }} campaign{{ '' if campaigns | length == 1 else 's' }}{% else %}Campaigns{% endif %}</h2>
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Campaign</th><th>Plan</th><th>Channel</th><th>Window</th>
+              <th>Budget</th><th>Pushes</th><th>Status</th>
+              <th>Last modified</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for campaign in campaigns %}
+            <tr>
+              <td>
+                {{ campaign["name"] }}
+                {% if campaign["target_audience"] %}
+                <br><span class="feed-meta">{{ campaign["target_audience"] }}</span>
+                {% endif %}
+              </td>
+              <td>
+                {{ campaign["plan_title"] or '—' }}
+                {% if campaign["plan_status"] %}
+                <br><span class="feed-meta">plan {{ campaign["plan_status"] | lower }}</span>
+                {% endif %}
+              </td>
+              <td>{{ campaign["channel"] or '—' }}</td>
+              <td class="nowrap">
+                {{ campaign["start_date"] or '—' }}<br>
+                <span class="feed-meta">to {{ campaign["end_date"] or '—' }}</span>
+              </td>
+              <td class="nowrap">
+                {{ "{:,.2f}".format(campaign["budget"] | float) }}
+                <span class="feed-meta">{{ campaign["currency"] }}</span>
+              </td>
+              <td>{{ campaign["digital_count"] }}</td>
+              <td>
+                <span class="status-badge {{ 'active' if campaign["status"] in
+                      ('Active', 'Completed') else 'off' if campaign["status"] == 'Cancelled'
+                      else 'neutral' }}">{{ campaign["status"] }}</span>
+              </td>
+              <td class="nowrap">
+                {{ campaign["updated_by_name"] or campaign["created_by_name"] or '—' }}
+                <br><span class="feed-meta">{{ campaign["updated_at"] | audit_time }}</span>
+              </td>
+              <td class="row-actions">
+                {% if 'marketing_campaigns' in granted_permissions %}
+                <a class="btn"
+                   href="{{ url_for('marketing.edit_campaign', campaign_id=campaign['id']) }}">
+                  Edit
+                </a>
+                {% else %}
+                <span class="feed-meta">—</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="9">No campaigns match this filter.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="dash-panel">
+      <h2>Control</h2>
+      <p>A campaign carries its own budget line, so the register shows what the
+        desk has already promised against a plan. Cancel a campaign to release its
+        figure; the plan total never changes without a decision from the approval
+        desk.</p>
+    </div>
+  </div>
+</section>
+{% endblock %}

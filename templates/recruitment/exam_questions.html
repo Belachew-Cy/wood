@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi with context %}
+
+{% block title %}{{ exam.exam_title }} | Examination{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Examination</span>
+      <h1>{{ exam.exam_title }}</h1>
+      <p>{{ exam.job_title }} · {{ exam.vacancy_department }}
+        {%- if exam.vacancy_reference %} · {{ exam.vacancy_reference }}{% endif %}</p>
+    </div>
+    <nav class="stock-actions" aria-label="Examination actions">
+      <a class="btn btn-outline btn-sm" href="{{ url_for('recruitment.hr_exams') }}">
+        Back to examinations
+      </a>
+      <a class="btn btn-outline btn-sm"
+         href="{{ url_for('recruitment.vacancy_detail', vacancy_id=exam.vacancy_id) }}">
+        The post
+      </a>
+      {% if exam.status != 'Draft' %}
+      <a class="btn btn-sm" href="{{ url_for('recruitment.hr_exam_results', exam_id=exam.id) }}">
+        Results
+      </a>
+      {% endif %}
+    </nav>
+  </div>
+</section>
+
+<section class="container finance-page">
+  <div class="hr-stats">
+    {{ kpi('Questions', exam.question_count, 'on the paper', 'flat', 'file') }}
+    {{ kpi('Marks set', '%g' | format(total_question_marks | float),
+           'of ' ~ '%g' | format(exam.total_marks | float) ~ ' needed',
+           'up' if total_question_marks | float == exam.total_marks | float else 'down',
+           'calculator') }}
+    {{ kpi('Pass at', '%g' | format(exam.pass_mark | float),
+           'marks needed to pass', 'flat', 'target') }}
+    {{ kpi('Seated', exam.candidate_count, 'candidates with an attempt', 'flat', 'users') }}
+    {{ kpi('Handed in', exam.submitted_count, 'marked against the key', 'up', 'inbox') }}
+    {{ kpi('At or above pass', exam.passed_count, 'of those who handed in',
+           'up' if exam.passed_count else 'flat', 'check') }}
+  </div>
+
+  <div class="dash-grid">
+    <div class="dash-panel">
+      <h2>The paper</h2>
+      <dl class="detail-list">
+        <dt>Status</dt>
+        <dd>
+          <span class="status-badge {{ 'active' if exam.status == 'Published'
+                                        else 'off' if exam.status == 'Closed'
+                                        else 'neutral' }}">{{ exam.status }}</span>
+        </dd>
+        <dt>Duration</dt><dd>{{ exam.duration_minutes }} minutes from the first question</dd>
+        <dt>Window</dt>
+        <dd>
+          {% if exam.start_datetime %}
+          opens {{ exam.start_datetime[:16] }} · closes {{ (exam.end_datetime or '')[:16] }}
+          {% else %}No window set - publish needs both{% endif %}
+        </dd>
+        <dt>Set by</dt>
+        <dd>{{ exam.created_by_name or 'the HR desk' }}
+          <span class="cell-note">{{ exam.created_at | audit_time }}</span></dd>
+        {% if exam.description %}
+        <dt>Coverage</dt><dd class="wrap-cell">{{ exam.description }}</dd>
+        {% endif %}
+      </dl>
+      {% if exam.status == 'Draft' %}
+      <p class="panel-note">The key is visible to the desk only. Candidates see the
+        question and its four options.</p>
+      {% else %}
+      <p class="panel-note">Published papers are frozen: the questions, the key and the
+        list of seated candidates no longer change.</p>
+      {% endif %}
+    </div>
+
+    <div class="dash-panel">
+      <h2>What this desk may do</h2>
+      {% if can_edit %}
+      <a class="btn finance-btn primary"
+         href="{{ url_for('recruitment.add_exam_question', exam_id=exam.id) }}">
+        Add a question
+      </a>
+      <a class="btn finance-btn secondary"
+         href="{{ url_for('recruitment.import_exam_questions', exam_id=exam.id) }}">
+        Upload questions
+      </a>
+      <a class="btn btn-outline btn-sm"
+         href="{{ url_for('recruitment.exam_question_template', exam_id=exam.id) }}">
+        Download the template
+      </a>
+      <form method="POST" action="{{ url_for('recruitment.publish_exam', exam_id=exam.id) }}"
+            class="dash-form">
+        {{ csrf_field() }}
+        <button class="btn finance-btn secondary" type="submit">Publish the paper</button>
+        <p class="cell-note">Publishing needs the marks to add up to
+          {{ '%g' | format(exam.total_marks | float) }}, a window with a close after the
+          open, at least one question, and a shortlisted candidate on the post. Every
+          shortlisted and interviewed candidate is then seated.</p>
+      </form>
+      {% elif scope.can('exam_publish', exam) and exam.status == 'Published' %}
+      <form method="POST" action="{{ url_for('recruitment.close_exam', exam_id=exam.id) }}"
+            class="dash-form">
+        {{ csrf_field() }}
+        <button class="btn finance-btn secondary" type="submit">Close the paper</button>
+        <p class="cell-note">Anyone who never started is recorded as missed; handed-in
+          papers keep their scores.</p>
+      </form>
+      {% else %}
+      <p class="panel-note">
+        {% if scope.read_only %}
+        An audit seat reads the paper and its key but changes nothing.
+        {% else %}
+        Only the HR desk writes or publishes a paper.
+        {% endif %}
+      </p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="dash-panel hr-table-panel">
+    <h2>Questions and key</h2>
+    <div class="hr-table-wrap table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Question</th>
+            <th>Options</th>
+            <th>Correct</th>
+            <th>Marks</th>
+            <th aria-label="Actions"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for question in questions %}
+          <tr>
+            <td class="nowrap">{{ loop.index }}</td>
+            <td class="wrap-cell">{{ question.question }}</td>
+            <td class="wrap-cell">
+              <ul class="exam-key">
+                {% for letter in ('A', 'B', 'C', 'D') %}
+                <li class="{{ 'is-key' if question.correct_answer == letter }}">
+                  <strong>{{ letter }}.</strong> {{ question['option_' ~ (letter | lower)] }}
+                </li>
+                {% endfor %}
+              </ul>
+            </td>
+            <td class="nowrap">
+              <span class="status-badge neutral">{{ question.correct_answer }}</span>
+            </td>
+            <td class="nowrap">{{ '%g' | format(question.marks | float) }}</td>
+            <td class="nowrap">
+              {% if can_edit %}
+              <form method="POST"
+                    action="{{ url_for('recruitment.delete_exam_question', question_id=question.id) }}"
+                    class="inline-form">
+                {{ csrf_field() }}
+                <button class="btn btn-outline btn-sm" type="submit">Remove</button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="6" class="employee-empty">
+              This paper has no questions yet.
+              {% if can_edit %}
+              <a href="{{ url_for('recruitment.add_exam_question', exam_id=exam.id) }}">
+                Write the first one</a>.
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="dash-panel hr-table-panel">
+    <h2>Seated candidates</h2>
+    <div class="hr-table-wrap table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Candidate</th>
+            <th>Application stage</th>
+            <th>Started</th>
+            <th>Handed in</th>
+            <th>Score</th>
+            <th>Result</th>
+            <th aria-label="Actions"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for attempt in attempts %}
+          <tr>
+            <td class="wrap-cell">
+              <strong>{{ attempt.full_name }}</strong>
+              <span class="cell-note">{{ attempt.email }}</span>
+            </td>
+            <td>
+              <span class="status-badge {{ 'active' if attempt.application_status in ('Selected', 'Hired')
+                                            else 'off' if attempt.application_status == 'Rejected'
+                                            else 'neutral' }}">{{ attempt.application_status }}</span>
+            </td>
+            <td class="nowrap">{{ attempt.started_at | audit_time or '—' }}</td>
+            <td class="nowrap">{{ attempt.submitted_at | audit_time or '—' }}</td>
+            <td class="nowrap">
+              {% if attempt.status == 'Submitted' %}
+              {{ '%g' | format(attempt.score | float) }} /
+              {{ '%g' | format(exam.total_marks | float) }}
+              {% else %}{{ attempt.status }}{% endif %}
+            </td>
+            <td class="nowrap">
+              {% if attempt.status == 'Submitted' %}
+              <span class="status-badge {{ 'active' if attempt.score | float >= exam.pass_mark | float else 'off' }}">
+                {{ 'Pass' if attempt.score | float >= exam.pass_mark | float else 'Below' }}
+              </span>
+              {% else %}<span class="cell-note">—</span>{% endif %}
+            </td>
+            <td class="nowrap">
+              <a class="btn btn-outline btn-sm"
+                 href="{{ url_for('recruitment.applicant_detail', application_id=attempt.application_id) }}">
+                Candidate</a>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7" class="employee-empty">
+              Nobody is seated yet. Candidates are seated when the paper is published.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+{% endblock %}

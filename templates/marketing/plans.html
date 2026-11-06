@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi with context %}
+
+{% block title %}Marketing Plans | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+{% set ns = namespace(pending=0, drafts=0, committed=0.0) %}
+{% for plan in plans %}
+  {% if plan["status"] == "Pending" %}{% set ns.pending = ns.pending + 1 %}{% endif %}
+  {% if plan["status"] == "Draft" %}{% set ns.drafts = ns.drafts + 1 %}{% endif %}
+  {% if plan["status"] == "Approved" %}
+    {% set ns.committed = ns.committed + (plan["budget"] | float) %}
+  {% endif %}
+{% endfor %}
+
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">MARKETING MANAGEMENT</span>
+      <h1>Marketing Plans</h1>
+      <p>Raise a plan, send it for a decision, then hang campaigns from the ones
+        that were signed.</p>
+    </div>
+    <div class="row-actions">
+      <a class="btn btn-outline" href="{{ url_for('marketing.dashboard') }}">
+        ← Marketing desk
+      </a>
+      {% if 'marketing_plans' in granted_permissions %}
+      <a class="btn" href="{{ url_for('marketing.create_plan') }}">New plan →</a>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="hr-stats">
+      {{ kpi('Plans listed', plans | length, 'matching this filter') }}
+      {{ kpi('Drafts', ns.drafts, 'not yet submitted') }}
+      {{ kpi('Awaiting a decision', ns.pending, 'the approval desk') }}
+      {{ kpi('Committed budget', "{:,.2f}".format(ns.committed),
+             'ETB across approved plans') }}
+    </div>
+
+    <form method="GET" class="stock-search">
+      <label for="search">Search</label>
+      <input id="search" name="search" value="{{ search }}"
+             placeholder="Plan title or description" />
+      <label for="status">Status</label>
+      <select id="status" name="status">
+        <option value="">All statuses</option>
+        {% for value in plan_statuses %}
+        <option value="{{ value }}" {% if status == value %}selected{% endif %}>
+          {{ value }}
+        </option>
+        {% endfor %}
+      </select>
+      <button class="btn" type="submit">Search</button>
+      <a class="btn btn-outline" href="{{ url_for('marketing.plans') }}">Reset</a>
+      {% if 'marketing_reports' in granted_permissions %}
+      <a class="btn btn-outline"
+         href="{{ url_for('marketing.export', kind='plans', status=status, search=search) }}">
+        Export CSV
+      </a>
+      {% endif %}
+    </form>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>{% if plans %}{{ plans | length }} plan{{ '' if plans | length == 1 else 's' }}{% else %}Plans{% endif %}</h2>
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Plan</th><th>Period</th><th>Budget</th><th>Campaigns</th>
+              <th>Status</th><th>Last modified</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for plan in plans %}
+            <tr>
+              <td>
+                {{ plan["title"] }}
+                {% if plan["description"] %}
+                <br><span class="feed-meta">{{ plan["description"] | truncate(90) }}</span>
+                {% endif %}
+              </td>
+              <td class="nowrap">
+                {{ plan["start_date"] }}<br>
+                <span class="feed-meta">to {{ plan["end_date"] }}</span>
+              </td>
+              <td class="nowrap">
+                {{ "{:,.2f}".format(plan["budget"] | float) }}
+                <span class="feed-meta">{{ plan["currency"] }}</span>
+              </td>
+              <td>
+                {{ plan["campaign_count"] }}
+                <br><span class="feed-meta">
+                  {{ "{:,.0f}".format(plan["committed_budget"] | float) }} ETB drawn
+                </span>
+              </td>
+              <td>
+                <span class="status-badge {{ 'active' if plan["status"] in
+                      ('Approved', 'Active') else 'off' if plan["status"] in
+                      ('Rejected', 'Closed') else 'neutral' }}">
+                  {{ plan["status"] }}
+                </span>
+              </td>
+              <td class="nowrap">
+                {{ plan["updated_by_name"] or plan["created_by_name"] or '—' }}
+                <br><span class="feed-meta">{{ plan["updated_at"] | audit_time }}</span>
+              </td>
+              <td class="row-actions">
+                {% if plan["status"] in ('Draft', 'Pending') %}
+                <a class="btn"
+                   href="{{ url_for('marketing.edit_plan', plan_id=plan['id']) }}">
+                  {{ 'Edit' if 'marketing_plans' in granted_permissions
+                     else 'Review' }}
+                </a>
+                {% endif %}
+
+                {% if plan["status"] == 'Draft'
+                      and 'marketing_plans' in granted_permissions %}
+                <form method="POST"
+                      action="{{ url_for('marketing.submit_plan', plan_id=plan['id']) }}">
+                  {{ csrf_field() }}
+                  <button class="btn btn-outline" type="submit">Submit</button>
+                </form>
+                {% endif %}
+
+                {% if plan["status"] != 'Closed'
+                      and 'marketing_approval' in granted_permissions %}
+                <form method="POST"
+                      action="{{ url_for('marketing.close_plan', plan_id=plan['id']) }}"
+                      onsubmit="return confirm('Closing a plan is permanent. Close it?');">
+                  {{ csrf_field() }}
+                  <button class="btn-danger" type="submit">Close</button>
+                </form>
+                {% endif %}
+
+                {% if plan["status"] == 'Closed' %}
+                <span class="feed-meta">—</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7">No marketing plans match this filter.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="dash-panel">
+      <h2>Control</h2>
+      <p>A new plan starts as a draft and authorises nothing by itself. Submitting
+        it wakes every seat that holds the plan-approval right; once signed, the
+        plan may be drawn on by campaigns. A signed or closed plan is history and
+        can no longer be edited, so the audit trail keeps one version of what was
+        agreed.</p>
+    </div>
+  </div>
+</section>
+{% endblock %}

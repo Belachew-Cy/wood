@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi, bars, donut, feed with context %}
+
+{% block title %}Asset Desk | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+{% set counts = summary["counts"] %}
+
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">ASSET MANAGEMENT</span>
+      <h1>Asset Desk</h1>
+      <p>Signed in as {{ user["full_name"] }} · {{ role_label }} access</p>
+    </div>
+    <div class="row-actions">
+      {% if can_register %}
+      <a class="btn" href="{{ url_for('asset.create_asset') }}">Register asset →</a>
+      {% endif %}
+      {% if can_allocate %}
+      <a class="btn btn-outline" href="{{ url_for('asset.allocate') }}">
+        Allocate asset
+      </a>
+      {% endif %}
+      <a class="btn btn-outline" href="{{ url_for('asset.assets') }}">
+        Asset register
+      </a>
+    </div>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="hr-stats">
+      {{ kpi('Units on the register', summary["live"], 'available, held or in service',
+             'flat', 'box', url_for('asset.assets')) }}
+      {{ kpi('Available', counts["Available"], 'ready to allocate', 'flat',
+             'check', url_for('asset.assets', status='Available')) }}
+      {{ kpi('Allocated', counts["Assigned"], 'with a department or custodian',
+             'flat', 'briefcase', url_for('asset.assets', status='Assigned')) }}
+      {{ kpi('In maintenance', counts["Maintenance"], 'off the shelf for repair',
+             'warn' if counts["Maintenance"] else 'flat', 'wrench',
+             url_for('asset.assets', status='Maintenance')) }}
+      {{ kpi('Categories', summary["categories"], 'open for new units', 'flat',
+             'file', url_for('asset.categories')) }}
+      {{ kpi('Departments holding units', summary["departments"],
+             'with assets on their books', 'flat', 'users',
+             url_for('asset.departments')) }}
+      {{ kpi('Register value', "{:,.2f}".format(summary["value"]),
+             'ETB at purchase cost', 'flat', 'wallet') }}
+      {% if summary["inactive"] %}
+      {{ kpi('Deactivated', summary["inactive"], 'kept for the record', 'flat',
+             'database', url_for('asset.assets', inactive='1')) }}
+      {% endif %}
+    </div>
+
+    {% set status_rows = [] %}
+    {% for row in breakdown %}
+      {% set _ = status_rows.append({
+        'label': row["status"], 'value': row["total"] | int,
+        'display': '{} unit{}'.format(row["total"],
+                                     '' if row["total"] == 1 else 's')
+      }) %}
+    {% endfor %}
+
+    {% set category_rows = [] %}
+    {% for row in categories %}
+      {% set _ = category_rows.append({
+        'label': row["name"], 'value': row["total"] | int,
+        'display': '{} unit{}'.format(row["total"],
+                                     '' if row["total"] == 1 else 's')
+      }) %}
+    {% endfor %}
+
+    {% set department_rows = [] %}
+    {% for row in departments[:6] %}
+      {% set _ = department_rows.append({
+        'label': row["department_name"], 'value': row["total"] | int,
+        'display': '{} unit{}'.format(row["total"],
+                                     '' if row["total"] == 1 else 's')
+      }) %}
+    {% endfor %}
+
+    {% set movement_items = [] %}
+    {% for row in movements %}
+      {% set _ = movement_items.append({
+        'icon': 'box' if row["status"] == 'Active' else 'check',
+        'tone': 'ok' if row["status"] == 'Active' else '',
+        'title': '{} · {}'.format(row["asset_code"], row["asset_name"]),
+        'meta': ('{} → {}'.format(row["status"], row["department_name"])
+                 ~ (' · ' ~ row["custodian_name"] if row["custodian_name"] else '')),
+        'href': url_for('asset.asset_detail', asset_id=row["asset_id"]),
+        'time': (row["returned_at"] | audit_time)
+                if row["status"] == 'Returned' else row["allocation_date"]
+      }) %}
+    {% endfor %}
+
+    <div class="chart-grid">
+      {{ bars('Units by status', status_rows, 'unit count') }}
+      {{ bars('Categories carrying the most units', category_rows,
+              'top six by count') }}
+      {{ donut('Ready to allocate', (counts["Available"] / summary["live"])
+               if summary["live"] else 0,
+               '{} of {}'.format(counts["Available"], summary["live"]),
+               [{'label': 'Available', 'color': 'var(--walnut)',
+                 'value': counts["Available"]},
+                {'label': 'Held or in service',
+                 'color': 'var(--ivory-2)',
+                 'value': summary["live"] - counts["Available"]}],
+               'the live register') }}
+      {{ feed('Latest allocations', movement_items, 'in and out',
+              {'href': url_for('asset.departments'),
+               'label': 'Departments holding units'}) }}
+    </div>
+
+    <div class="chart-grid">
+      {{ bars('Where the units sit', department_rows, 'by department') }}
+      <div class="dash-panel">
+        <h2>How this desk works</h2>
+        <p>A unit is registered once with a category, the price the company paid
+          and the place it lives. Allocating it names the department and, if one
+          person is answerable, the custodian from the staff list; returning it
+          puts the unit back on the available shelf and closes the allocation
+          with a date. Deactivating a unit keeps its history but takes it off the
+          live count.</p>
+        {% if can_categories %}
+        <p class="panel-note">Categories can be grouped under a parent, so
+          "Kitchen equipment" may carry "Ovens" and "Mixers" without a second
+          register.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>Latest on the register</h2>
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Asset</th><th>Category</th><th>Location</th><th>Cost</th>
+              <th>Status</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in recent %}
+            <tr>
+              <td>
+                <a href="{{ url_for('asset.asset_detail', asset_id=item['id']) }}">
+                  {{ item["name"] }}
+                </a>
+                <br><span class="feed-meta">{{ item["asset_code"] }}</span>
+              </td>
+              <td>
+                {{ item["category_name"] or '—' }}
+                <br><span class="feed-meta">{{ item["category_code"] or '' }}</span>
+              </td>
+              <td>
+                {{ item["department_name"] or item["location"] or 'In store' }}
+                <br><span class="feed-meta">{{ item["custodian_name"] or '' }}</span>
+              </td>
+              <td class="nowrap">
+                {{ "{:,.2f}".format(item["purchase_cost"] | float) }}
+                <span class="feed-meta">ETB</span>
+              </td>
+              <td>
+                <span class="status-badge {{ 'active' if item['status'] == 'Available'
+                      else 'neutral' if item['status'] == 'Maintenance'
+                      else 'off' if item['status'] == 'Inactive' else 'active' }}">
+                  {{ item["status"] }}
+                </span>
+              </td>
+              <td>
+                <a class="btn btn-outline"
+                   href="{{ url_for('asset.asset_detail', asset_id=item['id']) }}">Open</a>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6">No asset has been registered yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

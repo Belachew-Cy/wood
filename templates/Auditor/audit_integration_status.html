@@ -1,0 +1,310 @@
+
+{% extends "base.html" %}
+
+{% block title %}Integration Status | Audit Management{% endblock %}
+
+{% block content %}
+
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Audit Management / System Integration</span>
+            <h1>Integration Status</h1>
+            <p>
+                Monitor departmental database connections and
+                read-only audit data integration.
+            </p>
+        </div>
+
+        <div class="stock-actions">
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.dashboard') }}">
+                Dashboard
+            </a>
+
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.department_overview') }}">
+                Department Overview
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="container finance-page">
+
+    <!-- CONNECTION SUMMARY -->
+
+    <div class="hr-stats">
+
+        <div class="dash-panel">
+            <span class="eyebrow">Registered Sources</span>
+            <h2>{{ stats.total | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Connected</span>
+            <h2>{{ stats.connected | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Unavailable</span>
+            <h2>{{ stats.unavailable | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Integration Errors</span>
+            <h2>{{ stats.errors | default(0) }}</h2>
+        </div>
+
+    </div>
+
+
+    <!-- SOURCE CONNECTIONS -->
+
+    <div class="dash-panel hr-table-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Department Database Connections</h2>
+                <p>
+                    Connection health for registered departmental data sources.
+                </p>
+            </div>
+
+            <span class="status-badge neutral">
+                {{ connections | length }} Sources
+            </span>
+        </div>
+
+        <div class="table-scroll">
+
+            <table class="report-table">
+
+                <thead>
+                    <tr>
+                        <th>Department</th>
+                        <th>Module</th>
+                        <th>Connection Status</th>
+                        <th>Access Mode</th>
+                        <th>Last Checked</th>
+                        <th>Message</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for connection in connections | default([]) %}
+
+                    <tr>
+
+                        <td>
+                            <strong>
+                                {{ connection.name
+                                   | default(connection.department | default('Unknown')) }}
+                            </strong>
+                        </td>
+
+                        <td>
+                            {{ connection.module | default('—') }}
+                        </td>
+
+                        <td>
+
+                            {% if connection.connected | default(false) %}
+
+                                <span class="status-badge active">
+                                    Connected
+                                </span>
+
+                            {% else %}
+
+                                <span class="status-badge off">
+                                    Unavailable
+                                </span>
+
+                            {% endif %}
+
+                        </td>
+
+                        <td>
+                            <span class="status-badge neutral">
+                                Read Only
+                            </span>
+                        </td>
+
+                        <td>
+                            {{ connection.last_checked | default('—') }}
+                        </td>
+
+                        <td>
+                            {{ connection.message | default('No additional information') }}
+                        </td>
+
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="6" class="report-empty">
+                            No integration connection information is available.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <!-- INTEGRATION ERRORS -->
+
+    <div class="dash-panel hr-table-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Integration Errors</h2>
+                <p>
+                    Review reported connection and data-access problems.
+                </p>
+            </div>
+
+            <span class="status-badge neutral">
+                {{ errors | length }} Records
+            </span>
+        </div>
+
+        <div class="table-scroll">
+
+            <table class="report-table">
+
+                <thead>
+                    <tr>
+                        <th>Department</th>
+                        <th>Module</th>
+                        <th>Error Type</th>
+                        <th>Description</th>
+                        <th>Detected At</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for error in errors | default([]) %}
+
+                    <tr>
+
+                        <td>
+                            {{ error.department | default('—') }}
+                        </td>
+
+                        <td>
+                            {{ error.module | default('—') }}
+                        </td>
+
+                        <td>
+                            {{ error.error_type | default('Connection Error') }}
+                        </td>
+
+                        <td>
+                            {{ error.message | default('No description available') }}
+                        </td>
+
+                        <td>
+                            {{ error.created_at | default('—') }}
+                        </td>
+
+                        <td>
+                            <span class="status-badge off">
+                                {{ error.status | default('Unresolved') }}
+                            </span>
+                        </td>
+
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="6" class="report-empty">
+                            No integration errors have been reported.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <!-- SECURITY STATUS -->
+
+    <div class="dash-panel">
+
+        <h2>Integration Security Controls</h2>
+
+        <div class="hr-stats">
+
+            <div>
+                <strong>Read-Only Access</strong>
+                <p>
+                    Audit connections must not modify departmental transactions.
+                </p>
+            </div>
+
+            <div>
+                <strong>Source Validation</strong>
+                <p>
+                    Queries must use registered modules and authorized tables.
+                </p>
+            </div>
+
+            <div>
+                <strong>Credential Protection</strong>
+                <p>
+                    Database credentials and sensitive records must remain protected.
+                </p>
+            </div>
+
+            <div>
+                <strong>Access Logging</strong>
+                <p>
+                    Record relevant audit data-access activities.
+                </p>
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- CONNECTION GUIDANCE -->
+
+    <div class="dash-panel">
+
+        <h2>Connection Monitoring Guidelines</h2>
+
+        <ul>
+            <li>Use the existing database connection provider.</li>
+            <li>Check each registered source independently.</li>
+            <li>Do not expose database passwords or connection strings.</li>
+            <li>Report connection failures with safe diagnostic messages.</li>
+            <li>Distinguish an unavailable database from a table that does not exist.</li>
+            <li>Do not automatically modify departmental database configurations.</li>
+            <li>Keep integration monitoring separate from departmental transactions.</li>
+        </ul>
+
+    </div>
+
+</section>
+
+{% endblock %}

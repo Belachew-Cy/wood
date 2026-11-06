@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi, bars, donut, feed with context %}
+
+{% block title %}Stock reports | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">INVENTORY MANAGEMENT</span>
+      <h1>Stock reports</h1>
+      <p>What is on the shelf, what it is worth, and what moved this month.
+        Every view exports to CSV for Excel.</p>
+    </div>
+    <a class="btn btn-outline btn-sm" href="{{ url_for('inventory.dashboard') }}">
+      ← Inventory desk
+    </a>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="hr-stats">
+      {{ kpi('Items listed', totals["items"], 'active in the register') }}
+      {{ kpi('Units on hand', "{:,.2f}".format(totals["quantity"]),
+             'across every unit') }}
+      {{ kpi('Stock value (ETB)', "{:,.2f}".format(totals["value"]),
+             'at unit cost') }}
+      {{ kpi('At or below minimum', totals["low"] + totals["out"],
+             '{} out of stock'.format(totals["out"]),
+             'down' if totals["low"] + totals["out"] else 'flat') }}
+    </div>
+
+    {% set cat_rows = [] %}
+    {% for group in groups %}
+      {% set _ = cat_rows.append({
+        'label': group['category'] or 'Uncategorised',
+        'value': group['value'],
+        'display': '{:,.0f}'.format(group['value'])
+      }) %}
+    {% endfor %}
+    {% set healthy = (totals["items"] - totals["low"] - totals["out"]) %}
+    <div class="chart-grid">
+      {{ bars('Stock value by category', cat_rows, 'ETB') }}
+      {{ donut('Healthy shelves',
+              (healthy / totals["items"]) if totals["items"] else 0,
+              '{}%'.format((healthy * 100 // totals["items"]) if totals["items"] else 0),
+              [
+                {'label': 'Above minimum', 'color': 'var(--walnut)', 'value': healthy},
+                {'label': 'Low or empty', 'color': 'var(--ivory-2)',
+                 'value': totals["low"] + totals["out"]}
+              ], 'of listed items') }}
+    </div>
+
+    <div class="hr-stats">
+      {{ kpi('Received ' ~ month, "{:,.2f}".format(flow["received"]),
+             '{} movement(s)'.format(flow["moves"]), 'up') }}
+      {{ kpi('Issued ' ~ month, "{:,.2f}".format(flow["issued"]),
+             'stock out of the store', 'down') }}
+      {{ kpi('Units in categories', groups | length, 'valued groups') }}
+      {{ kpi('Report date', today, 'figures as of this page load') }}
+    </div>
+
+    <div class="dash-panel">
+      <h2>Open a report</h2>
+      <div class="stock-actions">
+        <a class="btn btn-sm" href="{{ url_for('inventory.stock_report') }}">
+          Stock on hand
+        </a>
+        <a class="btn btn-outline btn-sm" href="{{ url_for('inventory.valuation_report') }}">
+          Stock valuation
+        </a>
+        <a class="btn btn-outline btn-sm" href="{{ url_for('inventory.movement_report') }}">
+          Movement report
+        </a>
+        <a class="btn btn-outline btn-sm" href="{{ url_for('inventory.alerts') }}">
+          Reorder alerts
+        </a>
+      </div>
+      <p class="feed-meta">The movement report covers the last 30 days by
+        default; pick any range on its page.</p>
+    </div>
+
+    {% if recent %}
+    {% set recent_rows = [] %}
+    {% for move in recent %}
+      {% set _ = recent_rows.append({
+        'icon': 'box',
+        'tone': 'ok' if move['movement_type'] == 'IN' else 'warn',
+        'title': '{} {} {}'.format(
+          'Received' if move['movement_type'] == 'IN' else 'Issued',
+          move['quantity'], move['unit']),
+        'meta': '{} · {} · {}'.format(move['name'], move['reference_type'],
+                                      move['created_by']),
+        'time': move['created_at'] | audit_time
+      }) %}
+    {% endfor %}
+    <div class="chart-grid">
+      {{ feed('Latest movements', recent_rows, month,
+              {'href': url_for('inventory.history'), 'label': 'Full history'}) }}
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

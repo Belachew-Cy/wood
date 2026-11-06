@@ -13,7 +13,7 @@
     </div>
     <nav class="stock-actions" aria-label="Approval actions">
       {% if 'approvals' in permissions %}
-      <a class="btn btn-sm" href="{{ url_for('approvals.new_request') }}">New request</a>
+      <a class="btn btn-sm" href="{{ url_for('procurm.requisitions.html') }}">New request</a>
       {% endif %}
       <a class="btn btn-outline btn-sm" href="{{ url_for('approvals.dashboard') }}">All requests</a>
       {% if can_manage_policy %}
@@ -29,6 +29,15 @@
       <div class="finance-alert {{ category }}">{{ message }}</div>
     {% endfor %}
   {% endwith %}
+
+  {% if selected_type or selected_status %}
+  <p class="panel-note">
+    Showing
+    {% if selected_type %}<strong>{{ selected_type }}</strong> requests{% else %}every request type{% endif %}
+    {% if selected_status %} · status <strong>{{ selected_status }}</strong>{% endif %}.
+    <a href="{{ url_for('approvals.dashboard') }}">Show the whole queue</a>
+  </p>
+  {% endif %}
 
   <div class="hr-stats">
     {{ kpi('Requests you can see', counts.total) }}

@@ -1,0 +1,84 @@
+{# The permission catalogue both access screens draw. One macro keeps the role
+   dialog and the account editor on the same six categories, the same ticks and
+   the same select-all behaviour. #}
+{% from "base.html" import dash_icon with context %}
+
+{% macro permission_manager(catalog, uid) -%}
+<div class="perm-catalog" data-perm-catalog>
+  {# Every group is listed here before the cards. The index keeps Finance,
+     Audit and the rest reachable in one click inside a short dialog. #}
+  <nav class="perm-index" aria-label="Jump to a permission group">
+    {% for category in catalog %}
+    <button type="button" class="perm-index-btn" data-perm-jump="{{ category.key }}">
+      <span class="perm-index-icon">{{ dash_icon(category.icon) }}</span>
+      <span>{{ category.label }}</span>
+      <span class="perm-index-count" data-perm-index-count>{{ category.open }}/{{ category.total }}</span>
+    </button>
+    {% endfor %}
+  </nav>
+  {% for category in catalog %}
+  {% set partial = category.permissions | selectattr('partial') | list | length %}
+  <details class="perm-category" data-perm-category data-perm-group="{{ category.key }}"
+           {% if category.open or partial or loop.first %}open{% endif %}>
+    <summary class="perm-cat-head">
+      <span class="perm-cat-icon">{{ dash_icon(category.icon) }}</span>
+      <span class="perm-cat-copy">
+        <span class="perm-cat-title">{{ category.label }}</span>
+        <span class="perm-cat-note">{{ category.note }}</span>
+      </span>
+      <span class="perm-cat-count" data-perm-count>{{ category.open }}/{{ category.total }}</span>
+      <span class="perm-cat-caret" aria-hidden="true"></span>
+    </summary>
+
+    <div class="perm-cat-body">
+      <div class="perm-cat-tools">
+        <span class="perm-cat-total">{{ category.total }} permission{{ '' if category.total == 1 else 's' }}</span>
+        <label class="perm-select-all">
+          <input type="checkbox" data-perm-all
+                 {% if category.open == category.total and not partial %}checked{% endif %} />
+          <span>Select all</span>
+        </label>
+      </div>
+
+      <div class="perm-grid perm-cat-grid">
+        {% for row in category.permissions %}
+        <label class="perm-item" title="{{ row.description }}"
+               data-perm-key="{{ row.key }}" data-perm-kind="{{ row.kind }}">
+          {% if row.locked and row.kind == 'module' %}
+          <input type="hidden" name="permission" value="{{ row.key }}" />
+          <input type="checkbox" checked disabled
+                 aria-label="{{ row.label }} — granted by the module" />
+          {% elif row.kind == 'recruitment' %}
+          <input type="checkbox" name="permission" value="{{ row.key }}"
+                 id="{{ uid }}-{{ row.key }}"
+                 {% if row.checked %}checked{% endif %}
+                 {% if row.locked %}checked disabled{% endif %}
+                 {% if row.partial %}data-partial="1"{% endif %} />
+          {% if row.partial %}
+          <input type="hidden" name="recruitment_keep" value="{{ row.key }}"
+                 data-perm-keep />
+          {% endif %}
+          {% elif row.kind == 'letter' %}
+          <input type="checkbox" name="letter_permissions" value="{{ row.key }}"
+                 id="{{ uid }}-{{ row.key }}"
+                 {% if row.checked %}checked{% endif %} />
+          {% else %}
+          <input type="checkbox" name="permission" value="{{ row.key }}"
+                 id="{{ uid }}-{{ row.key }}"
+                 {% if row.checked %}checked{% endif %} />
+          {% endif %}
+          <span class="perm-name">{{ row.label }}</span>
+          {% if row.locked and row.kind == 'recruitment' %}
+          <em class="perm-default">module</em>
+          {% elif row.partial %}
+          <em class="perm-default">partial</em>
+          {% endif %}
+          <span class="perm-hint">{{ row.description }}</span>
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+  </details>
+  {% endfor %}
+</div>
+{%- endmacro %}

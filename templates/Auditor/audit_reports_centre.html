@@ -1,0 +1,433 @@
+
+{% extends "base.html" %}
+
+{% block title %}Audit Reports Centre | Audit Management{% endblock %}
+
+{% block content %}
+
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Audit Management / Reporting</span>
+            <h1>Audit Reports Centre</h1>
+            <p>
+                Consolidated audit reporting, departmental oversight,
+                risk monitoring and management reporting.
+            </p>
+        </div>
+
+        <div class="stock-actions">
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.dashboard') }}">
+                Dashboard
+            </a>
+
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.audit_reports') }}">
+                Audit Reports
+            </a>
+
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.export_audit_reports') }}">
+                Export Centre
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="container finance-page">
+
+    <!-- OVERALL AUDIT PERFORMANCE -->
+
+    <div class="hr-stats">
+
+        <div class="dash-panel">
+            <span class="eyebrow">Total Audit Plans</span>
+            <h2>{{ stats.total_plans | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Completed Audits</span>
+            <h2>{{ stats.completed_audits | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Open Findings</span>
+            <h2>{{ stats.open_findings | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Pending Actions</span>
+            <h2>{{ stats.pending_actions | default(0) }}</h2>
+        </div>
+
+    </div>
+
+
+    <!-- RISK OVERVIEW -->
+
+    <div class="dash-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Audit Risk Overview</h2>
+                <p>
+                    Summary of identified risks and their assessment levels.
+                </p>
+            </div>
+
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.risk_assessments') }}">
+                View Risk Assessments
+            </a>
+        </div>
+
+        <div class="hr-stats">
+
+            <div>
+                <span class="eyebrow">Critical</span>
+                <h2>{{ stats.critical_risks | default(0) }}</h2>
+            </div>
+
+            <div>
+                <span class="eyebrow">High</span>
+                <h2>{{ stats.high_risks | default(0) }}</h2>
+            </div>
+
+            <div>
+                <span class="eyebrow">Medium</span>
+                <h2>{{ stats.medium_risks | default(0) }}</h2>
+            </div>
+
+            <div>
+                <span class="eyebrow">Low</span>
+                <h2>{{ stats.low_risks | default(0) }}</h2>
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- DEPARTMENT PERFORMANCE -->
+
+    <div class="dash-panel hr-table-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Departmental Audit Performance</h2>
+                <p>
+                    Audit coverage and findings across organizational departments.
+                </p>
+            </div>
+
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.department_overview') }}">
+                Department Overview
+            </a>
+        </div>
+
+        <div class="table-scroll">
+
+            <table class="report-table">
+
+                <thead>
+                    <tr>
+                        <th>Department</th>
+                        <th>Audit Plans</th>
+                        <th>Completed</th>
+                        <th>Open Findings</th>
+                        <th>Pending Actions</th>
+                        <th>Compliance</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for department in department_reports | default([]) %}
+
+                    <tr>
+
+                        <td>
+                            <strong>
+                                {{ department.name | default('—') }}
+                            </strong>
+                        </td>
+
+                        <td>{{ department.total_plans | default(0) }}</td>
+
+                        <td>{{ department.completed_audits | default(0) }}</td>
+
+                        <td>{{ department.open_findings | default(0) }}</td>
+
+                        <td>{{ department.pending_actions | default(0) }}</td>
+
+                        <td>
+                            {% if department.compliance_percentage is not none %}
+                                {{ department.compliance_percentage }}%
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </td>
+
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="6" class="report-empty">
+                            No departmental reporting information is available.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <!-- FINDINGS SUMMARY -->
+
+    <div class="dash-panel hr-table-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Audit Findings Summary</h2>
+                <p>
+                    Important findings requiring management attention.
+                </p>
+            </div>
+
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.audit_findings') }}">
+                All Findings
+            </a>
+        </div>
+
+        <div class="table-scroll">
+
+            <table class="report-table">
+
+                <thead>
+                    <tr>
+                        <th>Finding Reference</th>
+                        <th>Finding</th>
+                        <th>Department</th>
+                        <th>Severity</th>
+                        <th>Target Date</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for finding in findings | default([]) %}
+
+                    <tr>
+
+                        <td>
+                            {{ finding.finding_number
+                               | default(finding.id | default('—')) }}
+                        </td>
+
+                        <td>{{ finding.title | default('—') }}</td>
+
+                        <td>{{ finding.department | default('—') }}</td>
+
+                        <td>{{ finding.severity | default('—') }}</td>
+
+                        <td>{{ finding.target_date | default('—') }}</td>
+
+                        <td>{{ finding.status | default('Open') }}</td>
+
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="6" class="report-empty">
+                            No audit findings are available.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <!-- CORRECTIVE ACTION SUMMARY -->
+
+    <div class="dash-panel hr-table-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Corrective Action Monitoring</h2>
+                <p>
+                    Monitor implementation of agreed corrective measures.
+                </p>
+            </div>
+
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.corrective_actions') }}">
+                View Corrective Actions
+            </a>
+        </div>
+
+        <div class="table-scroll">
+
+            <table class="report-table">
+
+                <thead>
+                    <tr>
+                        <th>Action Reference</th>
+                        <th>Corrective Action</th>
+                        <th>Responsible Person</th>
+                        <th>Due Date</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for action in corrective_actions | default([]) %}
+
+                    <tr>
+
+                        <td>
+                            {{ action.action_number
+                               | default(action.id | default('—')) }}
+                        </td>
+
+                        <td>{{ action.title | default(action.description | default('—')) }}</td>
+
+                        <td>{{ action.responsible_person | default('—') }}</td>
+
+                        <td>{{ action.due_date | default('—') }}</td>
+
+                        <td>{{ action.status | default('Pending') }}</td>
+
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="5" class="report-empty">
+                            No corrective action information is available.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <!-- REPORT REGISTER -->
+
+    <div class="dash-panel hr-table-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Recent Audit Reports</h2>
+                <p>
+                    Recently prepared and approved audit reports.
+                </p>
+            </div>
+
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.audit_reports') }}">
+                All Reports
+            </a>
+        </div>
+
+        <div class="table-scroll">
+
+            <table class="report-table">
+
+                <thead>
+                    <tr>
+                        <th>Report Reference</th>
+                        <th>Title</th>
+                        <th>Department</th>
+                        <th>Report Date</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for report in reports | default([]) %}
+
+                    <tr>
+
+                        <td>
+                            {{ report.report_number
+                               | default(report.id | default('—')) }}
+                        </td>
+
+                        <td>{{ report.title | default('—') }}</td>
+
+                        <td>{{ report.department | default('—') }}</td>
+
+                        <td>{{ report.report_date | default('—') }}</td>
+
+                        <td>{{ report.status | default('Draft') }}</td>
+
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="5" class="report-empty">
+                            No audit reports are available.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <!-- REPORTING GUIDELINES -->
+
+    <div class="dash-panel">
+
+        <h2>Reporting and Management Oversight</h2>
+
+        <ul>
+            <li>Consolidate information from authorized departmental audit sources.</li>
+            <li>Keep departmental source records read-only.</li>
+            <li>Use consistent reporting periods and status definitions.</li>
+            <li>Link findings and corrective actions to their original audit records.</li>
+            <li>Identify overdue actions and unresolved high-risk findings.</li>
+            <li>Restrict confidential management reports to authorized users.</li>
+            <li>Retain the reporting period, generation timestamp and source references.</li>
+        </ul>
+
+    </div>
+
+</section>
+
+{% endblock %}

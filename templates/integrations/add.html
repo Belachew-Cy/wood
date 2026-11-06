@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% from "integrations/_module_nav.html" import module_tabs with context %}
+
+{% block title %}Add Connection | Dereje Belay Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">System Integration</span>
+      <h1>Register a connection</h1>
+      <p>Name the system, say what it is and where it lives. The credential is stored on the
+        connection's own screen afterwards, sealed, and is never shown back.</p>
+    </div>
+    {{ module_tabs('registry') }}
+  </div>
+</section>
+
+<section class="section bg-white">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="dash-panel">
+      <h2>Connection details</h2>
+
+      <form method="POST" class="dash-form account-form" id="connection-form">
+        {{ csrf_field() }}
+        <div class="account-grid">
+          <div>
+            <label for="name">Name</label>
+            <input id="name" name="name" type="text" maxlength="120" required
+                   value="{{ form.get('name', '') }}" placeholder="Production Active Directory" />
+            <p class="cell-note">Two connections cannot share a name.</p>
+          </div>
+          <div>
+            <label for="integration_type">Integration type</label>
+            <select id="integration_type" name="integration_type" required>
+              <option value="">Choose a type</option>
+              {% for kind in integration_types %}
+              <option value="{{ kind }}" {% if form.get('integration_type') == kind %}selected{% endif %}>
+                {{ kind }}</option>
+              {% endfor %}
+            </select>
+            <p class="cell-note">Only Active Directory / LDAP brings records in; the other types
+              are reachable through the connection test.</p>
+          </div>
+          <div>
+            <label for="endpoint">Endpoint</label>
+            <input id="endpoint" name="endpoint" type="text" maxlength="300"
+                   value="{{ form.get('endpoint', '') }}"
+                   placeholder="ldaps://dc.example.local:636" />
+            <p class="cell-note">ldap:// or ldaps:// for a directory, http(s):// for a service,
+              smtp(s):// for mail.</p>
+          </div>
+          <div>
+            <label for="username">Bind account</label>
+            <input id="username" name="username" type="text" maxlength="300"
+                   value="{{ form.get('username', '') }}"
+                   placeholder="CN=svc-hris,OU=Service Accounts,DC=example,DC=local" />
+            <p class="cell-note">The account the connection signs in as - not a person's account.</p>
+          </div>
+          <div id="search-base-field" data-ad-type="{{ ad_type }}">
+            <label for="search_base">Directory search base</label>
+            <input id="search_base" name="search_base" type="text" maxlength="512"
+                   value="{{ form.get('search_base', '') }}"
+                   placeholder="OU=Staff,DC=example,DC=local" />
+            <p class="cell-note">What a scheduled read searches. Leave empty and set it from the
+              mapping desk when you run the first read.</p>
+          </div>
+          <div class="full">
+            <label for="description">What it is for</label>
+            <input id="description" name="description" type="text" maxlength="500"
+                   value="{{ form.get('description', '') }}"
+                   placeholder="Nightly staff list for the HR records" />
+          </div>
+        </div>
+
+        <p class="perm-note">A new connection starts inactive with no credential and no schedule,
+          so nothing reaches the system until it has been configured and tested here.</p>
+
+        <div class="finance-form-actions">
+          <a class="btn btn-outline-dark" href="{{ url_for('integrations.dashboard') }}">Cancel</a>
+          <button class="btn" type="submit">Register connection <span class="arrow">→</span></button>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    var type = document.getElementById('integration_type');
+    var field = document.getElementById('search-base-field');
+    if (!type || !field) return;
+    function refresh() {
+      // An unencrypted directory read is refused by the adapter, so say so here.
+      field.hidden = type.value !== field.dataset.adType;
+    }
+    type.addEventListener('change', refresh);
+    refresh();
+  })();
+</script>
+{% endblock %}

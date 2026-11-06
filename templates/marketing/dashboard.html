@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi, bars, donut, feed with context %}
+
+{% block title %}Marketing Desk | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+{% set totals = summary["totals"] %}
+{% set counts = summary["counts"] %}
+{% set pending_plans = counts["marketing_plans"].get("Pending", 0) %}
+{% set signed = counts["marketing_plans"].get("Approved", 0) %}
+{% set open_leads = totals["lead_count"] - totals["converted_leads"] %}
+
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">MARKETING MANAGEMENT</span>
+      <h1>Marketing Desk</h1>
+      <p>Signed in as {{ user["full_name"] }} · {{ role_label }} access</p>
+    </div>
+    <div class="row-actions">
+      {% if 'marketing_plans' in granted_permissions %}
+      <a class="btn" href="{{ url_for('marketing.create_plan') }}">New plan →</a>
+      {% endif %}
+      {% if 'marketing_leads' in granted_permissions %}
+      <a class="btn btn-outline" href="{{ url_for('marketing.create_lead') }}">
+        Register lead →
+      </a>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="hr-stats">
+      {{ kpi('Plans awaiting a decision', pending_plans,
+             'the approval desk signs these', 'warn' if pending_plans else 'flat',
+             'file', url_for('marketing.plans', status='Pending')) }}
+      {{ kpi('Active campaigns', totals["active_campaigns"], 'running now',
+             'flat', 'megaphone', url_for('marketing.campaigns')) }}
+      {{ kpi('Leads on the book', totals["lead_count"],
+             '{} converted'.format(totals["converted_leads"]),
+             'up' if totals["converted_leads"] else 'flat', 'users',
+             url_for('marketing.leads')) }}
+      {{ kpi('Follow-ups overdue', totals["overdue_leads"], 'needs a call',
+             'down' if totals["overdue_leads"] else 'flat', 'clock',
+             url_for('marketing.leads', follow_up='overdue')) }}
+      {{ kpi('Feedback awaiting an answer', totals["pending_feedback"],
+             'complaints and inquiries', 'warn' if totals["pending_feedback"]
+             else 'flat', 'inbox', url_for('marketing.feedback', status='Pending')) }}
+      {{ kpi('Customers billed', totals["customer_count"],
+             'read from the Finance register', 'flat', 'cart',
+             url_for('marketing.customers')) }}
+      {{ kpi('Approved plan budget', "{:,.2f}".format(totals["plan_budget"] | float),
+             'ETB committed', 'flat', 'wallet') }}
+      {{ kpi('Average rating', "{:.1f}".format(totals["average_rating"] | float),
+             'of 5, across all feedback', 'flat', 'check') }}
+    </div>
+
+    {% set channel_rows = [] %}
+    {% for row in channels %}
+      {% set _ = channel_rows.append({
+        'label': row["channel"], 'value': row["campaigns"] | int,
+        'display': '{} · {:,.0f} ETB'.format(row["campaigns"],
+                                             row["budget"] | float)
+      }) %}
+    {% endfor %}
+
+    {% set source_rows = [] %}
+    {% for row in pipeline %}
+      {% set _ = source_rows.append({
+        'label': row["source"], 'value': row["total"] | int,
+        'display': '{} won · {} overdue'.format(row["converted"], row["overdue"])
+      }) %}
+    {% endfor %}
+
+    {% set status_rows = [] %}
+    {% for status, number in counts["marketing_leads"] | dictsort %}
+      {% set _ = status_rows.append({'label': status, 'value': number | int,
+                                     'display': number}) %}
+    {% endfor %}
+
+    {% set activity_rows = [] %}
+    {% for row in activity %}
+      {% set _ = activity_rows.append({
+        'icon': 'megaphone' if row["kind"] == 'Campaign' else 'check',
+        'tone': 'bad' if row["status"] in ('Rejected', 'Lost', 'Cancelled', 'Closed')
+                else 'ok' if row["status"] in ('Approved', 'Converted', 'Completed',
+                                               'Resolved', 'Active')
+                else 'warn',
+        'title': '{} · {}'.format(row["kind"], row["name"]),
+        'meta': row["status"],
+        'time': row["updated_at"] | audit_time
+      }) %}
+    {% endfor %}
+
+    <div class="chart-grid">
+      {{ bars('Campaigns by channel', channel_rows, 'count · budget') }}
+      {{ bars('Leads by source', source_rows, 'converted · overdue') }}
+      {{ bars('Leads by status', status_rows, 'the pipeline shape') }}
+      {{ donut('Plans signed off', (signed / totals["plan_count"])
+               if totals["plan_count"] else 0,
+               '{} plans'.format(totals["plan_count"]),
+               [{'label': 'Approved', 'color': 'var(--walnut)', 'value': signed},
+                {'label': 'Still open', 'color': 'var(--ivory-2)',
+                 'value': totals["plan_count"] - signed}], 'of everything raised') }}
+      {{ feed('Latest at this desk', activity_rows[:8], 'newest first',
+              {'href': url_for('marketing.reports'), 'label': 'Open reports'}) }}
+    </div>
+
+    <div class="dash-panel">
+      <h2>How this desk works</h2>
+      <p>A plan is raised as a draft and authorises nothing until the approval desk
+        signs it. Campaigns hang from an approved plan, digital pushes hang from a
+        campaign, and a lead records the channel that brought the enquiry in.
+        {{ open_leads }} lead{{ '' if open_leads == 1 else 's' }} are still open
+        {% if totals["overdue_leads"] %}and {{ totals["overdue_leads"] }} passed
+        their follow-up date{% endif %}. Customers are not kept twice: the list
+        reads the invoices Finance has already issued.</p>
+    </div>
+  </div>
+</section>
+{% endblock %}

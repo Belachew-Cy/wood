@@ -9,6 +9,28 @@ def procurement_granted():
     return user is not None and "procurement" in effective_permissions(user)
 
 
+def purchase_order_ref(db, order_id):
+    """The purchase order a stock or asset row was bought on, or None.
+
+    stock.db and asset.db are their own files, so SQLite cannot hold a foreign
+    key into finance.procurement_orders. The id the receipt hand-off carries is
+    checked against the order desk when the row is written; a blank field simply
+    means the row did not come from an order.
+    """
+    if order_id in (None, ""):
+        return None
+    try:
+        order_id = int(order_id)
+    except (TypeError, ValueError):
+        raise ValueError("Choose a purchase order from the order desk.")
+    order = db.execute(
+        "SELECT id, order_number FROM finance.procurement_orders WHERE id = ?",
+        (order_id,)).fetchone()
+    if order is None:
+        raise ValueError("That purchase order no longer exists.")
+    return order
+
+
 def migrate_procurement_capture(db):
     """Give legacy purchasing rows the shape the requisition screens read.
 

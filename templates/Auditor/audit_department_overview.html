@@ -1,0 +1,299 @@
+
+{% extends "base.html" %}
+
+{% block title %}Department Audit Overview | Audit Management{% endblock %}
+
+{% block content %}
+
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Audit Management / Integration</span>
+            <h1>Department Audit Overview</h1>
+            <p>
+                Monitor audit coverage across departments and review
+                the availability of registered departmental data sources.
+            </p>
+        </div>
+
+        <div class="stock-actions">
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.dashboard') }}">
+                Dashboard
+            </a>
+
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.integration_status') }}">
+                Integration Status
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="container finance-page">
+
+    <!-- OVERALL COVERAGE -->
+
+    <div class="hr-stats">
+
+        <div class="dash-panel">
+            <span class="eyebrow">Registered Departments</span>
+            <h2>{{ stats.total_departments | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Connected Sources</span>
+            <h2>{{ stats.connected | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Unavailable Sources</span>
+            <h2>{{ stats.unavailable | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Registered Tables</span>
+            <h2>{{ stats.total_tables | default(0) }}</h2>
+        </div>
+
+    </div>
+
+
+    <!-- DEPARTMENT SOURCE REGISTER -->
+
+    <div class="dash-panel hr-table-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Departmental Audit Coverage</h2>
+                <p>
+                    Registered departmental modules and their available
+                    audit data sources.
+                </p>
+            </div>
+
+            <span class="status-badge neutral">
+                {{ departments | length }} Sources
+            </span>
+        </div>
+
+        <div class="table-scroll">
+
+            <table class="report-table">
+
+                <thead>
+                    <tr>
+                        <th>Department / Module</th>
+                        <th>Database Module</th>
+                        <th>Registered Tables</th>
+                        <th>Available Tables</th>
+                        <th>Records</th>
+                        <th>Connection</th>
+                        <th>Coverage</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for department in departments | default([]) %}
+
+                    {% set connected = department.connected | default(false) %}
+                    {% set registered = department.table_count | default(0) %}
+                    {% set available = department.available_table_count | default(0) %}
+
+                    <tr>
+
+                        <td>
+                            <strong>
+                                {{ department.name
+                                   | default(department.label | default('Unknown Department')) }}
+                            </strong>
+                        </td>
+
+                        <td>
+                            {{ department.module | default('—') }}
+                        </td>
+
+                        <td>
+                            {{ registered }}
+                        </td>
+
+                        <td>
+                            {{ available }}
+                        </td>
+
+                        <td>
+                            {{ department.record_count | default(0) }}
+                        </td>
+
+                        <td>
+                            {% if connected %}
+                                <span class="status-badge active">
+                                    Connected
+                                </span>
+                            {% else %}
+                                <span class="status-badge off">
+                                    Unavailable
+                                </span>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if registered > 0 %}
+                                {{ ((available / registered) * 100) | round(1) }}%
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            <a class="btn btn-outline btn-sm"
+                               href="{{ url_for(
+                                   'audit.department_records',
+                                   module_name=department.module,
+                                   table=department.default_table
+                               ) if department.default_table else url_for(
+                                   'audit.integration_status'
+                               ) }}">
+                                View Records
+                            </a>
+                        </td>
+
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="8" class="report-empty">
+                            No departmental audit sources are registered.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <!-- DEPARTMENT TABLE DETAILS -->
+
+    {% for department in departments | default([]) %}
+
+    <div class="dash-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>
+                    {{ department.name
+                       | default(department.label | default('Department')) }}
+                </h2>
+
+                <p>
+                    Registered tables for the
+                    {{ department.module | default('unknown') }} module.
+                </p>
+            </div>
+
+            {% if department.connected | default(false) %}
+                <span class="status-badge active">Connected</span>
+            {% else %}
+                <span class="status-badge off">Unavailable</span>
+            {% endif %}
+        </div>
+
+        <div class="table-scroll">
+
+            <table class="report-table">
+
+                <thead>
+                    <tr>
+                        <th>Table Name</th>
+                        <th>Availability</th>
+                        <th>Record Count</th>
+                        <th>Access Mode</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for table in department.tables | default([]) %}
+
+                    <tr>
+
+                        <td>
+                            <strong>{{ table.name | default(table.table | default('—')) }}</strong>
+                        </td>
+
+                        <td>
+                            {% if table.available | default(false) %}
+                                <span class="status-badge active">
+                                    Available
+                                </span>
+                            {% else %}
+                                <span class="status-badge off">
+                                    Unavailable
+                                </span>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {{ table.record_count | default(0) }}
+                        </td>
+
+                        <td>
+                            <span class="status-badge neutral">
+                                Read Only
+                            </span>
+                        </td>
+
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="4" class="report-empty">
+                            No table information is available for this department.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+    {% endfor %}
+
+
+    <!-- SECURITY INFORMATION -->
+
+    <div class="dash-panel">
+
+        <h2>Read-Only Integration Security</h2>
+
+        <ul>
+            <li>Audit Management retrieves information from registered departmental databases.</li>
+            <li>Departmental transaction records must not be modified by audit queries.</li>
+            <li>Database connections must use the existing connection provider.</li>
+            <li>Read-only database access must be enforced at the database connection level.</li>
+            <li>Only registered tables may be queried.</li>
+            <li>All data access must follow the existing Audit Management permissions.</li>
+            <li>Credentials, password hashes, tokens and other sensitive fields must not be exposed.</li>
+            <li>Unavailable data sources must be reported rather than silently treated as empty.</li>
+        </ul>
+
+    </div>
+
+</section>
+
+{% endblock %}

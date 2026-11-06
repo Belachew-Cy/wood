@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container-fluid py-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+
+        <div>
+            <h3>Asset Insurance Management</h3>
+            <p class="text-muted">
+                Monitor insurance policies, claims and expiry dates.
+            </p>
+        </div>
+
+        <a href="{{ url_for(
+            'asset_management.create_asset_insurance'
+        ) }}" class="btn btn-success">
+            <i class="fas fa-plus"></i> Register Insurance
+        </a>
+
+    </div>
+
+    <div class="row g-3">
+
+        {% for label, value in [
+            ('Total Policies', total_policies),
+            ('Active Policies', active_policies),
+            ('Expired Policies', expired_policies),
+            ('Expiring Within 30 Days', expiring_policies),
+            ('Total Claims', total_claims),
+            ('Pending Claims', pending_claims)
+        ] %}
+
+        <div class="col-xl-4 col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <p class="text-muted">{{ label }}</p>
+                    <h3 class="fw-bold">{{ value }}</h3>
+                </div>
+            </div>
+        </div>
+
+        {% endfor %}
+
+    </div>
+
+    <div class="card border-0 shadow-sm mt-4">
+
+        <div class="card-body">
+
+            <h5>Insurance Policies</h5>
+
+            <div class="table-responsive">
+
+                <table class="table table-hover">
+
+                    <thead>
+                        <tr>
+                            <th>Asset</th>
+                            <th>Policy Number</th>
+                            <th>Insurance Company</th>
+                            <th>Coverage Amount</th>
+                            <th>Expiry Date</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+
+                        {% for policy in policies %}
+
+                        <tr>
+                            <td>{{ policy.asset.name }}</td>
+                            <td>{{ policy.policy_number }}</td>
+                            <td>{{ policy.insurance_company }}</td>
+                            <td>
+                                {{ "{:,.2f}".format(policy.coverage_amount) }}
+                                ETB
+                            </td>
+                            <td>{{ policy.expiry_date }}</td>
+                            <td>{{ policy.status }}</td>
+                            <td>
+                                <a href="{{ url_for(
+                                    'asset_management.create_insurance_claim',
+                                    insurance_id=policy.id
+                                ) }}"
+                                class="btn btn-sm btn-outline-success">
+                                    Create Claim
+                                </a>
+                            </td>
+                        </tr>
+
+                        {% else %}
+
+                        <tr>
+                            <td colspan="7" class="text-center">
+                                No insurance policies registered.
+                            </td>
+                        </tr>
+
+                        {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

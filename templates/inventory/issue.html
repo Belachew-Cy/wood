@@ -1,0 +1,136 @@
+
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container-fluid py-4">
+
+    <div class="mb-4">
+        <h3>Warehouse Material Issuing</h3>
+        <p class="text-muted">
+            Issue approved production materials.
+        </p>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <h5>Request Information</h5>
+
+            <p>
+                <strong>Request Number:</strong>
+                {{ material_request.request_number }}
+            </p>
+
+            <p>
+                <strong>Purpose:</strong>
+                {{ material_request.purpose }}
+            </p>
+
+            <p>
+                <strong>Status:</strong>
+                {{ material_request.status }}
+            </p>
+        </div>
+    </div>
+
+    <form method="POST">
+
+        <input type="hidden"
+               name="csrf_token"
+               value="{{ csrf_token() }}">
+
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+
+                <h5 class="mb-3">Approved Materials</h5>
+
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th>Warehouse</th>
+                                <th>Requested</th>
+                                <th>Approved</th>
+                                <th>Previously Issued</th>
+                                <th>Remaining</th>
+                                <th>Issue Quantity</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+
+                        {% for item in material_request.items %}
+
+                            {% set remaining =
+                                item.approved_quantity - item.issued_quantity %}
+
+                            {% if remaining > 0 %}
+
+                            <tr>
+                                <td>{{ item.item_id }}</td>
+
+                                <td>{{ item.warehouse_id }}</td>
+
+                                <td>{{ item.requested_quantity }}</td>
+
+                                <td>{{ item.approved_quantity }}</td>
+
+                                <td>{{ item.issued_quantity }}</td>
+
+                                <td>{{ remaining }}</td>
+
+                                <td>
+                                    <input
+                                        type="number"
+                                        name="issue_quantity_{{ item.id }}"
+                                        class="form-control"
+                                        min="0"
+                                        max="{{ remaining }}"
+                                        step="0.001"
+                                        value="0"
+                                    >
+                                </td>
+                            </tr>
+
+                            {% endif %}
+
+                        {% endfor %}
+
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">
+                        Issue Remarks
+                    </label>
+
+                    <textarea
+                        name="remarks"
+                        class="form-control"
+                        rows="3"
+                        placeholder="Enter issue remarks..."
+                    ></textarea>
+                </div>
+
+                <button type="submit"
+                        class="btn btn-success"
+                        onclick="return confirm('Confirm the actual material quantities issued?')">
+                    Confirm Material Issue
+                </button>
+
+                <a href="{{ url_for('inventory.material_requests') }}"
+                   class="btn btn-outline-secondary">
+                    Cancel
+                </a>
+
+            </div>
+        </div>
+
+    </form>
+
+</div>
+
+{% endblock %}

@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi with context %}
+
+{% block title %}Asset Categories | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+{% set ns = namespace(active=0, inactive=0, units=0) %}
+{% for row in categories %}
+  {% if row["status"] == "Active" %}{% set ns.active = ns.active + 1 %}
+  {% else %}{% set ns.inactive = ns.inactive + 1 %}{% endif %}
+  {% set ns.units = ns.units + row["asset_count"] %}
+{% endfor %}
+
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">ASSET MANAGEMENT</span>
+      <h1>Asset Categories</h1>
+      <p>The filing tree behind the register. A category can sit under one
+        parent, and only an active category may take a new unit.</p>
+    </div>
+    <div class="row-actions">
+      <a class="btn btn-outline" href="{{ url_for('asset.dashboard') }}">
+        ← Asset desk
+      </a>
+      <a class="btn btn-outline" href="{{ url_for('asset.assets') }}">
+        Asset register
+      </a>
+      {% if can_categories %}
+      <a class="btn" href="{{ url_for('asset.create_category') }}">New category →</a>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="hr-stats">
+      {{ kpi('Categories listed', categories | length, 'matching this filter') }}
+      {{ kpi('Active', ns.active, 'open for new units') }}
+      {{ kpi('Inactive', ns.inactive, 'kept for the record') }}
+      {{ kpi('Units filed', ns.units, 'across these categories') }}
+    </div>
+
+    <form method="GET" class="stock-search">
+      <label for="search">Search</label>
+      <input id="search" name="search" value="{{ search }}"
+             placeholder="Category name or code" />
+      <label for="status">Status</label>
+      <select id="status" name="status">
+        <option value="">All statuses</option>
+        {% for value in category_statuses %}
+        <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ value }}</option>
+        {% endfor %}
+      </select>
+      <button class="btn" type="submit">Search</button>
+      <a class="btn btn-outline" href="{{ url_for('asset.categories') }}">Reset</a>
+    </form>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>{% if categories %}{{ categories | length }} categor{{ 'y' if categories | length == 1 else 'ies' }}{% else %}Categories{% endif %}</h2>
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Category</th><th>Parent</th><th>Subcategories</th>
+              <th>Units</th><th>Status</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in categories %}
+            <tr>
+              <td>
+                {{ row["name"] }}
+                <br><span class="feed-meta">{{ row["code"] }}</span>
+              </td>
+              <td>{{ row["parent_name"] or 'Top level' }}</td>
+              <td>{{ row["child_count"] }}</td>
+              <td>{{ row["asset_count"] }}</td>
+              <td>
+                <span class="status-badge {{ 'active' if row['status'] == 'Active' else 'off' }}">
+                  {{ row["status"] }}
+                </span>
+              </td>
+              <td class="row-actions">
+                {% if can_categories %}
+                <a class="btn btn-outline"
+                   href="{{ url_for('asset.edit_category', category_id=row['id']) }}">Edit</a>
+                <form method="POST"
+                      action="{{ url_for('asset.toggle_category', category_id=row['id']) }}"
+                      {% if row["status"] == "Active" %}onsubmit="return confirm('Deactivate this category? Active units keep their category; no new unit can be filed under it.');"{% endif %}>
+                  {{ csrf_field() }}
+                  <button class="btn btn-outline" type="submit">
+                    {{ 'Deactivate' if row["status"] == 'Active' else 'Activate' }}
+                  </button>
+                </form>
+                {% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6">No category matches this filter.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if categories and not can_categories %}
+      <p class="panel-note">Categories are read-only for this seat. An
+        administrator can hand the Asset Categories right to the role or the
+        account from the role dialog.</p>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}

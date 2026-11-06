@@ -1,0 +1,97 @@
+
+{% extends "base.html" %}
+
+{% block title %}Warehouse Management{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">WAREHOUSE MANAGEMENT</span>
+            <h1>Warehouses and Storage Locations</h1>
+            <p>Manage your organization's warehouses and material storage locations.</p>
+        </div>
+    </div>
+</section>
+
+<section class="section bg-ivory">
+    <div class="container">
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% for category, message in messages %}
+                <div class="finance-alert {{ category }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endwith %}
+
+        <div class="dash-panel">
+            <h2>Register Warehouse</h2>
+
+            <form method="POST">
+                {% if csrf_token is defined %}
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                {% endif %}
+
+                <div class="form-grid">
+                    <div>
+                        <label>Warehouse Code *</label>
+                        <input name="warehouse_code" required
+                               placeholder="WH-001">
+                    </div>
+
+                    <div>
+                        <label>Warehouse Name *</label>
+                        <input name="warehouse_name" required
+                               placeholder="Main Warehouse">
+                    </div>
+
+                    <div>
+                        <label>Location</label>
+                        <input name="location"
+                               placeholder="Building, floor or location">
+                    </div>
+                </div>
+
+                <div class="stock-actions">
+                    <button class="btn" type="submit">
+                        Create Warehouse
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div class="dash-panel hr-table-panel">
+            <h2>Registered Warehouses</h2>
+
+            <div class="hr-table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Code</th>
+                            <th>Warehouse</th>
+                            <th>Location</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for warehouse in warehouses %}
+                        <tr>
+                            <td>{{ warehouse.warehouse_code }}</td>
+                            <td>{{ warehouse.warehouse_name }}</td>
+                            <td>{{ warehouse.location or '-' }}</td>
+                            <td>{{ warehouse.status }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4">No warehouses registered.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+</section>
+{% endblock %}

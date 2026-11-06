@@ -1,0 +1,269 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi, bars, donut with context %}
+
+{% block title %}Recruitment reports{% endblock %}
+
+{% block content %}
+{% set departments_bar = namespace(rows=[]) %}
+{% for row in funnel %}
+  {% if departments_bar.rows | length < 8 %}
+    {% set departments_bar.rows = departments_bar.rows +
+         [{'label': row.department, 'value': row.applicants | int,
+           'display': '{} in · {} hired'.format(row.applicants | int, row.hired | int)}] %}
+  {% endif %}
+{% endfor %}
+
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Recruitment desk</span>
+      <h1>Recruitment reports</h1>
+      <p>Hiring counted from the records themselves &mdash; posts, candidates, marked
+        papers and panel scores &mdash; inside this account&rsquo;s reach. No figure on
+        this page is typed in twice.</p>
+    </div>
+    <nav class="stock-actions" aria-label="Report actions">
+      <a class="btn btn-outline btn-sm" href="{{ url_for('recruitment.hr_vacancies') }}">
+        Vacancy register
+      </a>
+      <a class="btn btn-outline btn-sm" href="{{ url_for('recruitment.hr_applicants') }}">
+        Applicants
+      </a>
+      {% if scope.can_budget or scope.can_manage %}
+      <a class="btn btn-outline btn-sm" href="{{ url_for('recruitment.finance_desk') }}">
+        Budget desk
+      </a>
+      {% endif %}
+    </nav>
+  </div>
+</section>
+
+<section class="container finance-page">
+  <div class="hr-stats">
+    {{ kpi('Posts', total_posts, open_posts ~ ' open · ' ~ draft_posts ~ ' draft',
+           'flat', 'briefcase', href=url_for('recruitment.hr_vacancies')) }}
+    {{ kpi('Applications', stages.applications, 'in reach', 'flat', 'users') }}
+    {{ kpi('Shortlisted', stages.shortlisted, 'past the first cut', 'flat', 'check') }}
+    {{ kpi('Selected', stages.selected, 'the desk said yes', 'up', 'target') }}
+    {{ kpi('Hired', stages.hired, 'reaches payroll', 'up', 'user') }}
+    {{ kpi('Awaiting approval', awaiting, 'requests on a chain',
+           'down' if awaiting else 'flat', 'clock') }}
+    {{ kpi('Committed', committed | money, 'against budget', 'flat', 'calculator') }}
+  </div>
+
+  <div class="dash-grid">
+    {{ bars('Where candidates reach', [
+         {'label': 'Applied', 'value': stages.applied},
+         {'label': 'Shortlisted', 'value': stages.shortlisted},
+         {'label': 'Interview', 'value': stages.interview},
+         {'label': 'Selected', 'value': stages.selected},
+         {'label': 'Hired', 'value': stages.hired},
+         {'label': 'Rejected', 'value': stages.rejected}
+       ], 'every stage of the reach') }}
+
+    {{ donut('Posts published',
+             (open_posts / total_posts) if total_posts else 0,
+             open_posts ~ ' / ' ~ total_posts,
+             [{'label': 'Open', 'color': 'var(--walnut)', 'value': open_posts},
+              {'label': 'Draft', 'color': 'var(--warning)', 'value': draft_posts},
+              {'label': 'Closed', 'color': 'var(--line-strong)', 'value': closed_posts}],
+             'open against the register') }}
+
+    {{ bars('By department', departments_bar.rows, 'applicants, widest first') }}
+  </div>
+
+  <div class="dash-panel">
+    <h2>What the hiring costs</h2>
+    <div class="desk-split">
+      <dl class="detail-list">
+        <div>
+          <dt>Estimated across every post in reach</dt>
+          <dd>{{ money.requested | money }}</dd>
+        </div>
+        <div>
+          <dt>Carried by posts already published</dt>
+          <dd>{{ money.published_cost | money }}</dd>
+        </div>
+        <div>
+          <dt>Still a draft</dt>
+          <dd>{{ money.draft_cost | money }}</dd>
+        </div>
+        <div>
+          <dt>Committed against a budget line</dt>
+          <dd>{{ committed | money }}</dd>
+        </div>
+      </dl>
+      <p class="panel-note">A commitment is written when a hiring request is signed
+        and stays until the post is withdrawn, so this is the money the budget already
+        counts as spent, not an estimate waiting for a signature.</p>
+    </div>
+    {% if scope.can_budget or scope.can_manage %}
+    <p class="panel-note">The chains themselves wait at the
+      <a href="{{ url_for('recruitment.finance_desk') }}">recruitment budget desk</a>
+      and are signed on the
+      <a href="{{ url_for('approvals.dashboard') }}">approvals screen</a>, where every
+      decision in the company is written.</p>
+    {% endif %}
+  </div>
+
+  <div class="dash-panel hr-table-panel">
+    <h2>Posts and their pipeline</h2>
+    <div class="hr-table-wrap table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Reference</th>
+            <th>Post</th>
+            <th>Department</th>
+            <th>Status</th>
+            <th>Openings</th>
+            <th>Applications</th>
+            <th>Shortlist</th>
+            <th>Interview</th>
+            <th>Selected</th>
+            <th>Hired</th>
+            <th>Exam avg</th>
+            <th>Panel avg</th>
+            <th>Estimate</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for post in posts %}
+          <tr>
+            <td class="nowrap">
+              <a href="{{ url_for('recruitment.vacancy_detail', vacancy_id=post.id) }}">
+                {{ post.reference }}</a>
+            </td>
+            <td class="wrap-cell">
+              <strong>{{ post.job_title }}</strong>
+              <span class="cell-note">
+                raised {{ post.created_at | friendly_date }}
+                {%- if post.closing_date %} · closes
+                  {{ post.closing_date | friendly_date }}{% endif %}
+              </span>
+            </td>
+            <td>{{ post.department }}</td>
+            <td>
+              <span class="status-badge {{ 'active' if post.status == 'Open'
+                                            else 'off' if post.status == 'Closed'
+                                            else 'neutral' }}">{{ post.status }}</span>
+            </td>
+            <td>{{ post.openings }}</td>
+            <td>{{ post.applicants }}</td>
+            <td>{{ post.shortlisted }}</td>
+            <td>{{ post.interviewed }}</td>
+            <td>{{ post.selected }}</td>
+            <td>{{ post.hired }}</td>
+            <td>{{ '%.1f' | format(post.exam_average | float)
+                   if post.exam_average is not none else '—' }}</td>
+            <td>{{ '%.1f' | format(post.interview_average | float)
+                   if post.interview_average is not none else '—' }}</td>
+            <td class="nowrap">{{ post.estimated_cost | money }}</td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="13" class="employee-empty">
+              No post falls inside this account&rsquo;s reach.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="dash-panel hr-table-panel">
+    <h2>Examinations</h2>
+    <div class="hr-table-wrap table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Paper</th>
+            <th>Post</th>
+            <th>Status</th>
+            <th>Questions</th>
+            <th>Marks</th>
+            <th>Pass mark</th>
+            <th>Seated</th>
+            <th>Handed in</th>
+            <th>Passed</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for exam in exams %}
+          <tr>
+            <td class="wrap-cell">
+              <a href="{{ url_for('recruitment.exam_questions', exam_id=exam.id) }}">
+                {{ exam.exam_title }}</a>
+              <span class="cell-note">{{ exam.start_datetime | audit_time }}
+                &rarr; {{ exam.end_datetime | audit_time }}</span>
+            </td>
+            <td class="wrap-cell">
+              {{ exam.job_title }}
+              <span class="cell-note">
+                {{ exam.vacancy_reference }} · {{ exam.vacancy_department }}</span>
+            </td>
+            <td>
+              <span class="status-badge {{ 'active' if exam.status == 'Published'
+                                            else 'off' if exam.status == 'Closed'
+                                            else 'neutral' }}">{{ exam.status }}</span>
+            </td>
+            <td>
+              {{ exam.question_count }}
+              {% if exam.question_marks | float != exam.total_marks | float %}
+              <span class="cell-note">does not add up</span>
+              {% endif %}
+            </td>
+            <td>{{ '%g' | format(exam.total_marks | float) }}</td>
+            <td>{{ '%g' | format(exam.pass_mark | float) }}</td>
+            <td>{{ exam.candidate_count }}</td>
+            <td>{{ exam.submitted_count }}</td>
+            <td>
+              {{ exam.passed_count }}
+              {% if exam.submitted_count %}
+              <span class="cell-note">
+                of {{ ((exam.passed_count / exam.submitted_count) * 100) | round(0) | int }}%</span>
+              {% else %}
+              <span class="cell-note">no paper handed in</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="9" class="employee-empty">
+              No examination has been set inside this reach.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if exams %}
+    <p class="panel-note">
+      {{ exams | sum(attribute='submitted_count') }} paper(s) handed in of
+      {{ exams | sum(attribute='candidate_count') }} seated,
+      {{ exams | sum(attribute='passed_count') }} at or above their pass mark.</p>
+    {% endif %}
+  </div>
+
+  <div class="dash-panel">
+    <h2>Panel recommendations</h2>
+    {% if outcomes %}
+    <ul class="chip-row">
+      {% for row in outcomes %}
+      <li class="chip">{{ row.outcome }} · {{ row.total }}</li>
+      {% endfor %}
+    </ul>
+    <p class="panel-note">{{ outcomes | sum(attribute='total') }} interview
+      {{ 'decision' if (outcomes | sum(attribute='total')) == 1 else 'decisions' }}
+      recorded, each written by the panel that sat with the candidate.</p>
+    {% else %}
+    <p class="panel-note">No interview has been closed yet, so no panel has left a
+      recommendation to report.</p>
+    {% endif %}
+    {% if scope.read_only %}
+    <p class="panel-note">An audit seat reads these figures and the records behind
+      them; the register, the papers and the panels are written by the desks that own
+      them.</p>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi with context %}
+
+{% block title %}Department Assets | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">ASSET MANAGEMENT</span>
+      <h1>Department Assets</h1>
+      <p>What each unit of the company is holding, under the name the HR
+        register uses today.</p>
+    </div>
+    <div class="row-actions">
+      <a class="btn btn-outline" href="{{ url_for('asset.dashboard') }}">
+        ← Asset desk
+      </a>
+      {% if can_allocate %}
+      <a class="btn" href="{{ url_for('asset.allocate') }}">Allocate asset →</a>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="hr-stats">
+      {{ kpi('Departments holding units', departments | length,
+             'with live assets', 'flat', 'users') }}
+      {{ kpi('Units held', units, 'across those departments', 'flat', 'box') }}
+      {{ kpi('Value held', "{:,.2f}".format(value), 'ETB at purchase cost',
+             'flat', 'wallet') }}
+    </div>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>{% if departments %}{{ departments | length }} department{{ '' if departments | length == 1 else 's' }}{% else %}Departments{% endif %}</h2>
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Department</th><th>Units</th><th>Allocated</th>
+              <th>Value</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in departments %}
+            <tr>
+              <td>
+                <a href="{{ url_for('asset.department_assets', department_id=row['department_id']) }}">
+                  {{ row["department_name"] }}
+                </a>
+              </td>
+              <td>{{ row["total"] }}</td>
+              <td>{{ row["assigned"] }}</td>
+              <td class="nowrap">
+                {{ "{:,.2f}".format(row["value"] | float) }}
+                <span class="feed-meta">ETB</span>
+              </td>
+              <td>
+                <a class="btn btn-outline"
+                   href="{{ url_for('asset.department_assets', department_id=row['department_id']) }}">Open</a>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5">No department is holding an asset yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if not departments %}
+      <p class="panel-note">Allocating a unit to a department puts it on this
+        list. The department picker is read from the HR register, so a retired
+        unit disappears from both.</p>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}

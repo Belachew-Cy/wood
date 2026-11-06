@@ -38,14 +38,14 @@ def budget_template_context():
 
 
 @budget_bp.route("/")
-@perm("budget")
+@perm("budget_management")
 def dashboard():
     """The budget overview now lives on the shared dashboard."""
     return redirect(url_for("dashboard"))
 
 
 @budget_bp.route("/plans")
-@perm("budget")
+@perm("budget_planning")
 def plan_list():
     plans = get_db().execute("""
         SELECT p.*,
@@ -63,7 +63,7 @@ def plan_list():
 
 
 @budget_bp.route("/plans/create", methods=["GET", "POST"])
-@perm("budget")
+@perm("budget_planning")
 def create_plan():
     if request.method == "POST":
         try:
@@ -107,7 +107,7 @@ def create_plan():
 
 
 @budget_bp.route("/plans/<int:plan_id>/status", methods=["POST"])
-@perm("budget")
+@perm("budget_planning")
 def set_plan_status(plan_id):
     status = request.form.get("status", "")
     if status not in ("Active", "Approved", "Closed"):
@@ -146,7 +146,7 @@ def set_plan_status(plan_id):
 
 
 @budget_bp.route("/allocations")
-@perm("budget")
+@perm("budget_allocation")
 def allocations():
     return render_template("budget/allocations.html",
                            allocations=budget_allocation_rows(get_db()),
@@ -154,7 +154,7 @@ def allocations():
 
 
 @budget_bp.route("/allocations/create", methods=["GET", "POST"])
-@perm("budget")
+@perm("budget_allocation")
 def create_allocation():
     db = get_db()
     if request.method == "POST":
@@ -227,7 +227,7 @@ def create_allocation():
 
 
 @budget_bp.route("/requests")
-@perm("budget")
+@perm("budget_planning", "budget_approval")
 def request_list():
     rows = get_db().execute("""
         SELECT r.*, p.plan_name,
@@ -242,7 +242,7 @@ def request_list():
 
 
 @budget_bp.route("/requests/create", methods=["GET", "POST"])
-@perm("budget")
+@perm("budget_planning")
 def create_request():
     db = get_db()
     if request.method == "POST":
@@ -315,7 +315,7 @@ def create_request():
 
 
 @budget_bp.route("/requests/<int:request_id>/decision", methods=["POST"])
-@perm("budget")
+@perm("budget_approval")
 def decide_request(request_id):
     db = get_db()
     row = db.execute("SELECT * FROM budget_requests WHERE id = ?",
@@ -370,7 +370,7 @@ def decide_request(request_id):
 
 
 @budget_bp.route("/expenditures")
-@perm("budget")
+@perm("budget_monitoring")
 def expenditures():
     rows = get_db().execute("""
         SELECT e.*, a.allocation_name, a.department,
@@ -387,7 +387,7 @@ def expenditures():
 
 
 @budget_bp.route("/expenditures/create", methods=["GET", "POST"])
-@perm("budget")
+@perm("budget_monitoring")
 def create_expenditure():
     db = get_db()
     if request.method == "POST":
@@ -446,7 +446,7 @@ def create_expenditure():
 
 
 @budget_bp.route("/reports")
-@perm("budget")
+@perm("budget_reports")
 def reports():
     db = get_db()
     fiscal_years = [row["fiscal_year"] for row in db.execute("""

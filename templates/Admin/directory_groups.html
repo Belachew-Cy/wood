@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% from "Admin/_directory_page.html" import directory_head, directory_flash with context %}
+
+{% block title %}Group mapping · {{ connection.name }} | Dereje Belay Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+{{ directory_head('Group mapping',
+     connection.name ~ ' · ' ~ kind_label ~ ' groups decide which role a synced account receives.',
+     connection) }}
+
+<section class="section bg-white">
+  <div class="container">
+    {{ directory_flash(notes) }}
+
+    <div class="hr-stats">
+      <div class="stat"><strong>{{ stored | length }}</strong><span>Groups known</span></div>
+      <div class="stat"><strong>{{ stored | selectattr('enabled') | list | length }}</strong>
+        <span>Mappings enabled</span></div>
+      <div class="stat"><strong>{{ mapped_keys | length }}</strong><span>Groups mapped</span></div>
+    </div>
+
+    <div class="emp-panel" style="margin-top: 1.5rem;">
+      <div class="account-card">
+        <header class="account-head">
+          <div>
+            <h3 class="account-name">Read the directory groups</h3>
+            <span class="cell-note">Discovery only stores each group's name, key and member
+              count; it discards them from review and maps nothing.</span>
+          </div>
+          <form method="POST">
+            {{ csrf_field() }}
+            <input type="hidden" name="action" value="discover" />
+            <button class="btn" type="submit">Read groups <span class="arrow">→</span></button>
+          </form>
+        </header>
+      </div>
+
+      <div class="account-card">
+        <header class="account-head">
+          <div>
+            <h3 class="account-name">Map a group to a role</h3>
+            <span class="cell-note">A mapped group grants its role when a synced account is a
+              member. One group may map to more than one role; saving enables the mapping.</span>
+          </div>
+        </header>
+
+        <form method="POST" class="dash-form account-form">
+          {{ csrf_field() }}
+          <input type="hidden" name="action" value="map" />
+          <div class="account-grid">
+            <div>
+              <label for="group_key">Group</label>
+              <input id="group_key" name="group_key" type="text" maxlength="512" required
+                     list="groupChoices" placeholder="CN=WK-Finance,OU=Groups,DC=corp,DC=local" />
+              <datalist id="groupChoices">
+                {% for row in stored %}
+                <option value="{{ row.group_key }}"
+                        label="{{ row.group_name or row.group_key }}{{ ' · mapped' if row.group_key in mapped_keys else '' }}">
+                  {{ row.member_count }} member{{ '' if row.member_count == 1 else 's' }}</option>
+                {% endfor %}
+              </datalist>
+              <p class="cell-note">Pick a discovered group, or paste the group's DN or object
+                id.</p>
+            </div>
+            <div>
+              <label for="group_name">Display name</label>
+              <input id="group_name" name="group_name" type="text" maxlength="120"
+                     placeholder="WK Finance" />
+            </div>
+            <div>
+              <label for="role_key">Role granted</label>
+              <select id="role_key" name="role_key" required>
+                {% for key, label in roles %}
+                <option value="{{ key }}" {% if key == connection.default_role %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label for="note">Note</label>
+              <input id="note" name="note" type="text" maxlength="200"
+                     placeholder="Finance staff below the directorate" />
+            </div>
+          </div>
+          <label class="dir-check-line">
+            <input type="checkbox" name="nested" checked />
+            Include members of nested groups
+          </label>
+          <div class="finance-form-actions">
+            <button class="btn" type="submit">Save mapping <span class="arrow">→</span></button>
+          </div>
+        </form>
+      </div>
+
+      <div class="account-card">
+        <header class="account-head">
+          <div>
+            <h3 class="account-name">Stored mappings</h3>
+            <span class="cell-note">Disabling keeps the mapping but grants nothing. To change
+              the role of a group, remove its mapping and add it again.</span>
+          </div>
+          <span class="cell-note">{{ stored | length }} row{{ '' if stored | length == 1 else 's' }}</span>
+        </header>
+
+        <div class="dash-table-wrap">
+          <table>
+            <thead>
+              <tr><th>Group</th><th>Members</th><th>Role</th><th>Nested</th><th>State</th>
+                  <th>Note</th><th></th></tr>
+            </thead>
+            <tbody>
+              {% for row in stored %}
+              <tr>
+                <td>
+                  {{ row.group_name or row.group_key }}
+                  <p class="cell-note">{{ row.group_key }}</p>
+                </td>
+                <td>{{ row.member_count }}</td>
+                <td>{{ row.role_name or row.role_key }}</td>
+                <td>{{ 'Yes' if row.nested else 'No' }}</td>
+                <td>
+                  <span class="status-badge {{ 'active' if row.enabled else 'off' }}">
+                    {{ 'enabled' if row.enabled else 'disabled' }}</span>
+                  {% if row.synced_at %}<p class="cell-note">synced {{ row.synced_at | audit_time }}</p>{% endif %}
+                </td>
+                <td class="cell-note">{{ row.note or '—' }}</td>
+                <td>
+                  <div class="row-actions">
+                    <form method="POST">
+                      {{ csrf_field() }}
+                      <input type="hidden" name="action" value="toggle" />
+                      <input type="hidden" name="mapping_id" value="{{ row.id }}" />
+                      <input type="hidden" name="enabled" value="{{ 0 if row.enabled else 1 }}" />
+                      <button class="btn btn-outline-dark btn-sm" type="submit">
+                        {{ 'Disable' if row.enabled else 'Enable' }}</button>
+                    </form>
+                    <form method="POST"
+                          onsubmit="return confirm('Remove this group mapping? Synced accounts keep the roles they already have.');">
+                      {{ csrf_field() }}
+                      <input type="hidden" name="action" value="unmap" />
+                      <input type="hidden" name="mapping_id" value="{{ row.id }}" />
+                      <button class="btn-danger btn-sm" type="submit">Remove</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="7" class="cell-note">No group is known yet. Read the groups from
+                  the directory, then map the ones this system should follow.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

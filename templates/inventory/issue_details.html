@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container-fluid py-4">
+
+    <h3>Material Issue Note</h3>
+
+    <div class="card shadow-sm border-0 mt-3">
+        <div class="card-body">
+
+            <h5>Issue Information</h5>
+
+            <p>
+                <strong>Issue Number:</strong>
+                {{ issue.issue_number }}
+            </p>
+
+            <p>
+                <strong>Request Number:</strong>
+                {{ issue.request_id }}
+            </p>
+
+            <p>
+                <strong>Issued By:</strong>
+                {{ issue.issued_by }}
+            </p>
+
+            <p>
+                <strong>Received By:</strong>
+                {{ issue.receiver_id }}
+            </p>
+
+            <p>
+                <strong>Issue Date:</strong>
+                {{ issue.issue_date.strftime('%Y-%m-%d %H:%M') }}
+            </p>
+
+            <hr>
+
+            <h5>Issued Materials</h5>
+
+            <table class="table table-bordered">
+                <thead>
+                    <tr>
+                        <th>Item ID</th>
+                        <th>Warehouse ID</th>
+                        <th>Issued Quantity</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for item in issue.items %}
+                    <tr>
+                        <td>{{ item.item_id }}</td>
+                        <td>{{ item.warehouse_id }}</td>
+                        <td>{{ item.issued_quantity }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <p>
+                <strong>Remarks:</strong>
+                {{ issue.remarks or "N/A" }}
+            </p>
+
+            <button onclick="window.print()"
+                    class="btn btn-success">
+                Print Issue Note
+            </button>
+
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}

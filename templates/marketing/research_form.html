@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit' if item else 'Record' }} Research | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">MARKETING MANAGEMENT</span>
+      <h1>{{ item["title"] if item else 'Record Market Research' }}</h1>
+      <p>{% if item %}
+          {{ item["research_type"] or 'type to be set' }} ·
+          {{ item["research_date"] }} · prepared by
+          {{ item["prepared_by_name"] or '—' }}
+        {% else %}
+          One record per study: what was looked at, which segment, and what it
+          showed.
+        {% endif %}</p>
+    </div>
+    <a class="btn btn-outline" href="{{ url_for('marketing.research') }}">
+      ← Back to research
+    </a>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="dash-panel">
+      <h2>{{ 'Study details' if item else 'New record' }}</h2>
+
+      <form method="POST" class="dash-form stock-grid">
+        {{ csrf_field() }}
+        <div>
+          <label for="title">Title *</label>
+          <input id="title" name="title" maxlength="150" required
+                 value="{{ item['title'] if item else '' }}"
+                 placeholder="e.g. Kitchen refit price check, Addis Ababa" />
+        </div>
+
+        <div>
+          <label for="research_type">Study type</label>
+          <select id="research_type" name="research_type">
+            <option value="">Not recorded</option>
+            {% for value in research_types %}
+            <option value="{{ value }}"
+              {% if item and item['research_type'] == value %}selected{% endif %}>
+              {{ value }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label for="market_segment">Market segment</label>
+          <input id="market_segment" name="market_segment" maxlength="150"
+                 value="{{ (item['market_segment'] or '') if item else '' }}"
+                 placeholder="e.g. Contractors, households, offices" />
+        </div>
+
+        <div>
+          <label for="research_date">Research date *</label>
+          <input id="research_date" type="date" name="research_date" required
+                 value="{{ item['research_date'] if item else '' }}" />
+        </div>
+
+        <div class="stock-notes">
+          <label for="findings">Findings</label>
+          <textarea id="findings" name="findings" rows="7" maxlength="4000"
+                    placeholder="What was measured, what it means for the plan, what to do next.">{{ (item['findings'] or '') if item else '' }}</textarea>
+        </div>
+
+        <div class="stock-form-actions">
+          <button class="btn" type="submit">Save record</button>
+          <a class="btn btn-outline" href="{{ url_for('marketing.research') }}">Cancel</a>
+        </div>
+      </form>
+    </div>
+
+    {% if item %}
+    <div class="dash-panel">
+      <h2>Record</h2>
+      <dl class="detail-list">
+        <dt>Prepared by</dt><dd>{{ item["prepared_by_name"] or '—' }}</dd>
+        <dt>Recorded on</dt><dd>{{ item["created_at"] | audit_time }}</dd>
+        <dt>Last modified</dt>
+        <dd>{{ item["updated_by_name"] or '—' }} ·
+            {{ item["updated_at"] | audit_time }}</dd>
+      </dl>
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

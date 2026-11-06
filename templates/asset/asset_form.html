@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit' if asset else 'Register' }} Asset | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+{% set draft = draft|default({}, true) %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">ASSET MANAGEMENT</span>
+      <h1>{{ asset["name"] if asset else 'Register an asset' }}</h1>
+      <p>{% if asset %}
+          {{ asset["asset_code"] }} · {{ asset["status"] }}
+          · {{ asset["category_name"] or 'Uncategorised' }}
+        {% else %}
+          A unit carries the category, the price the company paid and the place
+          it lives. The register issues the tag when the code is left blank.
+        {% endif %}</p>
+    </div>
+    <a class="btn btn-outline"
+       href="{{ url_for('asset.asset_detail', asset_id=asset['id']) if asset
+                else url_for('asset.assets') }}">
+      ← {{ 'Back to asset' if asset else 'Back to register' }}
+    </a>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="dash-panel">
+      <h2>{{ 'Asset details' if asset else 'Raise a unit' }}</h2>
+
+      <form method="POST" class="dash-form stock-grid"
+            action="{{ url_for('asset.edit_asset', asset_id=asset['id']) if asset
+                     else url_for('asset.create_asset') }}">
+        {{ csrf_field() }}
+        {% if not asset and draft.get('procurement_order_id') %}
+        <input type="hidden" name="procurement_order_id"
+               value="{{ draft.get('procurement_order_id') }}" />
+        {% endif %}
+
+        {% if asset %}
+        <div>
+          <label for="asset_code">Asset code</label>
+          <input id="asset_code" value="{{ asset['asset_code'] }}" disabled />
+        </div>
+        {% else %}
+        <div>
+          <label for="asset_code">Asset code</label>
+          <input id="asset_code" name="asset_code" maxlength="50"
+                 placeholder="Leave blank to issue the next AST number" />
+        </div>
+        {% endif %}
+
+        <div>
+          <label for="name">Asset name *</label>
+          <input id="name" name="name" maxlength="180" required
+                 value="{{ asset['name'] if asset else draft.get('name', '') }}"
+                 placeholder="e.g. Bosch table saw" />
+        </div>
+
+        <div>
+          <label for="category_id">Category *</label>
+          <select id="category_id" name="category_id" required>
+            <option value="">Choose a category</option>
+            {% for row in categories %}
+            <option value="{{ row['id'] }}"
+              {% if asset and asset['category_id'] == row['id'] %}selected{% endif %}>
+              {{ row["name"] }} ({{ row["code"] }})
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label for="condition">Condition</label>
+          <select id="condition" name="condition">
+            {% for value in asset_conditions %}
+            <option value="{{ value }}"
+              {% if (asset and asset['condition'] == value)
+                    or (not asset and value == 'Good') %}selected{% endif %}>
+              {{ value }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label for="serial_number">Serial number</label>
+          <input id="serial_number" name="serial_number" maxlength="100"
+                 value="{{ asset['serial_number'] if asset else '' }}" />
+        </div>
+
+        <div>
+          <label for="model_number">Model</label>
+          <input id="model_number" name="model_number" maxlength="100"
+                 value="{{ asset['model_number'] if asset else '' }}" />
+        </div>
+
+        <div>
+          <label for="manufacturer">Manufacturer</label>
+          <input id="manufacturer" name="manufacturer" maxlength="120"
+                 value="{{ asset['manufacturer'] if asset else '' }}" />
+        </div>
+
+        <div>
+          <label for="purchase_date">Purchase date</label>
+          <input id="purchase_date" type="date" name="purchase_date"
+                 value="{{ asset['purchase_date'] if asset else '' }}" />
+        </div>
+
+        <div>
+          <label for="purchase_cost">Purchase cost</label>
+          <input id="purchase_cost" type="number" step="0.01" min="0"
+                 name="purchase_cost"
+                 value="{{ asset['purchase_cost'] if asset else draft.get('purchase_cost', 0) }}" />
+        </div>
+
+        <div>
+          <label for="warranty_expiry">Warranty expiry</label>
+          <input id="warranty_expiry" type="date" name="warranty_expiry"
+                 value="{{ asset['warranty_expiry'] if asset else '' }}" />
+        </div>
+
+        <div>
+          <label for="supplier">Supplier</label>
+          <input id="supplier" name="supplier" maxlength="150"
+                 value="{{ asset['supplier'] if asset else draft.get('supplier', '') }}" />
+        </div>
+
+        <div>
+          <label for="purchase_order_number">Purchase order</label>
+          <input id="purchase_order_number" name="purchase_order_number"
+                 maxlength="100"
+                 value="{{ asset['purchase_order_number'] if asset
+                          else draft.get('purchase_order_number', '') }}" />
+        </div>
+
+        <div>
+          <label for="funding_source">Funding source</label>
+          <input id="funding_source" name="funding_source" maxlength="100"
+                 value="{{ asset['funding_source'] if asset else '' }}"
+                 placeholder="e.g. Capital budget" />
+        </div>
+
+        <div>
+          <label for="location">Location</label>
+          <input id="location" name="location" maxlength="200"
+                 value="{{ asset['location'] if asset else '' }}"
+                 placeholder="Store, workshop or site" />
+        </div>
+
+        <div class="stock-notes">
+          <label for="description">Description</label>
+          <textarea id="description" name="description" rows="3" maxlength="2000"
+                    placeholder="What the unit is, what came with it and anything the custodian should know.">{{ asset['description'] if asset else draft.get('description', '') }}</textarea>
+        </div>
+
+        <div class="stock-notes">
+          <label for="notes">Register notes</label>
+          <textarea id="notes" name="notes" rows="3" maxlength="2000"
+                    placeholder="Service history, restrictions or a handover note.">{{ asset['notes'] if asset else '' }}</textarea>
+        </div>
+
+        <div class="stock-form-actions">
+          <button class="btn" type="submit">Save asset</button>
+          <a class="btn btn-outline"
+             href="{{ url_for('asset.asset_detail', asset_id=asset['id']) if asset
+                      else url_for('asset.assets') }}">Cancel</a>
+        </div>
+      </form>
+
+      <p class="panel-note">Status is not typed here. A unit is Available until it
+        is allocated, and only a returned allocation puts it back on the
+        shelf.</p>
+    </div>
+  </div>
+</section>
+{% endblock %}

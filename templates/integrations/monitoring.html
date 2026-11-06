@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi, bars, feed with context %}
+{% from "integrations/_module_nav.html" import module_tabs with context %}
+
+{% block title %}Integration Monitoring | Dereje Belay Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">System Integration</span>
+      <h1>Monitoring</h1>
+      <p>What each connection is scheduled to do, what it last did, and every error that is still
+        open. Nothing here changes a connection: each row points back to the screen that does.</p>
+    </div>
+    {{ module_tabs('monitoring') }}
+  </div>
+</section>
+
+<section class="section bg-white">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="hr-stats">
+      {{ kpi('Connections', stats.total or 0,
+             '{} active · {} scheduled'.format(stats.active or 0, stats.scheduled or 0),
+             icon='network') }}
+      {{ kpi('Tests passed', test_stats.passed or 0,
+             '{} of {} recorded tests'.format(test_stats.passed or 0, test_stats.total or 0),
+             tone='up', icon='check') }}
+      {{ kpi('Tests failed', test_stats.failed or 0,
+             'Endpoint refused or unreachable' if test_stats.failed else 'No failed test',
+             tone='down' if test_stats.failed else 'flat', icon='warn') }}
+      {{ kpi('Synchronizations', run_stats.total or 0,
+             '{} failed in the last 30 days'.format(run_stats.failed or 0)
+             if run_stats.failed else 'Last 30 days, all clean',
+             tone='down' if run_stats.failed else 'up', icon='clock') }}
+    </div>
+
+    {% set directory_rows = [] %}
+    {% for c in cards if c.is_ad %}
+      {% set _ = directory_rows.append({
+        'label': c.name, 'value': c.ad_accounts,
+        'display': '{} acct'.format(c.ad_accounts) }) %}
+    {% endfor %}
+
+    {% set error_items = [] %}
+    {% for e in errors if not e.resolved %}
+      {% set _ = error_items.append({
+        'icon': 'warn', 'tone': 'warn',
+        'title': '{}: {}'.format(e.integration_name or 'a removed connection',
+                                 e.error_type or 'error'),
+        'meta': e.error_message,
+        'time': e.created_at | audit_time }) %}
+    {% endfor %}
+
+    <div class="chart-grid" style="margin-top: 1.5rem;">
+      {{ bars('Directory accounts read', directory_rows, 'per connection') }}
+      {{ feed('Open errors', error_items, 'Cleared below, never silently') }}
+    </div>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    <div class="emp-panel">
+
+      <div class="account-card">
+        <header class="account-head">
+          <div>
+            <h3 class="account-name">Schedule and last result</h3>
+            <span class="cell-note">A worker started with <code>flask integration-scheduler</code>
+              reads the next-run column; without it only manual runs happen.</span>
+          </div>
+          {% if run_stats.still_running %}
+          <span class="status-badge neutral">{{ run_stats.still_running }} still running</span>
+          {% endif %}
+        </header>
+
+        <div class="dash-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Connection</th><th>Status</th><th>Automatic</th><th>Next run</th>
+                <th>Last sync</th><th>Last test</th><th>Open errors</th><th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for c in cards %}
+              <tr class="{{ 'is-disabled' if c.status != 'active' }}">
+                <td>
+                  <a href="{{ url_for('integrations.edit', integration_id=c.id) }}">{{ c.name }}</a>
+                  <p class="cell-note">{{ c.integration_type }}</p>
+                </td>
+                <td>
+                  <span class="status-badge {{ 'active' if c.status == 'active' else 'off' }}">
+                    {{ c.status }}</span>
+                </td>
+                <td>{{ 'Every {} min'.format(c.sync_interval) if c.sync_enabled else 'Manual' }}</td>
+                <td class="cell-note">{{ c.next_run_at | audit_time or 'not scheduled' }}</td>
+                <td class="cell-note">{{ c.last_sync_at | audit_time or 'never' }}</td>
+                <td>
+                  <span class="status-badge {{ 'active' if c.last_test == 'success'
+                                                else ('off' if c.last_test == 'failed'
+                                                else 'neutral') }}">
+                    {{ c.last_test or 'untested' }}</span>
+                  <p class="cell-note">{{ c.last_test_at | audit_time or 'never' }}</p>
+                </td>
+                <td>
+                  {% if c.open_errors %}
+                  <span class="status-badge off">{{ c.open_errors }}</span>
+                  {% else %}
+                  <span class="cell-note">none</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <div class="row-actions">
+                    <a class="btn btn-outline-dark btn-sm"
+                       href="{{ url_for('integrations.connection_history', integration_id=c.id) }}">
+                      History</a>
+                    {% if c.can_sync %}
+                    <form method="POST" action="{{ url_for('integrations.sync', integration_id=c.id) }}">
+                      {{ csrf_field() }}
+                      <button class="btn btn-outline-dark btn-sm" type="submit">Sync now</button>
+                    </form>
+                    {% endif %}
+                    {% if c.is_ad %}
+                    <a class="btn btn-outline-dark btn-sm"
+                       href="{{ url_for('integrations.ad_mapping', integration_id=c.id) }}">Mapping</a>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="8" class="cell-note">No connection is registered yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="account-card">
+        <header class="account-head">
+          <div>
+            <h3 class="account-name">Errors</h3>
+            <span class="cell-note">Opened by a failed test or a failed run. Marking one resolved
+              says the administrator has seen it; it does not change the connection.</span>
+          </div>
+        </header>
+        <div class="dash-table-wrap">
+          <table>
+            <thead>
+              <tr><th>Connection</th><th>Type</th><th>Message</th><th>Opened</th>
+                  <th>State</th><th></th></tr>
+            </thead>
+            <tbody>
+              {% for e in errors %}
+              <tr>
+                <td>{{ e.integration_name or 'Removed connection' }}</td>
+                <td>{{ e.error_type or 'error' }}</td>
+                <td class="wrap-cell">{{ e.error_message }}</td>
+                <td class="nowrap">{{ e.created_at | audit_time }}</td>
+                <td>
+                  <span class="status-badge {{ 'active' if e.resolved else 'off' }}">
+                    {{ 'resolved' if e.resolved else 'open' }}</span>
+                </td>
+                <td>
+                  {% if not e.resolved %}
+                  <form method="POST" action="{{ url_for('integrations.resolve_error', error_id=e.id) }}">
+                    {{ csrf_field() }}
+                    <button class="btn btn-outline-dark btn-sm" type="submit">Mark resolved</button>
+                  </form>
+                  {% endif %}
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="6" class="cell-note">No synchronization has failed yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="account-card">
+        <header class="account-head">
+          <div>
+            <h3 class="account-name">Recent synchronizations</h3>
+            <span class="cell-note">One row per run, scheduled or manual, with the message the
+              adapter returned.</span>
+          </div>
+        </header>
+        <div class="dash-table-wrap">
+          <table>
+            <thead>
+              <tr><th>Connection</th><th>Kind</th><th>Result</th><th>Message</th>
+                  <th>Started</th><th>Completed</th></tr>
+            </thead>
+            <tbody>
+              {% for r in runs %}
+              <tr>
+                <td>{{ r.integration_name or 'Removed connection' }}</td>
+                <td>{{ r.sync_type }}</td>
+                <td>
+                  <span class="status-badge {{ 'active' if r.status == 'success'
+                                                else ('off' if r.status == 'failed'
+                                                else 'neutral') }}">{{ r.status }}</span>
+                </td>
+                <td class="wrap-cell">{{ r.message }}</td>
+                <td class="nowrap">{{ r.started_at | audit_time }}</td>
+                <td class="nowrap">{{ r.completed_at | audit_time or 'running' }}</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="6" class="cell-note">Nothing has been synchronized yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <p class="perm-note">Every action taken from this desk is in the
+          <a href="{{ url_for('integrations.logs') }}">integration activity log</a>, and the same
+          rows are visible to the audit seat in the audit console.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+{% endblock %}

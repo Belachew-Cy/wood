@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi, bars, donut, feed with context %}
+
+{% block title %}Project Desk | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+{% set counts = summary["counts"] %}
+
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">PROJECT MANAGEMENT</span>
+      <h1>Project Desk</h1>
+      <p>Signed in as {{ user["full_name"] }} · {{ role_label }} access</p>
+    </div>
+    <div class="row-actions">
+      {% if can_register %}
+      <a class="btn" href="{{ url_for('project.create_project') }}">New project →</a>
+      {% endif %}
+      <a class="btn btn-outline" href="{{ url_for('project.projects') }}">
+        Project register
+      </a>
+    </div>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="hr-stats">
+      {{ kpi('Jobs running', summary["live"], 'in progress or on hold', 'flat',
+             'briefcase', url_for('project.projects')) }}
+      {{ kpi('Awaiting a signature', summary["awaiting"],
+             'with the approval desk', 'warn' if summary["awaiting"] else 'flat',
+             'check', url_for('project.projects', status='Pending')) }}
+      {{ kpi('Drafts', summary["drafts"], 'not yet submitted', 'flat', 'file',
+             url_for('project.projects', status='Draft')) }}
+      {{ kpi('Open tasks', summary["open_tasks"], 'across every job', 'flat',
+             'clipboard', url_for('project.tasks', mine='0')) }}
+      {{ kpi('Overdue tasks', summary["overdue_tasks"], 'past their due date',
+             'down' if summary["overdue_tasks"] else 'flat', 'clock',
+             url_for('project.tasks', mine='0', overdue='1')) }}
+      {{ kpi('Overdue milestones', summary["overdue_milestones"],
+             'dates the site has missed',
+             'down' if summary["overdue_milestones"] else 'flat', 'clock',
+             url_for('project.milestones')) }}
+      {{ kpi('Awaiting budget', "{:,.2f}".format(summary["pending_value"] | float),
+             'ETB in unpublished jobs', 'flat', 'wallet') }}
+      {{ kpi('Jobs on the register', summary["total"], 'drafts and live work',
+             'flat', 'chart') }}
+    </div>
+
+    {% set status_rows = [] %}
+    {% for row in breakdown %}
+      {% set _ = status_rows.append({
+        'label': row["status"], 'value': row["total"] | int,
+        'display': '{} · {:,.0f} ETB'.format(row["total"], row["budget"] | float)
+      }) %}
+    {% endfor %}
+
+    {% set manager_rows = [] %}
+    {% for row in workload %}
+      {% set _ = manager_rows.append({
+        'label': row["full_name"], 'value': row["job_count"] | int,
+        'display': '{} project{} · {} open task{}'.format(
+          row["job_count"], '' if row["job_count"] == 1 else 's',
+          row["open_tasks"], '' if row["open_tasks"] == 1 else 's')
+      }) %}
+    {% endfor %}
+
+    {% set date_rows = [] %}
+    {% for row in upcoming %}
+      {% set _ = date_rows.append({
+        'icon': 'clock', 'tone': 'bad' if row["due_date"] < today else 'warn',
+        'title': row["milestone_name"],
+        'meta': '{} · {}'.format(row["project_code"], row["project_name"]),
+        'href': url_for('project.project_detail', project_id=row["project_id"]),
+        'time': row["due_date"]
+      }) %}
+    {% endfor %}
+
+    <div class="chart-grid">
+      {{ bars('Jobs by status', status_rows, 'count · budget') }}
+      {{ bars('Who is carrying what', manager_rows, 'open work by manager') }}
+      {{ donut('Completed jobs',
+               (counts["Completed"] / summary["total"]) if summary["total"] else 0,
+               '{} of {}'.format(counts["Completed"], summary["total"]),
+               [{'label': 'Completed', 'color': 'var(--walnut)',
+                 'value': counts["Completed"]},
+                {'label': 'Still open', 'color': 'var(--ivory-2)',
+                 'value': summary["total"] - counts["Completed"]}],
+               'the register by outcome') }}
+      {{ feed('Dates coming up', date_rows[:8], 'next 30 days',
+              {'href': url_for('project.milestones'), 'label': 'Open milestones'}) }}
+    </div>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>Latest on the register</h2>
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Job</th><th>Client / site</th><th>Dates</th><th>Budget</th>
+              <th>Progress</th><th>Status</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in recent %}
+            <tr>
+              <td>
+                <a href="{{ url_for('project.project_detail', project_id=item['id']) }}">
+                  {{ item["project_name"] }}
+                </a>
+                <br><span class="feed-meta">{{ item["project_code"] }}</span>
+              </td>
+              <td>
+                {{ item["client_name"] or '—' }}
+                <br><span class="feed-meta">{{ item["location"] or 'No site set' }}</span>
+              </td>
+              <td class="nowrap">
+                {{ item["start_date"] or '—' }}
+                <br><span class="feed-meta">to {{ item["end_date"] or '—' }}</span>
+              </td>
+              <td class="nowrap">
+                {{ "{:,.2f}".format(item["budget"] | float) }}
+                <span class="feed-meta">{{ item["currency"] }}</span>
+              </td>
+              <td class="nowrap">
+                <div class="bar-track">
+                  <div class="bar-fill" style="width: {{ item['progress'] | int }}%"></div>
+                </div>
+                <span class="feed-meta">{{ item["progress"] | int }}%</span>
+              </td>
+              <td>
+                <span class="status-badge {{ 'active' if item['status'] in ('In Progress', 'Completed')
+                      else 'off' if item['status'] in ('Cancelled',) else 'neutral' }}">
+                  {{ item["status"] }}
+                </span>
+              </td>
+              <td>
+                <a class="btn btn-outline" href="{{ url_for('project.project_detail', project_id=item['id']) }}">Open</a>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7">No project has been registered yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="dash-panel">
+      <h2>How this desk works</h2>
+      <p>A job is raised as a draft, given a manager, a team and the dates it has to
+        hold. Submitting it opens the shared approval chain and freezes the
+        figures while the desks sign; a signature starts the work and reserves the
+        budget allocation through the same commitment the budget screen counts, and
+        a refusal cancels the job without leaving money held. Milestones and tasks
+        then move the job forward, and the register keeps one row the site and the
+        accountant both read.</p>
+    </div>
+  </div>
+</section>
+{% endblock %}

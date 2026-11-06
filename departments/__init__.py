@@ -6,29 +6,34 @@ afterwards by ``register_blueprints`` in the same order the monolith did.
 """
 
 from departments import admin
+from departments import asset_management
+from departments import department_management
 from departments import approvals
 from departments import audit
 from departments import budget
 from departments import finance
-from departments import hr
 from departments import inventory
 from departments import letters
+from departments import marketing
 from departments import organization
-from departments import payroll
 from departments import procurement
+from departments import project
 from departments import reports
-from departments.HR import reports as hr_reports
-
+from departments.HR import reports as hr_reports, hr
+from departments.payroll import payroll as hr_attendance
 
 BLUEPRINT_MODULES = (
     hr,
     finance,
     budget,
     inventory,
+    asset_management,
     audit,
     procurement,
     approvals,
     letters,
+    marketing,
+    project,
 )
 
 

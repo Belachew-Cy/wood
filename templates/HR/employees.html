@@ -82,7 +82,7 @@
       <a class="hr-nav-link" href="{{ url_for('hr_dashboard') }}">Dashboard</a>
       <a class="hr-nav-link active" href="{{ url_for('employees') }}">Employees</a>
       <a class="hr-nav-link" href="{{ url_for('attendance') }}">Attendance</a>
-      <a class="hr-nav-link" href="{{ url_for('recruitment') }}">Recruitment</a>
+      <a class="hr-nav-link" href="{{ url_for('recruitment.hr_vacancies') }}">Hiring desk</a>
       <a class="hr-nav-link" href="{{ url_for('leave_management') }}">Leave</a>
       <a class="hr-nav-link" href="{{ url_for('training_performance') }}">Training &amp; Performance</a>
       <a class="hr-nav-link" href="{{ url_for('manage_hierarchy') }}">Organization</a>
@@ -151,9 +151,25 @@
       </div>
       {% endif %}
 
+      {% if form_data.recruitment_application_id %}
+      <div class="employee-alert info">
+        <strong>Registering a hire from the hiring desk.</strong>
+        {% if hiring_from %}
+        {{ hiring_from.full_name }} was selected for the {{ hiring_from.job_title }}
+        post ({{ hiring_from.vacancy_reference or 'vacancy #' ~ hiring_from.vacancy_id }}).
+        {% endif %}
+        Check the prefilled details, set the salary and attach the required documents.
+        Saving marks the application Hired and updates the post's filled count with it.
+      </div>
+      {% endif %}
+
       <form method="POST" enctype="multipart/form-data" class="employee-form"
             action="{{ url_for('edit_employee', employee_id=editing.id) if editing else url_for('add_employee') }}">
         {{ csrf_field() }}
+        {% if form_data.recruitment_application_id %}
+        <input type="hidden" name="recruitment_application_id"
+               value="{{ form_data.recruitment_application_id }}" />
+        {% endif %}
 
         <fieldset class="employee-fieldset">
           <legend><span class="employee-step">1</span> Personal information</legend>

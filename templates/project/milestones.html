@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi with context %}
+
+{% block title %}Project Milestones | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+{% set ns = namespace(open=0, done=0, overdue=0) %}
+{% for milestone in milestones %}
+  {% if milestone["status"] == "Completed" %}
+    {% set ns.done = ns.done + 1 %}
+  {% else %}
+    {% set ns.open = ns.open + 1 %}
+    {% if milestone["due_date"] and milestone["due_date"] < today %}
+      {% set ns.overdue = ns.overdue + 1 %}
+    {% endif %}
+  {% endif %}
+{% endfor %}
+
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">PROJECT MANAGEMENT</span>
+      <h1>Project Milestones</h1>
+      <p>The dates every job has to hold, read across the whole register.</p>
+    </div>
+    <div class="row-actions">
+      <a class="btn btn-outline" href="{{ url_for('project.dashboard') }}">
+        ← Project desk
+      </a>
+      <a class="btn btn-outline" href="{{ url_for('project.projects') }}">
+        Project register →
+      </a>
+    </div>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="hr-stats">
+      {{ kpi('Milestones listed', milestones | length, 'matching this filter',
+             'flat', 'target') }}
+      {{ kpi('Still open', ns.open, 'not marked complete', 'flat', 'clock') }}
+      {{ kpi('Past their date', ns.overdue, 'open and overdue',
+             'down' if ns.overdue else 'flat', 'warn') }}
+      {{ kpi('Completed', ns.done, 'the site held the date',
+             'up' if ns.done else 'flat', 'check') }}
+    </div>
+
+    <form method="GET" class="stock-search">
+      <label for="search">Search</label>
+      <input id="search" name="search" value="{{ search }}"
+             placeholder="Milestone name" />
+      <label for="project">Job</label>
+      <select id="project" name="project">
+        <option value="">All jobs</option>
+        {% for row in projects %}
+        <option value="{{ row['id'] }}"
+                {% if project | int == row['id'] %}selected{% endif %}>
+          {{ row["project_code"] }} · {{ row["project_name"] }}
+        </option>
+        {% endfor %}
+      </select>
+      <label for="status">Status</label>
+      <select id="status" name="status">
+        <option value="">All statuses</option>
+        {% for value in milestone_statuses %}
+        <option value="{{ value }}" {% if status == value %}selected{% endif %}>
+          {{ value }}</option>
+        {% endfor %}
+      </select>
+      <button class="btn" type="submit">Search</button>
+      <a class="btn btn-outline" href="{{ url_for('project.milestones') }}">Reset</a>
+    </form>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>{% if milestones %}{{ milestones | length }} milestone{{ '' if milestones | length == 1 else 's' }}{% else %}Milestones{% endif %}</h2>
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Milestone</th><th>Job</th><th>Due</th><th>Completed</th>
+              <th>Status</th><th>Deadline</th>{% if can_milestones %}<th>Move it</th>{% endif %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for milestone in milestones %}
+            {% set late = milestone["status"] != 'Completed'
+                          and milestone["due_date"]
+                          and milestone["due_date"] < today %}
+            <tr>
+              <td>
+                <a href="{{ url_for('project.project_detail', project_id=milestone['project_id']) }}">
+                  {{ milestone["milestone_name"] }}
+                </a>
+                {% if milestone["description"] %}
+                <br><span class="feed-meta">{{ milestone["description"] }}</span>
+                {% endif %}
+              </td>
+              <td>
+                {{ milestone["project_code"] }}
+                <br><span class="feed-meta">{{ milestone["project_name"] }}</span>
+              </td>
+              <td class="nowrap">{{ milestone["due_date"] or '—' }}</td>
+              <td class="nowrap">{{ milestone["completed_date"] or '—' }}</td>
+              <td>
+                <span class="status-badge {{ 'active' if milestone['status'] == 'Completed'
+                      else 'neutral' }}">{{ milestone["status"] }}</span>
+              </td>
+              <td class="nowrap">
+                {% if late %}
+                <span class="feed-meta">Overdue</span>
+                {% elif not milestone["due_date"] %}
+                <span class="feed-meta">No date</span>
+                {% else %}
+                <span class="feed-meta">Scheduled</span>
+                {% endif %}
+              </td>
+              {% if can_milestones %}
+              <td>
+                <form method="POST"
+                      action="{{ url_for('project.update_project_milestone', milestone_id=milestone['id']) }}">
+                  {{ csrf_field() }}
+                  <select name="status" aria-label="Milestone status">
+                    {% for value in milestone_statuses %}
+                    <option value="{{ value }}"
+                            {% if milestone['status'] == value %}selected{% endif %}>
+                      {{ value }}</option>
+                    {% endfor %}
+                  </select>
+                  <button class="btn btn-outline" type="submit">Save</button>
+                </form>
+              </td>
+              {% endif %}
+            </tr>
+            {% else %}
+            <tr><td colspan="{{ 7 if can_milestones else 6 }}">No milestone matches
+              this filter.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="panel-note">A milestone is raised on its job card, where it also
+        records the date and what the site has to deliver. Marking it complete here
+        writes the completion date and stamps the job.</p>
+    </div>
+  </div>
+</section>
+{% endblock %}

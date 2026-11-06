@@ -49,24 +49,36 @@ def deliver_notification(db, user_id, title, body="", href="", category="system"
     """, (user_id, category, title, body, href, icon, tone, dedupe_key)).lastrowid
 
 
+def notify_right_holders(db, key, title, body="", href="", category="system",
+                         icon="bell", tone="info", exclude_user_ids=(),
+                         dedupe_prefix=None):
+    """Fan one notice out to the seats that hold a named right.
+
+    ``notify_permission`` spreads by module tick, which is too wide for a decision
+    desk: the right that raises a record and the right that signs it sit on the same
+    module, and a draft should wake the signer rather than everyone who may raise
+    one. This walks the active accounts through ``has_permission`` instead.
+    """
+    from core.access import has_permission
+
+    delivered = 0
+    for account in db.execute(
+            "SELECT * FROM users WHERE status = 'Active'").fetchall():
+        if account["id"] in exclude_user_ids:
+            continue
+        if has_permission(key, user=account, db=db):
+            deliver_notification(db, account["id"], title, body, href, category,
+                                 icon, tone, dedupe_prefix)
+            delivered += 1
+    return delivered
+
+
 def step_holder_accounts(db, step, exclude_user_ids=()):
     """Every active account that can sign at this desk, read once."""
     from services.workflow import holds_step
     return [account for account in
             db.execute("SELECT * FROM users WHERE status = 'Active'").fetchall()
             if account["id"] not in exclude_user_ids and holds_step(account, step)]
-
-
-def notify_step_holders(db, step, title, body="", href="", category="approval",
-                        icon="clock", tone="warn", exclude_user_ids=(),
-                        dedupe_prefix=None):
-    """Deliver to every active account that can sign at this desk."""
-    delivered = 0
-    for account in step_holder_accounts(db, step, exclude_user_ids):
-        deliver_notification(db, account["id"], title, body, href, category,
-                             icon, tone, dedupe_prefix, reopen=True)
-        delivered += 1
-    return delivered
 
 
 def notify_permission(db, module, title, body="", href="", category="system",
@@ -187,14 +199,16 @@ def sync_notifications(user):
                      url_for("procurement.dashboard"), "procurement", "file", "warn")
         if "payroll" in granted:
             pending = conn.execute("""
-                SELECT COUNT(*) AS n FROM payroll WHERE payment_status = 'Pending'
+                SELECT COUNT(*) AS n FROM payroll_records
+                WHERE payment_status = 'Pending'
             """).fetchone()["n"]
             if pending:
                 want("payroll-pending",
                      "{} payslip{} not paid yet".format(
                          pending, "" if pending == 1 else "s"),
                      "Mark them paid once the money has moved.",
-                     url_for("payroll_dashboard"), "payroll", "cash", "warn")
+                     url_for("payroll.payroll_dashboard"),
+                     "payroll", "cash", "warn")
         if "hr" in granted:
             leave = conn.execute("""
                 SELECT COUNT(*) AS n FROM leave_requests WHERE status = 'Pending'

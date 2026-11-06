@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container-fluid py-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+
+        <div>
+            <h3>Employee Asset History</h3>
+            <p class="text-muted">
+                Track assigned and returned department assets.
+            </p>
+        </div>
+
+        <a
+            href="{{ url_for('asset_management.assign_employee_asset') }}"
+            class="btn btn-success">
+            <i class="fas fa-plus"></i> Assign Asset
+        </a>
+
+    </div>
+
+    <div class="card shadow-sm">
+
+        <div class="table-responsive">
+
+            <table class="table table-hover align-middle mb-0">
+
+                <thead class="table-light">
+                    <tr>
+                        <th>#</th>
+                        <th>Asset</th>
+                        <th>Employee ID</th>
+                        <th>Department ID</th>
+                        <th>Assigned Date</th>
+                        <th>Returned Date</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for item in assignments %}
+
+                    <tr>
+                        <td>{{ loop.index }}</td>
+
+                        <td>
+                            {{ item.asset.asset_code }}
+                            - {{ item.asset.name }}
+                        </td>
+
+                        <td>{{ item.employee_id }}</td>
+
+                        <td>{{ item.department_id }}</td>
+
+                        <td>{{ item.assigned_date }}</td>
+
+                        <td>{{ item.returned_date or "-" }}</td>
+
+                        <td>
+                            {% if item.status == "Active" %}
+                                <span class="badge bg-success">Active</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Returned</span>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if item.status == "Active" %}
+
+                            <form
+                                method="POST"
+                                action="{{ url_for(
+                                    'asset_management.return_employee_asset',
+                                    assignment_id=item.id
+                                ) }}"
+                                onsubmit="return confirm('Confirm asset return?');">
+
+                                <input
+                                    type="hidden"
+                                    name="csrf_token"
+                                    value="{{ csrf_token() }}"
+                                >
+
+                                <button class="btn btn-sm btn-warning">
+                                    Return
+                                </button>
+
+                            </form>
+
+                            {% else %}
+                                <span class="text-muted">Completed</span>
+                            {% endif %}
+                        </td>
+
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="8" class="text-center py-4">
+                            No employee asset assignments found.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

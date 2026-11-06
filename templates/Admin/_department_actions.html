@@ -1,0 +1,93 @@
+{# The ten standard actions for each of the seventeen departments. The same
+   macro serves the role dialog, the create dialog, and the account editor, so
+   a grant looks and behaves the same everywhere. Each tick is a full
+   permission key (dept_finance_create); the guard checks it on every request,
+   not only for the buttons the screens draw.
+
+   The grid itself lives in one <template> per page and is cloned into a
+   dialog only when that dialog opens. That keeps the page small even with
+   every role dialog in the document, and lets the form post no grid at all
+   when scripts are off — in which case the stored matrix is left exactly as
+   it stands. #}
+
+{% macro department_matrix(matrix, uid) -%}
+<div class="dept-matrix" data-dept-matrix
+     data-dept-readonly="{{ '1' if matrix.readonly else '0' }}"
+     data-dept-total="{{ matrix.total }}">
+  <div class="dept-matrix-tools">
+    <span class="dept-matrix-count" data-dept-count>
+      {{ matrix.open }} of {{ matrix.total }} actions open
+    </span>
+    <label class="dept-matrix-filter">
+      <span class="sr-only">Filter departments</span>
+      <input type="search" data-dept-filter placeholder="Filter departments"
+             autocomplete="off" />
+    </label>
+    {% if not matrix.readonly %}
+    <label class="perm-select-all">
+      <input type="checkbox" data-dept-all />
+      <span>All actions, every department</span>
+    </label>
+    {% endif %}
+  </div>
+
+  <div class="dept-matrix-scroll" role="region" tabindex="0"
+       aria-label="Department action rights" data-dept-grid>
+    <p class="dept-matrix-fallback">
+      Tick the grid after the page scripts load; saving without it leaves the
+      department actions as they are.
+    </p>
+  </div>
+
+  {# Single-quoted attribute so the JSON's double quotes cannot break it. #}
+  <script type="application/json"
+          data-dept-selected='{{ matrix.checked | tojson }}'></script>
+</div>
+{%- endmacro %}
+
+{% macro department_template(matrix) -%}
+<template id="deptMatrixTemplate">
+  <table class="dept-matrix-table">
+    <caption class="sr-only">Create, read, view, edit, delete, approve, reject,
+      export, print and manage rights for every department</caption>
+    <thead>
+      <tr>
+        <th scope="col" class="dept-matrix-dept">Department</th>
+        {% for action in matrix.actions %}
+        <th scope="col" title="{{ action.description }}">
+          <span class="dept-matrix-mark">{{ action.short }}</span>
+          <span class="dept-matrix-action">{{ action.label }}</span>
+        </th>
+        {% endfor %}
+        <th scope="col" class="dept-matrix-row-tools">
+          <span class="sr-only">All actions for a department</span>
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for scope in matrix.scopes %}
+      <tr data-dept-row data-scope="{{ scope.key }}">
+        <th scope="row" class="dept-matrix-dept">
+          <span class="dept-matrix-name">{{ scope.label }}</span>
+          <span class="dept-matrix-note">{{ scope.note }}</span>
+          {% if scope.users is not none %}
+          <span class="dept-matrix-users">{{ scope.users }} account{{ '' if scope.users == 1 else 's' }} with access</span>
+          {% endif %}
+        </th>
+        {% for cell in scope.actions %}
+        <td>
+          <label class="dept-matrix-cell" title="{{ scope.label }} — {{ cell.label }}">
+            <input type="checkbox" name="department_action" value="{{ cell.key }}" />
+            <span class="sr-only">{{ scope.label }}: {{ cell.label }}</span>
+          </label>
+        </td>
+        {% endfor %}
+        <td class="dept-matrix-row-tools">
+          <button type="button" class="dir-text-btn" data-dept-row-all>All</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</template>
+{%- endmacro %}

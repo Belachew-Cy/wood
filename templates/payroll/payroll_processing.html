@@ -1,0 +1,459 @@
+{% extends "base.html" %}
+
+{% block title %}Monthly Payroll Processing{% endblock %}
+
+{% block content %}
+<div class="container-fluid payroll-page">
+
+    <!-- Header -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1">Monthly Payroll Processing</h2>
+            <p class="text-muted mb-0">
+                Calculate, review and manage monthly employee payroll.
+            </p>
+        </div>
+    </div>
+
+    <!-- Month Selection -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="GET"
+                  action="{{ url_for('payroll.payroll_processing') }}"
+                  class="row g-3 align-items-end">
+
+                <div class="col-md-4">
+                    <label for="month" class="form-label">
+                        Payroll Month
+                    </label>
+
+                    <input type="month"
+                           id="month"
+                           name="month"
+                           class="form-control"
+                           value="{{ selected_month }}"
+                           required>
+                </div>
+
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search"></i> Load Payroll
+                    </button>
+                </div>
+
+            </form>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row g-3 mb-4">
+
+        <div class="col-xl-3 col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Basic Salary</div>
+                    <h4 class="mb-0">
+                        {{ "{:,.2f}".format(total_basic|default(0)|float) }} ETB
+                    </h4>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Total Allowances</div>
+                    <h4 class="mb-0">
+                        {{ "{:,.2f}".format(total_allowances|default(0)|float) }} ETB
+                    </h4>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Overtime Earnings</div>
+                    <h4 class="mb-0">
+                        {{ "{:,.2f}".format(total_overtime|default(0)|float) }} ETB
+                    </h4>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Total Deductions</div>
+                    <h4 class="mb-0">
+                        {{ "{:,.2f}".format(total_deductions|default(0)|float) }} ETB
+                    </h4>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Net Payroll</div>
+                    <h4 class="mb-0 text-success">
+                        {{ "{:,.2f}".format(total_net|default(0)|float) }} ETB
+                    </h4>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Payment Status -->
+    <div class="row g-3 mb-4">
+
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <div class="text-muted small">Paid Employees</div>
+                    <h4 class="text-success mb-0">
+                        {{ paid_count|default(0) }}
+                    </h4>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <div class="text-muted small">Pending Payment</div>
+                    <h4 class="text-warning mb-0">
+                        {{ pending_count|default(0) }}
+                    </h4>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Payroll Records -->
+    <div class="card shadow-sm mb-4">
+
+        <div class="card-header d-flex flex-wrap justify-content-between align-items-center">
+            <div>
+                <h5 class="mb-0">Employee Payroll Records</h5>
+                <small class="text-muted">
+                    Payroll period: {{ selected_month }}
+                </small>
+            </div>
+
+            <span class="badge bg-secondary">
+                {{ records|length }} Records
+            </span>
+        </div>
+
+        <div class="card-body p-0">
+            <div class="table-responsive">
+
+                <table class="table table-hover align-middle mb-0">
+
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Employee</th>
+                            <th>Basic Salary</th>
+                            <th>Allowances</th>
+                            <th>Overtime</th>
+                            <th>Deductions</th>
+                            <th>Net Salary</th>
+                            <th>Payment Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+
+                        {% for record in records %}
+                        <tr>
+
+                            <td>{{ loop.index }}</td>
+
+                            <td>
+                                <strong>
+                                    {{ record.full_name or record.employee_name or '-' }}
+                                </strong>
+                                <div class="small text-muted">
+                                    {{ record.employee_code or '' }}
+                                </div>
+                            </td>
+
+                            <td>
+                                {{ "{:,.2f}".format(record.basic_salary|float) }}
+                                ETB
+                            </td>
+
+                            <td>
+                                {{ "{:,.2f}".format(record.allowances|float) }}
+                                ETB
+                            </td>
+
+                            <td>
+                                {{ "{:,.2f}".format(record.overtime_amount|default(0)|float) }}
+                                ETB
+                            </td>
+
+                            <td>
+                                {{ "{:,.2f}".format(record.deductions|float) }}
+                                ETB
+                            </td>
+
+                            <td>
+                                <strong>
+                                    {{ "{:,.2f}".format(record.net_salary|float) }}
+                                    ETB
+                                </strong>
+                            </td>
+
+                            <td>
+                                {% if record.payment_status == 'Paid' %}
+                                    <span class="badge bg-success">Paid</span>
+                                {% elif record.payment_status == 'Approved' %}
+                                    <span class="badge bg-info text-dark">Approved</span>
+                                {% elif record.payment_status == 'Rejected' %}
+                                    <span class="badge bg-danger">Rejected</span>
+                                {% else %}
+                                    <span class="badge bg-warning text-dark">
+                                        {{ record.payment_status or 'Pending' }}
+                                    </span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {% if has_payroll_permission('payroll_payment')
+                                      and record.payroll_status == 'Approved'
+                                      and record.payment_status != 'Paid' %}
+
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-success"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#paymentModal{{ record.id }}">
+                                    <i class="fas fa-money-bill-wave"></i>
+                                    Record Payment
+                                </button>
+
+                                <div class="modal fade"
+                                     id="paymentModal{{ record.id }}"
+                                     tabindex="-1"
+                                     aria-hidden="true">
+
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+
+                                            <form method="POST"
+                                                  action="{{ url_for(
+                                                      'payroll.record_payment',
+                                                      payroll_id=record.id
+                                                  ) }}">
+                {{ csrf_field() }}
+
+                                                <input type="hidden"
+                                                       name="payroll_month"
+                                                       value="{{ selected_month }}">
+
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title">Record Payroll Payment</h5>
+                                                    <button type="button"
+                                                            class="btn-close"
+                                                            data-bs-dismiss="modal"></button>
+                                                </div>
+
+                                                <div class="modal-body">
+
+                                                    <p>
+                                                        Employee:
+                                                        <strong>{{ record.full_name }}</strong>
+                                                    </p>
+
+                                                    <p>
+                                                        Net Salary:
+                                                        <strong>
+                                                            {{ "{:,.2f}".format(record.net_salary|float) }}
+                                                            ETB
+                                                        </strong>
+                                                    </p>
+
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Payment Method</label>
+                                                        <select class="form-select"
+                                                                name="payment_method"
+                                                                required>
+                                                            <option value="Bank Transfer">Bank Transfer</option>
+                                                            <option value="Cash">Cash</option>
+                                                            <option value="Other">Other</option>
+                                                        </select>
+                                                    </div>
+
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Payment Reference</label>
+                                                        <input type="text"
+                                                               class="form-control"
+                                                               name="payment_reference"
+                                                               required>
+                                                    </div>
+
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Payment Date</label>
+                                                        <input type="date"
+                                                               class="form-control"
+                                                               name="payment_date"
+                                                               required>
+                                                    </div>
+
+                                                </div>
+
+                                                <div class="modal-footer">
+                                                    <button type="button"
+                                                            class="btn btn-secondary"
+                                                            data-bs-dismiss="modal">
+                                                        Cancel
+                                                    </button>
+
+                                                    <button type="submit" class="btn btn-success">
+                                                        Confirm Payment
+                                                    </button>
+                                                </div>
+
+                                            </form>
+
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {% endif %}
+                            </td>
+
+                        </tr>
+
+                        {% else %}
+                        <tr>
+                            <td colspan="9" class="text-center py-5">
+                                <i class="fas fa-file-invoice-dollar fa-2x text-muted mb-3"></i>
+                                <p class="mb-1">No payroll records found.</p>
+                                <small class="text-muted">
+                                    Select a payroll month or generate payroll records.
+                                </small>
+                            </td>
+                        </tr>
+                        {% endfor %}
+
+                    </tbody>
+                </table>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Generate -->
+    {% if has_payroll_permission('payroll_process') %}
+    <div class="card shadow-sm mb-4">
+        <div class="card-body d-flex flex-wrap justify-content-between align-items-center gap-3">
+
+            <div>
+                <h5 class="mb-1">Generate Monthly Payroll</h5>
+                <p class="text-muted mb-0">
+                    Generate draft payroll records for employees with active payroll profiles.
+                </p>
+            </div>
+
+            <form method="POST"
+                  action="{{ url_for('payroll.generate_payroll') }}"
+                  onsubmit="return confirm('Generate payroll for this month? Existing records will not be overwritten.');">
+                {{ csrf_field() }}
+
+                <input type="hidden"
+                       name="payroll_month"
+                       value="{{ selected_month }}">
+
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-calculator"></i>
+                    Generate Payroll
+                </button>
+
+            </form>
+
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Approval Actions -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+
+            <h5 class="mb-3">Payroll Approval Actions</h5>
+
+            <div class="d-flex flex-wrap gap-2">
+
+                {% if has_payroll_permission('payroll_submit') %}
+                <form method="POST"
+                      action="{{ url_for(
+                          'payroll.submit_payroll',
+                          payroll_month=selected_month
+                      ) }}"
+                      onsubmit="return confirm('Submit this payroll batch for approval?');">
+                {{ csrf_field() }}
+
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-paper-plane"></i>
+                        Submit for Approval
+                    </button>
+                </form>
+                {% endif %}
+
+                {% if has_payroll_permission('payroll_approve') %}
+                <form method="POST"
+                      action="{{ url_for(
+                          'payroll.approve_payroll',
+                          payroll_month=selected_month
+                      ) }}">
+                {{ csrf_field() }}
+
+                    <input type="text"
+                           name="comments"
+                           class="form-control mb-2"
+                           placeholder="Approval comments (optional)">
+
+                    <button type="submit"
+                            class="btn btn-success"
+                            onclick="return confirm('Approve this payroll batch?');">
+                        <i class="fas fa-check-circle"></i>
+                        Approve Payroll
+                    </button>
+                </form>
+                {% endif %}
+
+                {% if has_payroll_permission('payroll_reject') %}
+                <form method="POST"
+                      action="{{ url_for(
+                          'payroll.reject_payroll',
+                          payroll_month=selected_month
+                      ) }}">
+                {{ csrf_field() }}
+
+                    <input type="text"
+                           name="reason"
+                           class="form-control mb-2"
+                           placeholder="Reason for rejection"
+                           required>
+
+                    <button type="submit"
+                            class="btn btn-outline-danger"
+                            onclick="return confirm('Reject this payroll batch?');">
+                        <i class="fas fa-times-circle"></i>
+                        Reject Payroll
+                    </button>
+                </form>
+                {% endif %}
+
+            </div>
+
+        </div>
+    </div>
+
+</div>
+{% endblock %}

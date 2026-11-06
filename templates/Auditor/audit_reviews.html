@@ -1,0 +1,267 @@
+
+{% extends "base.html" %}
+
+{% block title %}Audit Reviews | Audit Management{% endblock %}
+
+{% block content %}
+
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Audit Management / Reviews</span>
+            <h1>Audit Reviews</h1>
+            <p>
+                Monitor audit review assignments, evaluate submitted work
+                and maintain a traceable review history.
+            </p>
+        </div>
+
+        <div class="stock-actions">
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.dashboard') }}">
+                Dashboard
+            </a>
+
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.audit_plans') }}">
+                Audit Plans
+            </a>
+
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.audit_reports') }}">
+                Audit Reports
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="container finance-page">
+
+    <!-- REVIEW STATISTICS -->
+
+    <div class="hr-stats">
+
+        <div class="dash-panel">
+            <span class="eyebrow">Total Reviews</span>
+            <h2>{{ stats.total | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Pending Reviews</span>
+            <h2>{{ stats.pending | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">In Progress</span>
+            <h2>{{ stats.in_progress | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Completed</span>
+            <h2>{{ stats.completed | default(0) }}</h2>
+        </div>
+
+    </div>
+
+
+    <!-- FILTERS -->
+
+    <div class="dash-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Find Audit Reviews</h2>
+                <p>Filter reviews by status, auditor or department.</p>
+            </div>
+        </div>
+
+        <form method="GET"
+              action="{{ url_for('audit.auditor_reviews') }}">
+
+            <div class="form-grid">
+
+                <div class="form-group">
+                    <label for="search">Search</label>
+                    <input type="search"
+                           id="search"
+                           name="search"
+                           value="{{ filters.search | default('') }}"
+                           placeholder="Review reference or title">
+                </div>
+
+                <div class="form-group">
+                    <label for="department">Department</label>
+
+                    <select id="department" name="department">
+                        <option value="">All Departments</option>
+
+                        {% for department in departments | default([]) %}
+                        <option value="{{ department.name }}"
+                            {% if filters.department | default('') == department.name %}
+                                selected
+                            {% endif %}>
+                            {{ department.name }}
+                        </option>
+                        {% endfor %}
+
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="status">Review Status</label>
+
+                    <select id="status" name="status">
+                        <option value="">All Statuses</option>
+
+                        {% for status in ['Pending', 'In Progress', 'Completed', 'Returned', 'Cancelled'] %}
+                        <option value="{{ status }}"
+                            {% if filters.status | default('') == status %}
+                                selected
+                            {% endif %}>
+                            {{ status }}
+                        </option>
+                        {% endfor %}
+
+                    </select>
+                </div>
+
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    Apply Filters
+                </button>
+
+                <a href="{{ url_for('audit.auditor_reviews') }}"
+                   class="btn btn-outline">
+                    Reset
+                </a>
+            </div>
+
+        </form>
+
+    </div>
+
+
+    <!-- REVIEW REGISTER -->
+
+    <div class="dash-panel hr-table-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Review Register</h2>
+                <p>All review records available to your account.</p>
+            </div>
+
+            <span class="status-badge neutral">
+                {{ reviews | length }} Reviews
+            </span>
+        </div>
+
+        <div class="table-scroll">
+
+            <table class="report-table">
+
+                <thead>
+                    <tr>
+                        <th>Review Reference</th>
+                        <th>Audit Plan</th>
+                        <th>Department</th>
+                        <th>Assigned Auditor</th>
+                        <th>Review Date</th>
+                        <th>Due Date</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for review in reviews | default([]) %}
+
+                    <tr>
+
+                        <td>
+                            {{ review.review_number
+                               | default(review.id | default('—')) }}
+                        </td>
+
+                        <td>
+                            {{ review.plan_title
+                               | default(review.audit_plan | default('—')) }}
+                        </td>
+
+                        <td>{{ review.department | default('—') }}</td>
+
+                        <td>
+                            {{ review.auditor_name
+                               | default(review.assigned_auditor | default('—')) }}
+                        </td>
+
+                        <td>{{ review.review_date | default('—') }}</td>
+
+                        <td>{{ review.due_date | default('—') }}</td>
+
+                        <td>
+                            {% set status = review.status | default('Pending') %}
+
+                            <span class="status-badge
+                                {{ 'active' if status == 'Completed'
+                                else ('off' if status == 'Returned'
+                                else 'neutral') }}">
+                                {{ status }}
+                            </span>
+                        </td>
+
+                        <td>
+                            {% if review.id is defined %}
+                                <a class="btn btn-outline btn-sm"
+                                   href="{{ url_for('audit.auditor_reviews', review_id=review.id) }}">
+                                    View
+                                </a>
+                            {% else %}
+                                <span class="eyebrow">Unavailable</span>
+                            {% endif %}
+                        </td>
+
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="8" class="report-empty">
+                            No audit reviews found.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <!-- REVIEW GUIDELINES -->
+
+    <div class="dash-panel">
+
+        <h2>Review Guidelines</h2>
+
+        <ul>
+            <li>Review evidence against the approved audit scope and objectives.</li>
+            <li>Document review observations and supporting evidence references.</li>
+            <li>Return incomplete work to the assigned auditor with clear comments.</li>
+            <li>Record reviewer identity, review date and decision.</li>
+            <li>Do not modify original departmental source transactions.</li>
+            <li>Restrict review information to users with the appropriate audit permissions.</li>
+        </ul>
+
+    </div>
+
+</section>
+
+{% endblock %}

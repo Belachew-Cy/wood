@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container-fluid py-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3>Asset Approval Management</h3>
+            <p class="text-muted">
+                Review and process your assigned asset requests.
+            </p>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body">
+
+            <div class="table-responsive">
+
+                <table class="table table-hover align-middle">
+
+                    <thead>
+                        <tr>
+                            <th>Reference</th>
+                            <th>Request Type</th>
+                            <th>Approval Level</th>
+                            <th>Submitted</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+
+                        {% for approval in approvals %}
+
+                        <tr>
+
+                            <td>#{{ approval.reference_id }}</td>
+
+                            <td>
+                                {{ approval.reference_type.replace('_', ' ').title() }}
+                            </td>
+
+                            <td>{{ approval.approval_level }}</td>
+
+                            <td>
+                                {{ approval.submitted_at.strftime('%Y-%m-%d') }}
+                            </td>
+
+                            <td>
+                                <span class="badge bg-warning text-dark">
+                                    {{ approval.action }}
+                                </span>
+                            </td>
+
+                            <td>
+                                <a href="{{ url_for(
+                                    'asset_management.approval_detail',
+                                    approval_id=approval.id
+                                ) }}"
+                                class="btn btn-sm btn-success">
+                                    Review
+                                </a>
+                            </td>
+
+                        </tr>
+
+                        {% else %}
+
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-4">
+                                No pending approval requests.
+                            </td>
+                        </tr>
+
+                        {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}

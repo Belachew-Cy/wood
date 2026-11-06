@@ -1,0 +1,231 @@
+
+{% extends "base.html" %}
+
+{% block title %}Corrective Actions | Audit Management{% endblock %}
+
+{% block content %}
+
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Audit Management</span>
+            <h1>Corrective Actions</h1>
+            <p>
+                Track management responses, corrective measures,
+                assigned responsibilities and resolution progress.
+            </p>
+        </div>
+
+        <div class="stock-actions">
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.dashboard') }}">
+                Dashboard
+            </a>
+
+            <a class="btn btn-sm"
+               href="#action-register">
+                View Actions
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="container finance-page">
+
+    <!-- SUMMARY -->
+
+    <div class="hr-stats">
+
+        <div class="dash-panel">
+            <span class="eyebrow">Total Actions</span>
+            <h2>{{ stats.total | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Pending</span>
+            <h2>{{ stats.pending | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">In Progress</span>
+            <h2>{{ stats.in_progress | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Completed</span>
+            <h2>{{ stats.completed | default(0) }}</h2>
+        </div>
+
+    </div>
+
+
+    <!-- CORRECTIVE ACTION REGISTER -->
+
+    <div class="dash-panel hr-table-panel" id="action-register">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Corrective Action Register</h2>
+                <p>
+                    Review corrective actions and monitor their implementation.
+                </p>
+            </div>
+
+            <span class="status-badge neutral">
+                {{ actions | length }} Records
+            </span>
+        </div>
+
+        <div class="table-scroll">
+
+            <table class="report-table">
+
+                <thead>
+                    <tr>
+                        <th>Action Reference</th>
+                        <th>Related Finding</th>
+                        <th>Corrective Action</th>
+                        <th>Responsible Person</th>
+                        <th>Due Date</th>
+                        <th>Priority</th>
+                        <th>Status</th>
+                        <th>Update</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for action in actions | default([]) %}
+
+                    <tr>
+
+                        <td>
+                            {{ action.action_number
+                               | default(action.reference | default('—')) }}
+                        </td>
+
+                        <td>
+                            {{ action.finding_title
+                               | default(action.finding_number | default('—')) }}
+                        </td>
+
+                        <td>
+                            <strong>
+                                {{ action.title
+                                   | default(action.description | default('Untitled Action')) }}
+                            </strong>
+                        </td>
+
+                        <td>
+                            {{ action.responsible_person | default('—') }}
+                        </td>
+
+                        <td>
+                            {{ action.due_date | default('—') }}
+                        </td>
+
+                        <td>
+                            {% set priority = action.priority | default('Medium') %}
+
+                            <span class="status-badge
+                                {{ 'off' if priority in ['High', 'Critical']
+                                else 'neutral' }}">
+                                {{ priority }}
+                            </span>
+                        </td>
+
+                        <td>
+                            {% set status = action.status | default('Pending') %}
+
+                            <span class="status-badge
+                                {{ 'active' if status == 'Completed'
+                                else 'neutral' }}">
+                                {{ status }}
+                            </span>
+                        </td>
+
+                        <td>
+
+                            <form method="POST"
+                                  action="{{ url_for(
+                                      'audit.update_corrective_action',
+                                      action_id=action.id
+                                  ) }}">
+
+                                {% if csrf_token is defined %}
+                                    {{ csrf_token() }}
+                                {% endif %}
+
+                                <select name="status"
+                                        aria-label="Update corrective action status">
+
+                                    {% for item in [
+                                        'Pending',
+                                        'In Progress',
+                                        'Completed',
+                                        'Overdue',
+                                        'Rejected',
+                                        'Cancelled'
+                                    ] %}
+
+                                    <option
+                                        value="{{ item }}"
+                                        {% if status == item %}selected{% endif %}
+                                    >
+                                        {{ item }}
+                                    </option>
+
+                                    {% endfor %}
+
+                                </select>
+
+                                <button type="submit"
+                                        class="btn btn-outline btn-sm">
+                                    Update
+                                </button>
+
+                            </form>
+
+                        </td>
+
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="8" class="report-empty">
+                            No corrective actions have been recorded.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <!-- MANAGEMENT GUIDELINES -->
+
+    <div class="dash-panel">
+
+        <h2>Corrective Action Management</h2>
+
+        <ul>
+            <li>Every corrective action should be linked to an audit finding.</li>
+            <li>Each action should have an accountable responsible person.</li>
+            <li>Set realistic implementation deadlines.</li>
+            <li>Record progress and supporting evidence.</li>
+            <li>Require auditor verification before closing an action where applicable.</li>
+            <li>Maintain a complete history of status changes.</li>
+        </ul>
+
+    </div>
+
+</section>
+
+{% endblock %}

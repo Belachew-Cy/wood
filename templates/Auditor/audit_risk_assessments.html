@@ -1,0 +1,366 @@
+
+{% extends "base.html" %}
+
+{% block title %}Audit Risk Assessments | Audit Management{% endblock %}
+
+{% block content %}
+
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Audit Management</span>
+            <h1>Risk Assessments</h1>
+            <p>
+                Identify, evaluate and monitor organizational risks
+                across departments.
+            </p>
+        </div>
+
+        <div class="stock-actions">
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.dashboard') }}">
+                Dashboard
+            </a>
+            <a class="btn btn-sm"
+               href="#risk-assessment-form">
+                + Record Risk
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="container finance-page">
+
+    <!-- RISK SUMMARY -->
+
+    <div class="hr-stats">
+
+        <div class="dash-panel">
+            <span class="eyebrow">Total Risks</span>
+            <h2>{{ stats.total | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Critical Risks</span>
+            <h2>{{ stats.critical | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">High Risks</span>
+            <h2>{{ stats.high | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Mitigation Pending</span>
+            <h2>{{ stats.pending | default(0) }}</h2>
+        </div>
+
+    </div>
+
+
+    <!-- RECORD NEW RISK -->
+
+    <div class="dash-panel" id="risk-assessment-form">
+
+        <h2>Record Risk Assessment</h2>
+        <p>
+            Document the identified risk and its potential organizational impact.
+        </p>
+
+        <form method="POST"
+              action="{{ url_for('audit.create_risk_assessment') }}">
+
+            {% if csrf_token is defined %}
+                {{ csrf_token() }}
+            {% endif %}
+
+            <div class="form-grid">
+
+                <div class="form-group">
+                    <label for="title">Risk Title *</label>
+                    <input
+                        type="text"
+                        id="title"
+                        name="title"
+                        placeholder="Enter risk title"
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="department">Department *</label>
+                    <select id="department" name="department" required>
+                        <option value="">Select Department</option>
+
+                        {% for department in departments | default([]) %}
+                        <option value="{{ department }}">
+                            {{ department }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="risk_category">Risk Category</label>
+                    <select id="risk_category" name="risk_category">
+                        <option value="Financial">Financial</option>
+                        <option value="Operational">Operational</option>
+                        <option value="Compliance">Compliance</option>
+                        <option value="Information Security">Information Security</option>
+                        <option value="Fraud">Fraud</option>
+                        <option value="Strategic">Strategic</option>
+                        <option value="Human Resources">Human Resources</option>
+                        <option value="Technology">Technology</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="likelihood">Likelihood *</label>
+                    <select id="likelihood" name="likelihood" required>
+                        <option value="">Select Likelihood</option>
+                        <option value="1">1 - Rare</option>
+                        <option value="2">2 - Unlikely</option>
+                        <option value="3">3 - Possible</option>
+                        <option value="4">4 - Likely</option>
+                        <option value="5">5 - Almost Certain</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="impact">Impact *</label>
+                    <select id="impact" name="impact" required>
+                        <option value="">Select Impact</option>
+                        <option value="1">1 - Insignificant</option>
+                        <option value="2">2 - Minor</option>
+                        <option value="3">3 - Moderate</option>
+                        <option value="4">4 - Major</option>
+                        <option value="5">5 - Severe</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="risk_owner">Risk Owner</label>
+                    <input
+                        type="text"
+                        id="risk_owner"
+                        name="risk_owner"
+                        placeholder="Responsible person or position"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="assessment_date">Assessment Date</label>
+                    <input
+                        type="date"
+                        id="assessment_date"
+                        name="assessment_date"
+                    >
+                </div>
+
+            </div>
+
+            <div class="form-group">
+                <label for="description">Risk Description *</label>
+                <textarea
+                    id="description"
+                    name="description"
+                    rows="4"
+                    placeholder="Describe the risk and its possible consequences"
+                    required
+                ></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="existing_controls">Existing Controls</label>
+                <textarea
+                    id="existing_controls"
+                    name="existing_controls"
+                    rows="3"
+                    placeholder="Describe existing preventive or detective controls"
+                ></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="mitigation_plan">Risk Mitigation Plan</label>
+                <textarea
+                    id="mitigation_plan"
+                    name="mitigation_plan"
+                    rows="4"
+                    placeholder="Describe proposed risk treatment and mitigation actions"
+                ></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="remarks">Additional Remarks</label>
+                <textarea
+                    id="remarks"
+                    name="remarks"
+                    rows="3"
+                    placeholder="Additional assessment information"
+                ></textarea>
+            </div>
+
+            <div class="stock-actions">
+                <button type="submit" class="btn btn-sm">
+                    Save Risk Assessment
+                </button>
+
+                <button type="reset" class="btn btn-outline btn-sm">
+                    Clear Form
+                </button>
+            </div>
+
+        </form>
+
+    </div>
+
+
+    <!-- RISK REGISTER -->
+
+    <div class="dash-panel hr-table-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Risk Register</h2>
+                <p>
+                    Review identified risks and their assessment status.
+                </p>
+            </div>
+
+            <span class="status-badge neutral">
+                {{ risks | length }} Records
+            </span>
+        </div>
+
+        <div class="table-scroll">
+
+            <table class="report-table">
+
+                <thead>
+                    <tr>
+                        <th>Risk Title</th>
+                        <th>Department</th>
+                        <th>Category</th>
+                        <th>Likelihood</th>
+                        <th>Impact</th>
+                        <th>Risk Score</th>
+                        <th>Risk Level</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for risk in risks | default([]) %}
+
+                    <tr>
+
+                        <td>
+                            <strong>
+                                {{ risk.title | default('Untitled Risk') }}
+                            </strong>
+                        </td>
+
+                        <td>{{ risk.department | default('—') }}</td>
+
+                        <td>{{ risk.risk_category | default('—') }}</td>
+
+                        <td>{{ risk.likelihood | default('—') }}</td>
+
+                        <td>{{ risk.impact | default('—') }}</td>
+
+                        <td>
+                            {{ risk.risk_score | default('—') }}
+                        </td>
+
+                        <td>
+                            {% set level = risk.risk_level | default('Not Rated') %}
+
+                            <span class="status-badge
+                                {{ 'off' if level in ['High', 'Critical']
+                                else 'neutral' }}">
+                                {{ level }}
+                            </span>
+                        </td>
+
+                        <td>
+                            {{ risk.status | default('Open') }}
+                        </td>
+
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="8" class="report-empty">
+                            No risk assessments have been recorded.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <!-- RISK SCORING GUIDE -->
+
+    <div class="dash-panel">
+
+        <h2>Risk Scoring Guide</h2>
+
+        <p>
+            Risk score = Likelihood × Impact.
+            The thresholds below are a proposed default and should be
+            aligned with your organization's approved risk policy.
+        </p>
+
+        <div class="table-scroll">
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>Score</th>
+                        <th>Risk Level</th>
+                        <th>Suggested Response</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    <tr>
+                        <td>1–4</td>
+                        <td>Low</td>
+                        <td>Monitor and maintain existing controls.</td>
+                    </tr>
+
+                    <tr>
+                        <td>5–9</td>
+                        <td>Medium</td>
+                        <td>Review controls and plan improvements.</td>
+                    </tr>
+
+                    <tr>
+                        <td>10–16</td>
+                        <td>High</td>
+                        <td>Prioritize mitigation and management oversight.</td>
+                    </tr>
+
+                    <tr>
+                        <td>17–25</td>
+                        <td>Critical</td>
+                        <td>Escalate promptly and implement urgent treatment.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+</section>
+
+{% endblock %}

@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi with context %}
+
+{% block title %}Examinations{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Recruitment desk</span>
+      <h1>Examinations</h1>
+      <p>Every paper set against a post in reach: what it asks, who is seated and how the
+        marking landed.</p>
+    </div>
+    <nav class="stock-actions" aria-label="Examination actions">
+      {% if scope.can('exam_author') %}
+      <a class="btn btn-sm" href="{{ url_for('recruitment.create_exam') }}">New paper</a>
+      {% endif %}
+      <a class="btn btn-outline btn-sm" href="{{ url_for('recruitment.hr_vacancies') }}">
+        Vacancy register
+      </a>
+      <a class="btn btn-outline btn-sm" href="{{ url_for('recruitment.hr_applicants') }}">
+        Applicants
+      </a>
+    </nav>
+  </div>
+</section>
+
+<section class="container finance-page">
+  <div class="hr-stats">
+    {{ kpi('Papers', exams | length, 'inside this reach', 'flat', 'graduation') }}
+    {{ kpi('Drafts', exams | selectattr('status', 'equalto', 'Draft') | list | length,
+           'questions still being set', 'down' if exams | selectattr('status', 'equalto', 'Draft') | list else 'flat', 'file') }}
+    {{ kpi('Published', exams | selectattr('status', 'equalto', 'Published') | list | length,
+           'open for sitting', 'up', 'check') }}
+    {{ kpi('Closed', exams | selectattr('status', 'equalto', 'Closed') | list | length,
+           'results are final', 'flat', 'clipboard') }}
+    {{ kpi('Candidates seated', exams | sum(attribute='candidate_count'),
+           'across every paper', 'flat', 'users') }}
+    {{ kpi('Handed in', exams | sum(attribute='submitted_count'),
+           'marked against the key', 'up', 'inbox') }}
+  </div>
+
+  <div class="dash-panel hr-table-panel">
+    <h2>The register</h2>
+    <div class="hr-table-wrap table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Paper</th>
+            <th>Post</th>
+            <th>Questions</th>
+            <th>Marks set</th>
+            <th>Pass at</th>
+            <th>Window</th>
+            <th>Seated</th>
+            <th>Handed in</th>
+            <th>At or above pass</th>
+            <th>Status</th>
+            <th aria-label="Actions"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for exam in exams %}
+          <tr>
+            <td class="wrap-cell">
+              <strong>{{ exam.exam_title }}</strong>
+              <span class="cell-note">set by {{ exam.created_by_name or 'the HR desk' }}
+                · {{ exam.duration_minutes }} min</span>
+            </td>
+            <td class="wrap-cell">
+              <a href="{{ url_for('recruitment.vacancy_detail', vacancy_id=exam.vacancy_id) }}">
+                {{ exam.job_title }}</a>
+              <span class="cell-note">{{ exam.vacancy_department }}</span>
+            </td>
+            <td class="nowrap">{{ exam.question_count }}</td>
+            <td class="nowrap">
+              {{ '%g' | format(exam.question_marks | float) }} /
+              {{ '%g' | format(exam.total_marks | float) }}
+              {% if exam.status == 'Draft'
+                    and exam.question_marks | float != exam.total_marks | float %}
+              <span class="cell-note">does not add up</span>
+              {% endif %}
+            </td>
+            <td class="nowrap">{{ '%g' | format(exam.pass_mark | float) }}</td>
+            <td class="nowrap">
+              {% if exam.start_datetime %}
+              {{ exam.start_datetime[:16] }}
+              <span class="cell-note">to {{ (exam.end_datetime or '')[:16] }}</span>
+              {% else %}
+              <span class="cell-note">No window set</span>
+              {% endif %}
+            </td>
+            <td class="nowrap">{{ exam.candidate_count }}</td>
+            <td class="nowrap">{{ exam.submitted_count }}</td>
+            <td class="nowrap">{{ exam.passed_count }}</td>
+            <td>
+              <span class="status-badge {{ 'active' if exam.status == 'Published'
+                                            else 'off' if exam.status == 'Closed'
+                                            else 'neutral' }}">{{ exam.status }}</span>
+            </td>
+            <td class="nowrap">
+              <a class="btn btn-outline btn-sm"
+                 href="{{ url_for('recruitment.exam_questions', exam_id=exam.id) }}">Paper</a>
+              {% if exam.status != 'Draft' %}
+              <a class="btn btn-outline btn-sm"
+                 href="{{ url_for('recruitment.hr_exam_results', exam_id=exam.id) }}">Results</a>
+              {% endif %}
+              {% if scope.can('exam_publish', exam) and exam.status == 'Published' %}
+              <form method="POST" action="{{ url_for('recruitment.close_exam', exam_id=exam.id) }}"
+                    class="inline-form">
+                {{ csrf_field() }}
+                <button class="btn btn-outline btn-sm" type="submit">Close</button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="11" class="employee-empty">
+              No examination has been set for a post in your reach.
+              {% if scope.can('exam_author') %}
+              <a href="{{ url_for('recruitment.create_exam') }}">Write the first paper</a>.
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="panel-note">
+      {% if scope.can('exam_author') %}
+      A paper is written as a draft, published once its marks add up to the total and a
+      window is set, and closed when the sitting ends. Publishing freezes the key.
+      {% else %}
+      Papers are written and published by the HR desk; this account reads the register and
+      the marked results.
+      {% endif %}
+    </p>
+  </div>
+</section>
+{% endblock %}

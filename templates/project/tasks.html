@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi with context %}
+
+{% block title %}Project Tasks | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+{% set ns = namespace(open=0, done=0, overdue=0) %}
+{% for task in tasks %}
+  {% if task["status"] == "Completed" %}
+    {% set ns.done = ns.done + 1 %}
+  {% else %}
+    {% set ns.open = ns.open + 1 %}
+    {% if task["due_date"] and task["due_date"] < today %}
+      {% set ns.overdue = ns.overdue + 1 %}
+    {% endif %}
+  {% endif %}
+{% endfor %}
+
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">PROJECT MANAGEMENT</span>
+      <h1>Project Tasks</h1>
+      <p>The work on the board, who holds it and what date it is due.</p>
+    </div>
+    <div class="row-actions">
+      <a class="btn btn-outline" href="{{ url_for('project.dashboard') }}">
+        ← Project desk
+      </a>
+      <a class="btn btn-outline" href="{{ url_for('project.projects') }}">
+        Project register →
+      </a>
+    </div>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="hr-stats">
+      {{ kpi('Tasks listed', tasks | length, 'matching this filter', 'flat',
+             'clipboard') }}
+      {{ kpi('Still open', ns.open, 'not completed yet', 'flat', 'clock') }}
+      {{ kpi('Past their date', ns.overdue, 'open and overdue',
+             'down' if ns.overdue else 'flat', 'warn') }}
+      {{ kpi('Completed', ns.done, 'signed off on site', 'up' if ns.done else 'flat',
+             'check') }}
+    </div>
+
+    <form method="GET" class="stock-search">
+      <label for="search">Search</label>
+      <input id="search" name="search" value="{{ search }}"
+             placeholder="Task, job or code" />
+      <label for="project">Job</label>
+      <select id="project" name="project">
+        <option value="">All jobs</option>
+        {% for row in projects %}
+        <option value="{{ row['id'] }}"
+                {% if project | int == row['id'] %}selected{% endif %}>
+          {{ row["project_code"] }} · {{ row["project_name"] }}
+        </option>
+        {% endfor %}
+      </select>
+      <label for="status">Status</label>
+      <select id="status" name="status">
+        <option value="">All statuses</option>
+        {% for value in task_statuses %}
+        <option value="{{ value }}" {% if status == value %}selected{% endif %}>
+          {{ value }}</option>
+        {% endfor %}
+      </select>
+      <label for="owner">Owner</label>
+      <select id="owner" name="mine">
+        <option value="1" {% if mine %}selected{% endif %}>My tasks</option>
+        <option value="0" {% if not mine %}selected{% endif %}>Everyone</option>
+      </select>
+      <label for="overdue">Dates</label>
+      <select id="overdue" name="overdue">
+        <option value="">Any date</option>
+        <option value="1" {% if overdue %}selected{% endif %}>Past due</option>
+      </select>
+      <button class="btn" type="submit">Search</button>
+      <a class="btn btn-outline" href="{{ url_for('project.tasks') }}">Reset</a>
+    </form>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>{% if tasks %}{{ tasks | length }} task{{ '' if tasks | length == 1 else 's' }}{% else %}Tasks{% endif %}</h2>
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Task</th><th>Job</th><th>Milestone</th><th>Owner</th>
+              <th>Window</th><th>Progress</th><th>Status</th><th>Move it</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for task in tasks %}
+            {% set late = task["status"] != 'Completed' and task["due_date"]
+                          and task["due_date"] < today %}
+            <tr>
+              <td>
+                <a href="{{ url_for('project.project_detail', project_id=task['project_id']) }}">
+                  {{ task["task_title"] }}
+                </a>
+                {% if task["description"] %}
+                <br><span class="feed-meta">{{ task["description"] }}</span>
+                {% endif %}
+              </td>
+              <td>
+                {{ task["project_code"] }}
+                <br><span class="feed-meta">{{ task["project_name"] }}</span>
+              </td>
+              <td>{{ task["milestone_name"] or '—' }}</td>
+              <td>{{ task["assigned_name"] or 'Unassigned' }}</td>
+              <td class="nowrap">
+                {{ task["start_date"] or '—' }}
+                <br><span class="feed-meta"
+                  {% if late %}style="color: var(--danger-ink);"{% endif %}>to
+                  {{ task["due_date"] or '—' }}{% if late %} · late{% endif %}</span>
+              </td>
+              <td style="min-width: 120px;">
+                <div class="bar-track">
+                  <div class="bar-fill"
+                       style="width: {{ task['progress'] | int }}%"></div>
+                </div>
+                <span class="feed-meta">{{ task["progress"] | int }}%</span>
+              </td>
+              <td>
+                <span class="status-badge {{ 'active' if task['status'] == 'Completed'
+                      else 'off' if task['status'] == 'Blocked' else 'neutral' }}">
+                  {{ task["status"] }}
+                </span>
+              </td>
+              <td>
+                <form method="POST"
+                      action="{{ url_for('project.update_project_task', task_id=task['id']) }}">
+                  {{ csrf_field() }}
+                  <select name="status" aria-label="Task status">
+                    {% for value in task_statuses %}
+                    <option value="{{ value }}"
+                            {% if task['status'] == value %}selected{% endif %}>
+                      {{ value }}</option>
+                    {% endfor %}
+                  </select>
+                  <input type="number" name="progress" min="0" max="100"
+                         step="5" value="{{ task['progress'] | int }}"
+                         aria-label="Progress percent" style="width: 5.5rem;" />
+                  <button class="btn btn-outline" type="submit">Save</button>
+                </form>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="8">No task matches this filter.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="panel-note">A task is raised on its job card, so every task has a
+        project to answer to. Completing it here leaves the brief untouched and
+        stamps the job the task belongs to.</p>
+    </div>
+  </div>
+</section>
+{% endblock %}

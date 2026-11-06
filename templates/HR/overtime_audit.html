@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Overtime Audit History | Dereje Belay Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Human Resources</span>
+      <h1>Overtime Audit History</h1>
+      <p>Track overtime approvals, HR verification and payroll imports.</p>
+    </div>
+    <nav class="stock-actions" aria-label="Overtime actions">
+      <a class="btn btn-outline btn-sm" href="{{ url_for('hr.overtime_dashboard') }}">Back to Overtime</a>
+    </nav>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% set ot_active = request.endpoint and (request.endpoint == 'hr.overtime_dashboard' or request.endpoint.startswith('hr.overtime_') or request.endpoint == 'hr.submit_overtime_request') %}
+    <nav class="hr-navigation" aria-label="HR Management">
+      <a class="hr-nav-link" href="{{ url_for('hr_dashboard') }}">Dashboard</a>
+      <a class="hr-nav-link" href="{{ url_for('employees') }}">Employees</a>
+      <a class="hr-nav-link" href="{{ url_for('attendance') }}">Attendance</a>
+      <a class="hr-nav-link" href="{{ url_for('recruitment.hr_vacancies') }}">Hiring desk</a>
+      <a class="hr-nav-link" href="{{ url_for('leave_management') }}">Leave</a>
+      <a class="hr-nav-link {% if ot_active %}active{% endif %}" href="{{ url_for('hr.overtime_dashboard') }}">Overtime</a>
+      <a class="hr-nav-link" href="{{ url_for('training_performance') }}">Training &amp; Performance</a>
+      <a class="hr-nav-link" href="{{ url_for('manage_hierarchy') }}">Organization</a>
+      <a class="hr-nav-link" href="{{ url_for('reports_centre') }}">Reports</a>
+      <a class="hr-nav-link" href="{{ url_for('hr_settings.index') }}">HR Settings</a>
+    </nav>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+  </div>
+</section>
+
+<section class="section bg-white">
+  <div class="container">
+    <div class="dash-panel hr-table-panel">
+      <h2>Audit records</h2>
+
+      {% if logs %}
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Employee</th>
+              <th>Request</th>
+              <th>Action</th>
+              <th>Previous status</th>
+              <th>New status</th>
+              <th>Performed by</th>
+              <th>Comment</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for log in logs %}
+            <tr>
+              <td>{{ log.created_at }}</td>
+              <td>{{ log.full_name or '—' }}</td>
+              <td>{{ log.overtime_request_id }}</td>
+              <td>{{ log.action }}</td>
+              <td>{{ log.previous_status or '—' }}</td>
+              <td>
+                <span class="status-badge {{ 'active' if log.new_status == 'Approved' or log.new_status == 'Verified' else ('off' if log.new_status == 'Rejected' else 'neutral') }}">{{ log.new_status or '—' }}</span>
+              </td>
+              <td>{{ log.performed_by or '—' }}</td>
+              <td>
+                {% if log.comment %}
+                {{ log.comment }}
+                {% else %}
+                <span class="cell-note">—</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="empty-state">No overtime audit records found.</p>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}

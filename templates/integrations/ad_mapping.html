@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi with context %}
+{% from "integrations/_module_nav.html" import module_tabs with context %}
+
+{% block title %}Directory mapping · {{ row.name }} | System Integrations{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">System Integration</span>
+      <h1>Directory mapping</h1>
+      <p>{{ row.name }} · {{ row.endpoint or 'no endpoint set' }}
+        {%- if row.search_base %} · reading {{ row.search_base }}{% endif %}</p>
+    </div>
+    <div class="dash-stats">
+      <div class="stat"><strong>{{ accounts }}</strong><span>Accounts read</span></div>
+      <div class="stat"><strong>{{ active_accounts }}</strong><span>Enabled</span></div>
+      <div class="stat"><strong>{{ pending }}</strong><span>Pending mapping</span></div>
+      <div class="stat"><strong>{{ mapped_departments }}</strong><span>Department matched</span></div>
+    </div>
+    <nav class="stock-actions" aria-label="Connection actions">
+      <a class="btn btn-outline btn-sm"
+         href="{{ url_for('integrations.edit', integration_id=row.id) }}">Settings</a>
+      <a class="btn btn-outline btn-sm"
+         href="{{ url_for('integrations.connection_history', integration_id=row.id) }}">Test history</a>
+    </nav>
+    {{ module_tabs('registry') }}
+  </div>
+</section>
+
+<section class="section bg-white">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="hr-stats">
+      {{ kpi('Directory accounts', accounts,
+             'Read from the search base and kept per connection', icon='user') }}
+      {{ kpi('Enabled accounts', active_accounts,
+             '{} disabled in the directory'.format(accounts - active_accounts),
+             tone='up', icon='check') }}
+      {{ kpi('Pending mappings', pending,
+             'Waiting for a person to decide', tone='down' if pending else 'flat',
+             icon='clock') }}
+      {{ kpi('Departments matched', mapped_departments,
+             'Accounts whose directory department names a company department',
+             icon='network') }}
+    </div>
+
+    <div class="emp-panel" style="margin-top: 1.5rem;">
+
+      <div class="account-card">
+        <header class="account-head">
+          <div>
+            <h3 class="account-name">Read the directory</h3>
+            <span class="cell-note">The base becomes the scheduled base as well, because a
+              background run has nobody to ask what it should search.</span>
+          </div>
+          <span class="status-badge {{ 'active' if row.status == 'active' else 'off' }}">
+            {{ row.status }}</span>
+        </header>
+        <form method="POST" action="{{ url_for('integrations.ad_sync', integration_id=row.id) }}"
+              class="dash-form account-form">
+          {{ csrf_field() }}
+          <div class="account-grid">
+            <div class="full">
+              <label for="search_base">Search base</label>
+              <input id="search_base" name="search_base" type="text" maxlength="512" required
+                     value="{{ row.search_base }}"
+                     placeholder="OU=Staff,DC=example,DC=local" />
+              <p class="cell-note">Synchronization runs over LDAPS only; an unencrypted
+                ldap:// endpoint is refused.</p>
+            </div>
+          </div>
+          <div class="finance-form-actions">
+            <button class="btn" type="submit">Read directory now <span class="arrow">→</span></button>
+          </div>
+        </form>
+      </div>
+
+      <div class="account-card">
+        <header class="account-head">
+          <div>
+            <h3 class="account-name">Employee mappings</h3>
+            <span class="cell-note">Opening a pending row records who is waiting for a
+              decision. It creates no employee and changes no existing match.</span>
+          </div>
+          <span class="cell-note">{{ pending }} pending</span>
+        </header>
+        <form method="POST"
+              action="{{ url_for('integrations.ad_prepare', integration_id=row.id) }}">
+          {{ csrf_field() }}
+          <button class="btn btn-outline-dark" type="submit">Prepare pending mappings</button>
+        </form>
+      </div>
+
+      <div class="account-card">
+        <header class="account-head">
+          <div>
+            <h3 class="account-name">Department mapping</h3>
+            <span class="cell-note">Say which company department each directory department
+              string means. Choosing “not mapped” removes the match.</span>
+          </div>
+        </header>
+
+        {% if departments %}
+        <form method="POST"
+              action="{{ url_for('integrations.ad_departments_save', integration_id=row.id) }}">
+          {{ csrf_field() }}
+          <div class="dash-table-wrap">
+            <table>
+              <thead>
+                <tr><th>Directory department</th><th>Accounts</th><th>Company department</th></tr>
+              </thead>
+              <tbody>
+                {% for department in departments %}
+                <tr>
+                  <td>{{ department.ad_department }}</td>
+                  <td class="nowrap">{{ department.accounts }}</td>
+                  <td>
+                    <select name="department_{{ department.ad_department }}"
+                            aria-label="Company department for {{ department.ad_department }}">
+                      <option value="">Not mapped</option>
+                      {% for choice in choices %}
+                      <option value="{{ choice.id }}"
+                              {% if department.hr_department_id == choice.id %}selected{% endif %}>
+                        {{ choice.name }}</option>
+                      {% endfor %}
+                    </select>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <div class="finance-form-actions">
+            <button class="btn" type="submit">Save department mapping <span class="arrow">→</span></button>
+          </div>
+        </form>
+        {% else %}
+        <p class="cell-note">No directory account carries a department value yet, so there is
+          nothing to map. Read the directory first, then come back to this panel.</p>
+        {% endif %}
+      </div>
+
+      <div class="account-card">
+        <header class="account-head">
+          <div>
+            <h3 class="account-name">Directory accounts</h3>
+            <span class="cell-note">What the last read stored, with the department and the
+              employee mapping each account has.</span>
+          </div>
+          <span class="cell-note">{{ accounts }} account{{ '' if accounts == 1 else 's' }}</span>
+        </header>
+
+        <div class="dash-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Account</th><th>Contact</th><th>Directory department</th>
+                <th>Company department</th><th>Account</th><th>Mapping</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for user in users %}
+              {% set mapping = user.mapping_status or 'pending' %}
+              <tr>
+                <td>
+                  {{ user.username or 'unknown' }}
+                  <p class="cell-note">{{ user.full_name or 'No display name' }}
+                    {%- if user.job_title %} · {{ user.job_title }}{% endif %}</p>
+                </td>
+                <td>
+                  {{ user.email or '-' }}
+                  {% if user.phone %}<p class="cell-note">{{ user.phone }}</p>{% endif %}
+                </td>
+                <td>{{ user.department or '-' }}</td>
+                <td>
+                  {{ user.hr_department_name or 'Not mapped' }}
+                  {% if user.hr_department_name %}
+                  <span class="status-badge active">matched</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <span class="status-badge {{ 'active' if user.is_active else 'off' }}">
+                    {{ 'enabled' if user.is_active else 'disabled' }}</span>
+                </td>
+                <td>
+                  <span class="status-badge {{ 'active' if mapping == 'mapped'
+                                                else ('neutral' if mapping == 'ignored'
+                                                else 'off') }}">{{ mapping }}</span>
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="6" class="cell-note">
+                  No directory account has been read yet. Start with the read panel above.
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <p class="perm-note">The mapping desk never edits an employee record. It stores which
+          company department a directory department means and opens a pending mapping per
+          account for a person to review.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+{% endblock %}

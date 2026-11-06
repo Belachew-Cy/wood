@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi with context %}
+
+{% block title %}{{ department_name }} Assets | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+{% set ns = namespace(available=0, assigned=0, maintenance=0, value=0.0) %}
+{% for item in assets %}
+  {% if item["status"] == "Available" %}{% set ns.available = ns.available + 1 %}{% endif %}
+  {% if item["status"] == "Assigned" %}{% set ns.assigned = ns.assigned + 1 %}{% endif %}
+  {% if item["status"] == "Maintenance" %}{% set ns.maintenance = ns.maintenance + 1 %}{% endif %}
+  {% set ns.value = ns.value + (item["purchase_cost"] | float) %}
+{% endfor %}
+
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">ASSET MANAGEMENT · DEPARTMENT</span>
+      <h1>{{ department_name }}</h1>
+      <p>The units on this department's books and the allocations behind
+        them.</p>
+    </div>
+    <div class="row-actions">
+      <a class="btn btn-outline" href="{{ url_for('asset.departments') }}">
+        ← Departments
+      </a>
+      {% if can_allocate %}
+      <a class="btn" href="{{ url_for('asset.allocate') }}">Allocate asset →</a>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="hr-stats">
+      {{ kpi('Units held', assets | length, 'on this department', 'flat', 'box') }}
+      {{ kpi('Allocated', ns.assigned, 'with a named custodian', 'flat',
+             'briefcase') }}
+      {{ kpi('Available', ns.available, 'on the department shelf', 'flat',
+             'check') }}
+      {{ kpi('In maintenance', ns.maintenance, 'off site for repair',
+             'warn' if ns.maintenance else 'flat', 'wrench') }}
+      {{ kpi('Value held', "{:,.2f}".format(ns.value), 'ETB at purchase cost',
+             'flat', 'wallet') }}
+    </div>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>Assets held</h2>
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Asset</th><th>Category</th><th>Custodian</th>
+              <th>Purchase</th><th>Condition</th><th>Status</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in assets %}
+            <tr>
+              <td>
+                <a href="{{ url_for('asset.asset_detail', asset_id=item['id']) }}">
+                  {{ item["name"] }}
+                </a>
+                <br><span class="feed-meta">{{ item["asset_code"] }}</span>
+              </td>
+              <td>{{ item["category_name"] or 'Uncategorised' }}</td>
+              <td>{{ item["custodian_name"] or '—' }}</td>
+              <td class="nowrap">
+                {{ "{:,.2f}".format(item["purchase_cost"] | float) }}
+                <span class="feed-meta">ETB</span>
+                <br><span class="feed-meta">{{ item["purchase_date"] or 'No date' }}</span>
+              </td>
+              <td>{{ item["condition"] }}</td>
+              <td>
+                <span class="status-badge {{ 'active' if item['status'] in ('Available', 'Assigned')
+                      else 'neutral' if item['status'] == 'Maintenance' else 'off' }}">
+                  {{ item["status"] }}
+                </span>
+              </td>
+              <td>
+                <a class="btn btn-outline"
+                   href="{{ url_for('asset.asset_detail', asset_id=item['id']) }}">Open</a>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7">This department holds no asset.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>Allocation history</h2>
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Asset</th><th>Custodian</th><th>Allocated</th>
+              <th>Expected return</th><th>Returned</th><th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in movements %}
+            <tr>
+              <td>
+                <a href="{{ url_for('asset.asset_detail', asset_id=row['asset_id']) }}">
+                  {{ row["asset_name"] }}
+                </a>
+                <br><span class="feed-meta">{{ row["asset_code"] }}</span>
+              </td>
+              <td>{{ row["custodian_name"] or '—' }}</td>
+              <td class="nowrap">{{ row["allocation_date"] }}</td>
+              <td class="nowrap">{{ row["expected_return"] or '—' }}</td>
+              <td class="nowrap">{{ row["returned_at"] | audit_time or '—' }}</td>
+              <td>
+                <span class="status-badge {{ 'active' if row['status'] == 'Active' else 'neutral' }}">
+                  {{ row["status"] }}
+                </span>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6">No allocation has been recorded for this department.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

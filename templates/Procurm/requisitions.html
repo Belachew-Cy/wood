@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "base.html" import kpi with context %}
 
-{% block title %}Requisitions | Dereje Wood &amp; Kitchen{% endblock %}
+{% block title %}Purchase Requisitions | Dereje Wood &amp; Kitchen{% endblock %}
 
 {% macro requisition_table(rows, show_owner, states, editable, csrf) %}
   <div class="hr-table-wrap table-scroll">
@@ -86,7 +86,7 @@
 <section class="dash-head">
   <div class="container">
     <div>
-      <span class="eyebrow">Purchasing</span>
+      <span class="eyebrow">Procurement Management</span>
       <h1>Purchase Requisitions</h1>
       <p>Prepare what your department needs, line by line, and send it to the approvers.
         A draft stays yours until you submit it.</p>
@@ -94,7 +94,7 @@
     <nav class="stock-actions" aria-label="Requisition actions">
       <a class="btn btn-outline btn-sm" href="{{ url_for('procurement.requisition_new') }}">New requisition</a>
       {% if 'procurement' in permissions %}
-      <a class="btn btn-outline btn-sm" href="{{ url_for('procurement.dashboard') }}">Procurement</a>
+      <a class="btn btn-outline btn-sm" href="{{ url_for('procurement.dashboard') }}">Procurement Management</a>
       {% endif %}
     </nav>
   </div>

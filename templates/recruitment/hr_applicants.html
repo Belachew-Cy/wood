@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi with context %}
+
+{% block title %}Applicants{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Recruitment desk</span>
+      <h1>Applicants</h1>
+      <p>Every candidate inside this account&rsquo;s reach, newest first, with the
+        examination result and interview panel already attached to the row.</p>
+    </div>
+    <nav class="stock-actions" aria-label="Applicant actions">
+      <a class="btn btn-outline btn-sm" href="{{ url_for('recruitment.hr_vacancies') }}">
+        Vacancy register
+      </a>
+      <a class="btn btn-outline btn-sm" href="{{ url_for('recruitment.hr_exams') }}">
+        Examinations
+      </a>
+      <a class="btn btn-outline btn-sm" href="{{ url_for('recruitment.hr_interviews') }}">
+        Interview panels
+      </a>
+    </nav>
+  </div>
+</section>
+
+<section class="container finance-page">
+  <div class="hr-stats">
+    {{ kpi('Applications', stages.applications, 'in reach', 'flat', 'users',
+           href=url_for('recruitment.hr_applicants')) }}
+    {{ kpi('Awaiting screen', stages.applied, 'not shortlisted yet', 'down' if stages.applied else 'flat', 'inbox') }}
+    {{ kpi('Shortlisted', stages.shortlisted, 'past the first cut', 'flat', 'check') }}
+    {{ kpi('In interview', stages.interview, 'with a panel', 'flat', 'handshake') }}
+    {{ kpi('Selected', stages.selected, 'the desk said yes', 'up', 'target') }}
+    {{ kpi('Hired', stages.hired, 'reaches payroll', 'up', 'user') }}
+    {{ kpi('Rejected', stages.rejected, 'with a reason on file', 'down' if stages.rejected else 'flat', 'warn') }}
+  </div>
+
+  <div class="dash-panel">
+    <h2>Filter the pipeline</h2>
+    <form method="GET" action="{{ url_for('recruitment.hr_applicants') }}" class="filter-form">
+      <input type="search" name="search" value="{{ search }}"
+             placeholder="Name, email, phone or post" aria-label="Search candidates">
+      <select name="status" aria-label="Stage">
+        <option value="">Every stage</option>
+        {% for status in application_statuses %}
+        <option value="{{ status }}" {% if selected_status == status %}selected{% endif %}>
+          {{ status }}
+        </option>
+        {% endfor %}
+      </select>
+      <select name="vacancy_id" aria-label="Vacancy">
+        <option value="">Every post in reach</option>
+        {% for post in posts %}
+        <option value="{{ post.id }}" {% if selected_vacancy == post.id | string %}selected{% endif %}>
+          {{ post.job_title }} · {{ post.department }}
+        </option>
+        {% endfor %}
+      </select>
+      <button class="btn btn-sm" type="submit">Apply filters</button>
+      {% if search or selected_status or selected_vacancy %}
+      <a class="btn btn-outline btn-sm" href="{{ url_for('recruitment.hr_applicants') }}">Clear</a>
+      {% endif %}
+    </form>
+    <p class="panel-note">{{ applications | length }}
+      {{ 'candidate' if applications | length == 1 else 'candidates' }} match.</p>
+  </div>
+
+  <div class="dash-panel hr-table-panel">
+    <h2>Candidates</h2>
+    <div class="hr-table-wrap table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Reference</th>
+            <th>Candidate</th>
+            <th>Post</th>
+            <th>Applied</th>
+            <th>GPA</th>
+            <th>Source</th>
+            <th>Stage</th>
+            <th>Examination</th>
+            <th>Screened by</th>
+            <th aria-label="Actions"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for application in applications %}
+          <tr>
+            <td class="nowrap">{{ application.reference or '#' ~ application.id }}</td>
+            <td class="wrap-cell">
+              <strong>{{ application.full_name }}</strong>
+              <span class="cell-note">{{ application.email }} · {{ application.phone }}</span>
+            </td>
+            <td class="wrap-cell">
+              <a href="{{ url_for('recruitment.vacancy_detail', vacancy_id=application.vacancy_id) }}">
+                {{ application.job_title }}
+              </a>
+              <span class="cell-note">{{ application.department }}</span>
+            </td>
+            <td class="nowrap">{{ application.applied_at | friendly_date }}</td>
+            <td>{{ '%.2f' | format(application.gpa | float) if application.gpa is not none else '—' }}</td>
+            <td>{{ application.source }}</td>
+            <td>
+              <span class="status-badge {{ 'active' if application.status in ('Selected', 'Hired')
+                                            else 'off' if application.status == 'Rejected'
+                                            else 'neutral' }}">{{ application.status }}</span>
+            </td>
+            <td class="nowrap">
+              {% if application.attempt_status == 'Submitted' %}
+              {{ '%g' | format(application.exam_score | float) }} /
+              {{ '%g' | format(application.total_marks | float) }}
+              <span class="cell-note">
+                {{ 'pass' if application.exam_score | float >= application.pass_mark | float else 'below' }}
+              </span>
+              {% elif application.exam_id %}
+              <span class="cell-note">{{ application.attempt_status }}</span>
+              {% else %}—{% endif %}
+            </td>
+            <td class="nowrap">
+              {% if application.screened_by_name %}
+              {{ application.screened_by_name }}
+              <span class="cell-note">{{ application.screened_at | audit_time }}</span>
+              {% else %}<span class="cell-note">Not screened</span>{% endif %}
+            </td>
+            <td class="nowrap">
+              <a class="btn btn-outline btn-sm"
+                 href="{{ url_for('recruitment.applicant_detail', application_id=application.id) }}">Open</a>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="10" class="employee-empty">
+              No candidate matches this filter.
+              {% if applied_total %}
+              {{ applied_total }} application(s) sit outside it.
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if scope.read_only %}
+    <p class="panel-note">An audit seat reads a candidate&rsquo;s file, the marked paper and
+      the panel&rsquo;s scores; the stage itself is answered by the desk that owns the post.</p>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

@@ -38,7 +38,7 @@
       'icon': 'cash', 'tone': 'warn',
       'title': "{} unpaid".format(r["full_name"]),
       'meta': "{} · {:,.2f} ETB net.".format(r["employee_code"], r["net_salary"]),
-      'href': url_for('payroll', month=month), 'time': 'Mark paid'
+      'href': url_for('payroll.payroll_processing', month=month), 'time': 'Mark paid'
     }) %}
   {% endif %}
 {% endfor %}
@@ -48,7 +48,7 @@
     'icon': 'inbox', 'tone': 'warn',
     'title': "{} more payslip lines still pending".format(extra),
     'meta': 'Open Run Payroll to settle them.',
-    'href': url_for('payroll', month=month), 'time': 'All'
+    'href': url_for('payroll.payroll_processing', month=month), 'time': 'All'
   }] %}
 {% endif %}
 {% if lines and paid == lines %}
@@ -64,7 +64,7 @@
     'icon': 'calendar', 'tone': '',
     'title': "No salary lines for {}".format(month),
     'meta': 'Run payroll for the month or pick another month above.',
-    'href': url_for('payroll', month=month), 'time': 'Run'
+    'href': url_for('payroll.payroll_processing', month=month), 'time': 'Run'
   }) %}
 {% endif %}
 
@@ -75,7 +75,7 @@
       <h1>Payroll Dashboard</h1>
       <p>Signed in as {{ user.full_name }} · {{ role_label }} access</p>
     </div>
-    {% if 'hr' in permissions %}
+    {% if 'hr_employees' in granted_permissions %}
     <a class="btn" href="{{ url_for('hr_dashboard') }}">HR Management →</a>
     {% endif %}
   </div>
@@ -84,9 +84,15 @@
 <section class="section bg-ivory">
   <div class="container">
     <nav class="hr-navigation" aria-label="Payroll">
-      <a class="hr-nav-link active" href="{{ url_for('payroll_dashboard') }}">Dashboard</a>
-      {% if 'hr' in permissions or 'payroll' in permissions %}
-      <a class="hr-nav-link" href="{{ url_for('payroll') }}">Run Payroll</a>
+      <a class="hr-nav-link active" href="{{ url_for('payroll.payroll_dashboard') }}">Dashboard</a>
+      {% if 'payroll_process' in granted_permissions %}
+      <a class="hr-nav-link" href="{{ url_for('payroll.payroll_processing') }}">Run Payroll</a>
+      {% endif %}
+      {% if has_payroll_permission('payroll_reports') %}
+      <a class="hr-nav-link" href="{{ url_for('payroll.payroll_reports') }}">Payroll Reports</a>
+      {% endif %}
+      {% if has_payroll_permission('payroll_statutory_view') %}
+      <a class="hr-nav-link" href="{{ url_for('payroll.statutory_rules') }}">Statutory Rules</a>
       {% endif %}
     </nav>
 
@@ -167,7 +173,7 @@
           <tbody>
             {% for m in months %}
             <tr>
-              <td><a href="{{ url_for('payroll_dashboard', month=m['month']) }}">{{ m["month"] }}</a></td>
+              <td><a href="{{ url_for('payroll.payroll_dashboard', month=m['month']) }}">{{ m["month"] }}</a></td>
               <td>{{ m["lines"] }}</td>
               <td>{{ "{:,.2f}".format(m["net"]) }}</td>
               <td>
@@ -184,6 +190,57 @@
         </table>
       </div>
     </div>
+
+          <div class="card shadow-sm mb-4">
+
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="fas fa-clock me-2"></i>
+            Import Verified Overtime
+        </h5>
+    </div>
+
+    <div class="card-body">
+
+        <p class="text-muted">
+            Import HR-verified overtime earnings into an existing
+            draft payroll period.
+        </p>
+
+        <form method="POST"
+              action="{{ url_for(
+                  'payroll.import_overtime_to_payroll'
+              ) }}">
+
+            {{ csrf_field() }}
+
+            <div class="row align-items-end g-3">
+
+                <div class="col-md-4">
+                    <label class="form-label">
+                        Payroll Month
+                    </label>
+
+                    <input type="month"
+                           name="payroll_month"
+                           class="form-control"
+                           required>
+                </div>
+
+                <div class="col-md-4">
+                    <button type="submit"
+                            class="btn btn-primary">
+                        <i class="fas fa-file-import me-1"></i>
+                        Import Verified Overtime
+                    </button>
+                </div>
+
+            </div>
+
+        </form>
+
+    </div>
+</div>
   </div>
 </section>
 {% endblock %}

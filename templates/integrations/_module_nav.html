@@ -1,0 +1,22 @@
+{# Section tabs for the one System Integration desk. The rail carries a single
+   entry for the whole module, so every screen reaches its siblings here. A tab
+   is offered only when the account's own module tick would open it: the two
+   directory screens answer to ``accounts``, the rest to ``integrations``. #}
+{% macro module_tabs(current) -%}
+{% set tabs = (
+    ('registry', 'Registry', 'integrations.dashboard', 'integrations'),
+    ('directory', 'Directory connections', 'integrations.directory_connections', 'accounts'),
+    ('accounts', 'Directory accounts', 'integrations.directory_accounts', 'accounts'),
+    ('monitoring', 'Monitoring', 'integrations.monitoring', 'integrations'),
+    ('logs', 'Activity logs', 'integrations.logs', 'integrations'),
+) %}
+<nav class="stock-actions module-tabs" aria-label="System Integration sections">
+  {% for key, label, endpoint, module in tabs %}
+  {% if module in permissions %}
+  <a class="btn{{ ' btn-sm' if key == current else ' btn-outline btn-sm' }}"
+     href="{{ url_for(endpoint) }}"
+     {% if key == current %}aria-current="page"{% endif %}>{{ label }}</a>
+  {% endif %}
+  {% endfor %}
+</nav>
+{%- endmacro %}

@@ -1,0 +1,35 @@
+{# Shared header and flash area for the four directory screens. #}
+{% from "integrations/_module_nav.html" import module_tabs with context %}
+{% macro directory_head(title, subtitle, connection=None, tab='directory') -%}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">System Integration · Directory</span>
+      <h1>{{ title }}</h1>
+      <p>{{ subtitle }}</p>
+    </div>
+    {% if connection %}
+    <nav class="stock-actions" aria-label="Connection actions">
+      <a class="btn btn-outline btn-sm"
+         href="{{ url_for('integrations.directory_groups', connection_id=connection.id) }}">Groups</a>
+      <a class="btn btn-outline btn-sm"
+         href="{{ url_for('integrations.directory_sync', connection_id=connection.id) }}">Sync</a>
+      <a class="btn btn-outline btn-sm"
+         href="{{ url_for('integrations.directory_connection', connection_id=connection.id) }}">Edit connection</a>
+    </nav>
+    {% endif %}
+    {{ module_tabs(tab) }}
+  </div>
+</section>
+{%- endmacro %}
+
+{% macro directory_flash(notes=[]) -%}
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for category, message in messages %}
+    <div class="finance-alert {{ category }}">{{ message }}</div>
+  {% endfor %}
+{% endwith %}
+{% for note in notes %}
+  <div class="dir-form-note warn">{{ note }}</div>
+{% endfor %}
+{%- endmacro %}

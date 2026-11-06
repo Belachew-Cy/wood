@@ -1,0 +1,337 @@
+
+{% extends "base.html" %}
+
+{% block title %}Audit Plans | Dereje Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Audit Management</span>
+            <h1>Audit Plans</h1>
+            <p>
+                Plan, organize, assign and monitor departmental
+                audit activities.
+            </p>
+        </div>
+
+        <nav class="stock-actions" aria-label="Audit plan actions">
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.dashboard') }}">
+                Dashboard
+            </a>
+
+            <a class="btn btn-sm"
+               href="{{ url_for('audit.create_audit_plan') }}">
+                + Create Audit Plan
+            </a>
+        </nav>
+    </div>
+</section>
+
+
+<section class="container finance-page">
+
+    <!-- SUMMARY -->
+
+    <div class="hr-stats">
+
+        <div class="dash-panel">
+            <span class="eyebrow">Total Plans</span>
+            <h2>{{ stats.total | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Planned</span>
+            <h2>{{ stats.planned | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Ongoing</span>
+            <h2>{{ stats.ongoing | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Completed</span>
+            <h2>{{ stats.completed | default(0) }}</h2>
+        </div>
+
+    </div>
+
+
+    <!-- FILTERS -->
+
+    <div class="dash-panel">
+
+        <h2>Search and Filter Audit Plans</h2>
+
+        <form method="GET"
+              action="{{ url_for('audit.audit_plans') }}"
+              class="form-grid">
+
+            <div class="form-group">
+                <label for="search">Search</label>
+                <input
+                    type="text"
+                    id="search"
+                    name="search"
+                    value="{{ request.args.get('search', '') }}"
+                    placeholder="Search plan number or title"
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="department">Department</label>
+                <select id="department" name="department">
+                    <option value="">All Departments</option>
+
+                    {% for department in departments | default([]) %}
+                    <option
+                        value="{{ department }}"
+                        {% if request.args.get('department') == department %}
+                            selected
+                        {% endif %}
+                    >
+                        {{ department }}
+                    </option>
+                    {% endfor %}
+
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="status">Status</label>
+                <select id="status" name="status">
+                    <option value="">All Statuses</option>
+
+                    {% for status in [
+                        'Planned',
+                        'Ongoing',
+                        'Completed',
+                        'Cancelled',
+                        'On Hold'
+                    ] %}
+                    <option
+                        value="{{ status }}"
+                        {% if request.args.get('status') == status %}
+                            selected
+                        {% endif %}
+                    >
+                        {{ status }}
+                    </option>
+                    {% endfor %}
+
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="risk_level">Risk Level</label>
+                <select id="risk_level" name="risk_level">
+                    <option value="">All Risk Levels</option>
+
+                    {% for risk in ['Low', 'Medium', 'High', 'Critical'] %}
+                    <option
+                        value="{{ risk }}"
+                        {% if request.args.get('risk_level') == risk %}
+                            selected
+                        {% endif %}
+                    >
+                        {{ risk }}
+                    </option>
+                    {% endfor %}
+
+                </select>
+            </div>
+
+            <div class="stock-actions">
+                <button type="submit" class="btn btn-sm">
+                    Apply Filters
+                </button>
+
+                <a class="btn btn-outline btn-sm"
+                   href="{{ url_for('audit.audit_plans') }}">
+                    Reset
+                </a>
+            </div>
+
+        </form>
+
+    </div>
+
+
+    <!-- AUDIT PLAN TABLE -->
+
+    <div class="dash-panel hr-table-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Registered Audit Plans</h2>
+                <p>
+                    Review audit schedules, responsibilities and progress.
+                </p>
+            </div>
+
+            <span class="status-badge neutral">
+                {{ plans | length }} Plans
+            </span>
+        </div>
+
+
+        <div class="hr-table-wrap table-scroll">
+
+            <table class="report-table">
+
+                <thead>
+                    <tr>
+                        <th>Plan Number</th>
+                        <th>Audit Title</th>
+                        <th>Department</th>
+                        <th>Audit Period</th>
+                        <th>Risk</th>
+                        <th>Assigned Auditor</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for plan in plans | default([]) %}
+
+                    <tr>
+
+                        <td class="nowrap">
+                            {{ plan.plan_number | default('—') }}
+                        </td>
+
+                        <td class="wrap-cell">
+                            <strong>
+                                {{ plan.title | default('Untitled Audit') }}
+                            </strong>
+
+                            {% if plan.description %}
+                            <span class="feed-meta">
+                                {{ plan.description }}
+                            </span>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {{ plan.department | default('—') }}
+                        </td>
+
+                        <td class="nowrap">
+
+                            {{ plan.start_date | default('—') }}
+
+                            {% if plan.end_date %}
+                            → {{ plan.end_date }}
+                            {% endif %}
+
+                        </td>
+
+                        <td>
+                            {% set risk = plan.risk_level | default('Medium') %}
+
+                            <span class="status-badge
+                                {{ 'off' if risk in ('High', 'Critical')
+                                else 'neutral' }}">
+                                {{ risk }}
+                            </span>
+                        </td>
+
+                        <td>
+                            {{ plan.auditor_name
+                               | default(plan.assigned_auditor_name
+                               | default('Unassigned')) }}
+                        </td>
+
+                        <td>
+                            {% set status = plan.status | default('Planned') %}
+
+                            <span class="status-badge
+                                {{ 'active' if status == 'Completed'
+                                else ('off' if status == 'Cancelled'
+                                else 'neutral') }}">
+                                {{ status }}
+                            </span>
+                        </td>
+
+                        <td>
+                            <a class="btn btn-outline btn-sm"
+                               href="{{ url_for(
+                                   'audit.audit_plan_detail',
+                                   plan_id=plan.id
+                               ) }}">
+                                View
+                            </a>
+                        </td>
+
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="8" class="report-empty">
+                            No audit plans found. Create an audit plan
+                            to begin scheduling departmental audits.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <!-- PAGINATION -->
+
+    {% if pagination %}
+
+    <div class="stock-actions">
+
+        {% if pagination.has_prev %}
+        <a class="btn btn-outline btn-sm"
+           href="{{ url_for(
+               'audit.audit_plans',
+               page=pagination.prev_num,
+               search=request.args.get('search', ''),
+               department=request.args.get('department', ''),
+               status=request.args.get('status', ''),
+               risk_level=request.args.get('risk_level', '')
+           ) }}">
+            Previous
+        </a>
+        {% endif %}
+
+        <span class="status-badge neutral">
+            Page {{ pagination.page }} of {{ pagination.pages }}
+        </span>
+
+        {% if pagination.has_next %}
+        <a class="btn btn-outline btn-sm"
+           href="{{ url_for(
+               'audit.audit_plans',
+               page=pagination.next_num,
+               search=request.args.get('search', ''),
+               department=request.args.get('department', ''),
+               status=request.args.get('status', ''),
+               risk_level=request.args.get('risk_level', '')
+           ) }}">
+            Next
+        </a>
+        {% endif %}
+
+    </div>
+
+    {% endif %}
+
+</section>
+
+{% endblock %}

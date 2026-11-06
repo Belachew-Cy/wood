@@ -1,0 +1,277 @@
+
+{% extends "base.html" %}
+
+{% block title %}Audit Evidence | Audit Management{% endblock %}
+
+{% block content %}
+
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Audit Management</span>
+            <h1>Audit Evidence</h1>
+            <p>
+                Register, organize and track supporting evidence
+                collected during audit activities.
+            </p>
+        </div>
+
+        <div class="stock-actions">
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.dashboard') }}">
+                Dashboard
+            </a>
+
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.audit_findings') }}">
+                Audit Findings
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="container finance-page">
+
+    <!-- SUMMARY -->
+
+    <div class="hr-stats">
+
+        <div class="dash-panel">
+            <span class="eyebrow">Total Evidence</span>
+            <h2>{{ stats.total | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Documents</span>
+            <h2>{{ stats.documents | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Pending Review</span>
+            <h2>{{ stats.pending | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Verified</span>
+            <h2>{{ stats.verified | default(0) }}</h2>
+        </div>
+
+    </div>
+
+
+    <!-- UPLOAD EVIDENCE -->
+
+    <div class="dash-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Register New Evidence</h2>
+                <p>
+                    Upload an authorized supporting document
+                    and provide its audit reference.
+                </p>
+            </div>
+        </div>
+
+        <form method="POST"
+              action="{{ url_for('audit.upload_audit_evidence') }}"
+              enctype="multipart/form-data">
+
+            {% if csrf_token is defined %}
+                {{ csrf_token() }}
+            {% endif %}
+
+            <div class="form-grid">
+
+                <div class="form-group">
+                    <label for="description">Evidence Description</label>
+                    <input type="text"
+                           id="description"
+                           name="description"
+                           maxlength="500"
+                           placeholder="Describe the supporting evidence"
+                           required>
+                </div>
+
+                <div class="form-group">
+                    <label for="evidence_type">Evidence Type</label>
+                    <select id="evidence_type"
+                            name="evidence_type">
+                        <option value="Document">Document</option>
+                        <option value="Financial Record">Financial Record</option>
+                        <option value="Photograph">Photograph</option>
+                        <option value="Correspondence">Correspondence</option>
+                        <option value="System Record">System Record</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="plan_id">Related Audit Plan ID</label>
+                    <input type="number"
+                           id="plan_id"
+                           name="plan_id"
+                           min="1"
+                           placeholder="Optional">
+                </div>
+
+                <div class="form-group">
+                    <label for="finding_id">Related Finding ID</label>
+                    <input type="number"
+                           id="finding_id"
+                           name="finding_id"
+                           min="1"
+                           placeholder="Optional">
+                </div>
+
+                <div class="form-group form-full">
+                    <label for="evidence_file">Select Evidence File</label>
+                    <input type="file"
+                           id="evidence_file"
+                           name="evidence_file"
+                           accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx,.csv,.txt"
+                           required>
+                    <small>
+                        Only upload authorized evidence. The server must
+                        enforce file-size, extension and content validation.
+                    </small>
+                </div>
+
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    Upload Evidence
+                </button>
+            </div>
+
+        </form>
+
+    </div>
+
+
+    <!-- EVIDENCE REGISTER -->
+
+    <div class="dash-panel hr-table-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Evidence Register</h2>
+                <p>
+                    Evidence records associated with audit activities.
+                </p>
+            </div>
+
+            <span class="status-badge neutral">
+                {{ evidence_records | length }} Records
+            </span>
+        </div>
+
+        <div class="table-scroll">
+
+            <table class="report-table">
+
+                <thead>
+                    <tr>
+                        <th>Reference</th>
+                        <th>Description</th>
+                        <th>Evidence Type</th>
+                        <th>Audit Plan</th>
+                        <th>Finding</th>
+                        <th>Uploaded By</th>
+                        <th>Upload Date</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for evidence in evidence_records | default([]) %}
+
+                    <tr>
+
+                        <td>
+                            {{ evidence.evidence_number
+                               | default(evidence.id | default('—')) }}
+                        </td>
+
+                        <td>
+                            <strong>
+                                {{ evidence.description | default('—') }}
+                            </strong>
+                        </td>
+
+                        <td>
+                            {{ evidence.evidence_type | default('Document') }}
+                        </td>
+
+                        <td>
+                            {{ evidence.plan_number | default('—') }}
+                        </td>
+
+                        <td>
+                            {{ evidence.finding_number | default('—') }}
+                        </td>
+
+                        <td>
+                            {{ evidence.uploaded_by_name
+                               | default(evidence.uploaded_by | default('—')) }}
+                        </td>
+
+                        <td>
+                            {{ evidence.created_at | default('—') }}
+                        </td>
+
+                        <td>
+                            {% set status = evidence.status | default('Pending Review') %}
+
+                            <span class="status-badge
+                                {{ 'active' if status == 'Verified'
+                                else 'neutral' }}">
+                                {{ status }}
+                            </span>
+                        </td>
+
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="8" class="report-empty">
+                            No audit evidence has been uploaded.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <!-- EVIDENCE HANDLING -->
+
+    <div class="dash-panel">
+
+        <h2>Evidence Security and Handling</h2>
+
+        <ul>
+            <li>Only authorized audit users should upload or access evidence.</li>
+            <li>Validate file extensions, MIME types, file signatures and file sizes on the server.</li>
+            <li>Store uploaded files outside the public static directory.</li>
+            <li>Generate safe server-side filenames rather than trusting uploaded filenames.</li>
+            <li>Restrict evidence downloads through permission-checked routes.</li>
+            <li>Record uploader, upload date, file hash and related audit references.</li>
+            <li>Protect evidence against unauthorized modification or deletion.</li>
+            <li>Maintain an auditable history of evidence access and verification.</li>
+        </ul>
+
+    </div>
+
+</section>
+
+{% endblock %}

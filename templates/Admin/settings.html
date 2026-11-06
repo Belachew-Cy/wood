@@ -30,7 +30,7 @@
     <div class="hr-stats">
       {{ kpi('Company', stored.get('company_name', defaults['company_name']), 'Printed on reports') }}
       {{ kpi('Currency', stored.get('currency', defaults['currency']), 'Amounts are stored in ETB regardless') }}
-      {{ kpi('Modules you open', permissions | length, 'This account&rsquo;s access, set on Role Management') }}
+      {{ kpi('Modules you open', permissions | length, 'This account&rsquo;s access, set on Role and Permission Management') }}
     </div>
   </div>
 </section>

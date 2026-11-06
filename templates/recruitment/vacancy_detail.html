@@ -1,0 +1,370 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi with context %}
+{% from "_workflow.html" import approval_route %}
+
+{% block title %}{{ vacancy.reference or vacancy.job_title }} | Recruitment{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">
+        {{ 'Recruitment request' if vacancy.status == 'Draft' else 'Vacancy' }}
+      </span>
+      <h1>{{ vacancy.job_title }}</h1>
+      <p>{{ vacancy.department }} · {{ vacancy.job_type }}
+        {%- if vacancy.location %} · {{ vacancy.location }}{% endif %}
+        {%- if vacancy.reference %} · {{ vacancy.reference }}{% endif %}</p>
+    </div>
+    <nav class="stock-actions" aria-label="Vacancy actions">
+      <a class="btn btn-outline btn-sm" href="{{ url_for('recruitment.hr_vacancies') }}">
+        Back to the register
+      </a>
+      {% if can_edit %}
+      <a class="btn btn-outline btn-sm"
+         href="{{ url_for('recruitment.edit_vacancy', vacancy_id=vacancy.id) }}">Revise</a>
+      {% endif %}
+      {% if chain %}
+      <a class="btn btn-outline btn-sm"
+         href="{{ url_for('approvals.detail', request_id=chain.id) }}">Approval trail</a>
+      {% endif %}
+      <a class="btn btn-outline btn-sm"
+         href="{{ url_for('recruitment.hr_applicants', vacancy_id=vacancy.id) }}">
+        All applicants
+      </a>
+    </nav>
+  </div>
+</section>
+
+<section class="container finance-page">
+  <div class="hr-stats">
+    {{ kpi('Applicants', applicants | length, 'at every stage', 'flat', 'users') }}
+    {{ kpi('Shortlisted', applicants | selectattr('status', 'in', ['Shortlisted', 'Interview', 'Selected', 'Hired']) | list | length,
+           'past the first screen', 'flat', 'check') }}
+    {{ kpi('Filled', vacancy.filled_count, 'of ' ~ vacancy.openings ~ ' opening(s)',
+           'up' if vacancy.filled_count >= vacancy.openings else 'flat', 'user') }}
+    {{ kpi('Examinations', exams | length, 'papers set for this post', 'flat', 'graduation') }}
+    {{ kpi('Interviews', interviews | length, 'panels booked', 'flat', 'handshake') }}
+  </div>
+
+  <div class="dash-grid">
+    <div class="dash-panel">
+      <h2>The post</h2>
+      <dl class="detail-list">
+        <dt>Status</dt>
+        <dd>
+          <span class="status-badge {{ 'active' if vacancy.status == 'Open'
+                                        else 'off' if vacancy.status == 'Closed'
+                                        else 'neutral' }}">{{ vacancy.status }}</span>
+        </dd>
+        <dt>Department</dt><dd>{{ vacancy.registered_department or vacancy.department }}</dd>
+        <dt>Raised by</dt><dd>{{ vacancy.created_by_name or 'the HR desk' }}</dd>
+        <dt>Opened</dt><dd>{{ (vacancy.created_at or '—')[:10] }}</dd>
+        <dt>Employment type</dt><dd>{{ vacancy.job_type }}</dd>
+        <dt>Openings</dt><dd>{{ vacancy.openings }}</dd>
+        <dt>Closing date</dt>
+        <dd>{{ vacancy.closing_date | friendly_date if vacancy.closing_date else 'No closing date set' }}</dd>
+        <dt>Who may apply</dt>
+        <dd>{{ 'Reserved for the company’s own staff' if vacancy.internal_only else 'Open to every applicant' }}</dd>
+        <dt>Minimum GPA</dt>
+        <dd>{{ '%.2f' | format(vacancy.minimum_gpa | float) if vacancy.minimum_gpa else 'None' }}</dd>
+        <dt>Age</dt>
+        <dd>
+          {% if vacancy.minimum_age or vacancy.maximum_age %}
+          {{ vacancy.minimum_age or 'any' }} to {{ vacancy.maximum_age or 'no limit' }}
+          {% else %}
+          No limit
+          {% endif %}
+        </dd>
+        <dt>Estimated cost</dt>
+        <dd><strong>{{ "{:,.2f}".format(vacancy.estimated_cost | float) }} ETB</strong></dd>
+        {% if vacancy.description %}
+        <dt>What the work is</dt><dd class="wrap-cell">{{ vacancy.description }}</dd>
+        {% endif %}
+        {% if vacancy.requirements %}
+        <dt>What we ask for</dt><dd class="wrap-cell">{{ vacancy.requirements }}</dd>
+        {% endif %}
+      </dl>
+    </div>
+
+    <div class="dash-panel">
+      <h2>What this desk may do</h2>
+      {% if note %}<p class="panel-note">{{ note }}</p>{% endif %}
+      <dl class="detail-list">
+        <dt>Review rights</dt>
+        <dd>{{ 'Yes - candidates and stages' if can_review else 'Read only for this account' }}</dd>
+        <dt>Desk</dt><dd>{{ scope.name }} ({{ scope.level }})</dd>
+      </dl>
+
+      {% if scope.can('vacancy_publish', vacancy) %}
+      <form method="POST" action="{{ url_for('recruitment.set_vacancy_status', vacancy_id=vacancy.id) }}"
+            class="dash-form">
+        {{ csrf_field() }}
+        <label for="status">Publish, close or reopen</label>
+        <div class="account-grid">
+          <select id="status" name="status" aria-label="New post status">
+            {% for status in vacancy_statuses %}
+            <option value="{{ status }}" {% if vacancy.status == status %}selected{% endif %}>
+              {{ status }}
+            </option>
+            {% endfor %}
+          </select>
+          <button class="btn finance-btn secondary" type="submit">Set status</button>
+        </div>
+        <p class="cell-note">A post still waiting on a signature cannot be published from
+          here - that is what the route is for.</p>
+      </form>
+      {% endif %}
+
+      {% if scope.can_request and vacancy.status == 'Draft'
+            and (scope.can('vacancy_publish', vacancy)
+                 or vacancy.created_by_id == scope.user_id) %}
+      <form method="POST" action="{{ url_for('recruitment.submit_vacancy_request', vacancy_id=vacancy.id) }}"
+            class="dash-form">
+        {{ csrf_field() }}
+        <button class="btn finance-btn primary" type="submit">Submit for approval</button>
+        <p class="cell-note">Starts the company&rsquo;s approval route for
+          {{ "{:,.2f}".format(vacancy.estimated_cost | float) }} ETB
+          {{ 'charged to the linked allocation' if vacancy.budget_allocation_id else 'with no allocation linked' }}.</p>
+      </form>
+      {% endif %}
+
+      {% if scope.can('exam_author') %}
+      <a class="btn btn-outline" href="{{ url_for('recruitment.create_exam') }}">
+        Set an examination
+      </a>
+      {% endif %}
+      {% if not scope.read_only and scope.can_request %}
+      <a class="btn btn-outline" href="{{ url_for('recruitment.apply', vacancy_id=vacancy.id) }}">
+        Apply for this post
+      </a>
+      {% endif %}
+    </div>
+  </div>
+
+  {{ approval_route(trail, 'Approval route', 'The request travels the same desks as a purchase requisition.') }}
+
+  <div class="dash-panel hr-table-panel">
+    <h2>Candidates</h2>
+    <div class="hr-table-wrap table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Reference</th>
+            <th>Candidate</th>
+            <th>Applied</th>
+            <th>GPA</th>
+            <th>Source</th>
+            <th>Stage</th>
+            <th>Examination</th>
+            <th aria-label="Actions"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for applicant in applicants %}
+          <tr>
+            <td class="nowrap">{{ applicant.reference or '#' ~ applicant.id }}</td>
+            <td class="wrap-cell">
+              <strong>{{ applicant.full_name }}</strong>
+              <span class="cell-note">{{ applicant.email }} · {{ applicant.phone }}</span>
+            </td>
+            <td class="nowrap">{{ applicant.applied_at | friendly_date }}</td>
+            <td>{{ '%.2f' | format(applicant.gpa | float) if applicant.gpa is not none else '—' }}</td>
+            <td>{{ applicant.source }}</td>
+            <td>
+              <span class="status-badge {{ 'active' if applicant.status in ('Selected', 'Hired')
+                                            else 'off' if applicant.status == 'Rejected'
+                                            else 'neutral' }}">{{ applicant.status }}</span>
+            </td>
+            <td class="nowrap">
+              {% if applicant.attempt_status == 'Submitted' %}
+              {{ '%g' | format(applicant.exam_score | float) }} /
+              {{ '%g' | format(applicant.total_marks | float) }}
+              {% elif applicant.exam_id %}
+              <span class="cell-note">{{ applicant.attempt_status or applicant.exam_status }}</span>
+              {% else %}—{% endif %}
+            </td>
+            <td class="nowrap">
+              <a class="btn btn-outline btn-sm"
+                 href="{{ url_for('recruitment.applicant_detail', application_id=applicant.id) }}">Open</a>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="8" class="employee-empty">
+              {% if vacancy.status == 'Open' %}
+              No application has arrived for this post yet.
+              {% else %}
+              This post has no candidates on it.
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if can_review %}
+    <p class="panel-note">Open a candidate to screen them, send the paper, book a panel or
+      record the desk&rsquo;s answer. A selection or a hire stays with the HR desk.</p>
+    {% endif %}
+
+    {% if scope.can('applicant_register', vacancy) and vacancy.status == 'Open' %}
+    <details class="desk-split">
+      <summary><strong>Register a walk-in or referred applicant</strong></summary>
+      <form method="POST" enctype="multipart/form-data" class="dash-form"
+            action="{{ url_for('recruitment.register_applicant', vacancy_id=vacancy.id) }}">
+        {{ csrf_field() }}
+        <div class="account-grid">
+          <div>
+            <label for="reg_name">Full name *</label>
+            <input id="reg_name" name="full_name" maxlength="120" required />
+          </div>
+          <div>
+            <label for="reg_email">Email *</label>
+            <input id="reg_email" name="email" type="email" maxlength="160" required />
+          </div>
+          <div>
+            <label for="reg_phone">Phone *</label>
+            <input id="reg_phone" name="phone" maxlength="30" required />
+          </div>
+          <div>
+            <label for="reg_dob">Date of birth</label>
+            <input id="reg_dob" name="date_of_birth" type="date" />
+          </div>
+          <div>
+            <label for="reg_gpa">GPA</label>
+            <input id="reg_gpa" name="gpa" inputmode="decimal" maxlength="10" />
+          </div>
+          <div>
+            <label for="reg_source">Source</label>
+            <select id="reg_source" name="source">
+              {% for source in application_sources %}
+              <option value="{{ source }}" {% if source == 'Walk-in' %}selected{% endif %}>{{ source }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label for="reg_education">Qualification</label>
+            <input id="reg_education" name="education" maxlength="200" />
+          </div>
+          <div>
+            <label for="reg_cv">CV (optional)</label>
+            <input id="reg_cv" name="cv" type="file" accept=".pdf,.doc,.docx" />
+          </div>
+          <div class="full">
+            <label for="reg_experience">Experience</label>
+            <textarea id="reg_experience" name="experience" rows="2" maxlength="2000"></textarea>
+          </div>
+          <div class="full">
+            <button class="btn finance-btn primary" type="submit">Register applicant</button>
+          </div>
+        </div>
+        <p class="cell-note">The same age, GPA, closing-date and duplicate checks that a
+          portal application passes run on this one.</p>
+      </form>
+    </details>
+    {% endif %}
+  </div>
+
+  <div class="dash-panel hr-table-panel">
+    <h2>Examinations</h2>
+    <div class="hr-table-wrap table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Paper</th>
+            <th>Questions</th>
+            <th>Marks</th>
+            <th>Pass at</th>
+            <th>Window</th>
+            <th>Status</th>
+            <th>Submitted</th>
+            <th aria-label="Actions"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for exam in exams %}
+          <tr>
+            <td class="wrap-cell"><strong>{{ exam.exam_title }}</strong></td>
+            <td class="nowrap">{{ exam.question_count }}</td>
+            <td class="nowrap">{{ '%g' | format(exam.total_marks | float) }}</td>
+            <td class="nowrap">{{ '%g' | format(exam.pass_mark | float) }}</td>
+            <td class="nowrap">
+              {% if exam.start_datetime %}
+              {{ exam.start_datetime[:16] }} → {{ (exam.end_datetime or '')[:16] }}
+              {% else %}No window set{% endif %}
+            </td>
+            <td>
+              <span class="status-badge {{ 'active' if exam.status == 'Published'
+                                            else 'off' if exam.status == 'Closed'
+                                            else 'neutral' }}">{{ exam.status }}</span>
+            </td>
+            <td class="nowrap">{{ exam.attempt_count }} seated</td>
+            <td class="nowrap">
+              <a class="btn btn-outline btn-sm"
+                 href="{{ url_for('recruitment.exam_questions', exam_id=exam.id) }}">Open paper</a>
+              {% if exam.status != 'Draft' %}
+              <a class="btn btn-outline btn-sm"
+                 href="{{ url_for('recruitment.hr_exam_results', exam_id=exam.id) }}">Results</a>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="8" class="employee-empty">
+              No examination has been set for this post.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="dash-panel hr-table-panel">
+    <h2>Interviews</h2>
+    <div class="hr-table-wrap table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Candidate</th>
+            <th>Scheduled</th>
+            <th>Location</th>
+            <th>Status</th>
+            <th>Outcome</th>
+            <th>Scores</th>
+            <th aria-label="Actions"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for interview in interviews %}
+          <tr>
+            <td class="wrap-cell">
+              <strong>{{ interview.full_name }}</strong>
+              <span class="cell-note">{{ interview.email }}</span>
+            </td>
+            <td class="nowrap">{{ (interview.scheduled_at or '')[:16] or 'No time set' }}</td>
+            <td>{{ interview.location or '—' }}</td>
+            <td>
+              <span class="status-badge {{ 'active' if interview.status == 'Held'
+                                            else 'off' if interview.status == 'Cancelled'
+                                            else 'neutral' }}">{{ interview.status }}</span>
+            </td>
+            <td>{{ interview.outcome }}</td>
+            <td class="nowrap">{{ interview.score_count }} recorded</td>
+            <td class="nowrap">
+              <a class="btn btn-outline btn-sm"
+                 href="{{ url_for('recruitment.interview_detail', interview_id=interview.id) }}">Open</a>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7" class="employee-empty">No interview has been booked for this post.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+{% endblock %}

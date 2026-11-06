@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Answer' if item else 'Record' }} Feedback | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">MARKETING MANAGEMENT</span>
+      <h1>{{ (item["customer_name"] or 'Feedback #' ~ item["id"]) if item
+             else 'Record Customer Feedback' }}</h1>
+      <p>{% if item %}
+          {{ item["feedback_type"] }} · {{ item["status"] }} ·
+          {{ item["created_at"] | audit_time }}
+        {% else %}
+          What the customer said, who has to answer it, and what settled it.
+        {% endif %}</p>
+    </div>
+    <a class="btn btn-outline" href="{{ url_for('marketing.feedback') }}">
+      ← Back to feedback
+    </a>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="dash-panel">
+      <h2>{{ 'Record' if item else 'New record' }}</h2>
+
+      <form method="POST" class="dash-form stock-grid">
+        {{ csrf_field() }}
+        <div>
+          <label for="customer_name">Customer name</label>
+          <input id="customer_name" name="customer_name" maxlength="150"
+                 value="{{ (item['customer_name'] or '') if item else '' }}" />
+        </div>
+
+        <div>
+          <label for="contact">Contact</label>
+          <input id="contact" name="contact" maxlength="150"
+                 value="{{ (item['contact'] or '') if item else '' }}"
+                 placeholder="Phone or email the desk can answer on" />
+        </div>
+
+        <div>
+          <label for="feedback_type">Type</label>
+          <select id="feedback_type" name="feedback_type">
+            {% for value in feedback_types %}
+            <option value="{{ value }}"
+              {% if item and item['feedback_type'] == value %}selected{% endif %}>
+              {{ value }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label for="rating">Rating (1-5)</label>
+          <input id="rating" type="number" min="1" max="5" step="1" name="rating"
+                 value="{{ item['rating'] if item and item['rating'] else '' }}" />
+        </div>
+
+        <div>
+          <label for="assigned_to">Assigned to</label>
+          <select id="assigned_to" name="assigned_to">
+            <option value="">Unassigned</option>
+            {% for account in accounts %}
+            <option value="{{ account['id'] }}"
+              {% if item and item['assigned_to'] == account['id'] %}selected{% endif %}>
+              {{ account['full_name'] }} ({{ account['username'] }})</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        {% if item %}
+        <div>
+          <label for="status">Status</label>
+          <select id="status" name="status">
+            {% for value in feedback_statuses %}
+            <option value="{{ value }}"
+              {% if item['status'] == value %}selected{% endif %}>
+              {{ value }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endif %}
+
+        <div class="stock-notes">
+          <label for="description">What the customer said *</label>
+          <textarea id="description" name="description" rows="4" maxlength="2000"
+                    required>{{ (item['description'] or '') if item else '' }}</textarea>
+        </div>
+
+        {% if item %}
+        <div class="stock-notes">
+          <label for="resolution">What settled it</label>
+          <textarea id="resolution" name="resolution" rows="3" maxlength="2000"
+                    placeholder="Required before the record can be resolved or closed.">{{ (item['resolution'] or '') if item else '' }}</textarea>
+        </div>
+        {% endif %}
+
+        <div class="stock-form-actions">
+          <button class="btn" type="submit">Save record</button>
+          <a class="btn btn-outline" href="{{ url_for('marketing.feedback') }}">Cancel</a>
+        </div>
+      </form>
+    </div>
+
+    {% if item %}
+    <div class="dash-panel">
+      <h2>Audit</h2>
+      <dl class="detail-list">
+        <dt>Recorded by</dt><dd>{{ item["created_by_name"] or '—' }}</dd>
+        <dt>Recorded on</dt><dd>{{ item["created_at"] | audit_time }}</dd>
+        <dt>Last modified</dt>
+        <dd>{{ item["updated_by_name"] or '—' }} ·
+            {{ item["updated_at"] | audit_time }}</dd>
+      </dl>
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

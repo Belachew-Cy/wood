@@ -4,6 +4,7 @@ from core.access import effective_permissions
 from core.config import DB_PATH
 from core.config import ROLE_LABEL
 from core.db import connect_db
+from database import database_config
 from services.hr import employee_photo_url
 from services.workflow import account_position_level
 import sqlite3
@@ -34,6 +35,9 @@ DEPARTMENTS_DDL = """
         description TEXT DEFAULT '',
         is_active INTEGER NOT NULL DEFAULT 1,
         leadership_position TEXT NOT NULL DEFAULT 'Director',
+        parent_id INTEGER,
+        head_employee_id INTEGER,
+        unit_type TEXT NOT NULL DEFAULT 'Department',
         created_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
 """
@@ -45,6 +49,8 @@ POSITIONS_DDL = """
         title TEXT NOT NULL COLLATE NOCASE,
         department_id INTEGER,
         level INTEGER NOT NULL DEFAULT 4,
+        reports_to_position_id INTEGER,
+        is_active INTEGER NOT NULL DEFAULT 1,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(title, department_id),
         FOREIGN KEY(department_id)
@@ -52,6 +58,56 @@ POSITIONS_DDL = """
             ON DELETE SET NULL
     )
 """
+
+
+LEAVE_REQUESTS_DDL = """
+    CREATE TABLE IF NOT EXISTS leave_requests (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        employee_id INTEGER NOT NULL,
+        leave_type TEXT NOT NULL,
+        start_date TEXT NOT NULL,
+        end_date TEXT NOT NULL,
+        days_requested INTEGER NOT NULL,
+        reason TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'Pending'
+            CHECK (status IN ('Pending', 'Approved', 'Rejected')),
+        reviewed_by TEXT DEFAULT '',
+        review_comment TEXT DEFAULT '',
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (employee_id) REFERENCES employees(id)
+    )
+"""
+
+
+EMPLOYEE_TRAINING_DDL = """
+    CREATE TABLE IF NOT EXISTS employee_training (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        employee_id INTEGER NOT NULL,
+        course_title TEXT NOT NULL,
+        provider TEXT DEFAULT '',
+        start_date TEXT NOT NULL,
+        end_date TEXT,
+        status TEXT NOT NULL DEFAULT 'Planned'
+            CHECK (status IN (
+                'Planned', 'In Progress', 'Completed', 'Cancelled'
+            )),
+        certificate TEXT DEFAULT '',
+        notes TEXT DEFAULT '',
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (employee_id) REFERENCES employees(id)
+    )
+"""
+
+
+# A directorate groups departments under one director; a department is the
+# ordinary team; a team is a smaller unit inside a department.
+DEPARTMENT_UNIT_TYPES = ("Directorate", "Department", "Team")
+
+
+def clean_unit_type(value):
+    """Return a known unit type, defaulting to an ordinary department."""
+    value = (value or "").strip().title()
+    return value if value in DEPARTMENT_UNIT_TYPES else "Department"
 
 
 POSITION_LEVEL_LABEL = {0: "CEO", 1: "Executive", 2: "Director",
@@ -73,8 +129,43 @@ def ensure_org_tables(conn):
             ALTER TABLE departments
             ADD COLUMN leadership_position TEXT NOT NULL DEFAULT 'Director'
         """)
+    # Added with the organization tree: a department may sit under a directorate
+    # (or another department), name the employee who heads it, and say which kind
+    # of unit it is. Existing rows keep their place at the top with no head.
+    if "parent_id" not in department_columns:
+        conn.execute("ALTER TABLE departments ADD COLUMN parent_id INTEGER")
+    if "head_employee_id" not in department_columns:
+        conn.execute(
+            "ALTER TABLE departments ADD COLUMN head_employee_id INTEGER")
+    if "unit_type" not in department_columns:
+        conn.execute("""
+            ALTER TABLE departments
+            ADD COLUMN unit_type TEXT NOT NULL DEFAULT 'Department'
+        """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_department_parent
+        ON departments(parent_id)
+    """)
 
     conn.execute(POSITIONS_DDL)
+
+    position_columns = hierarchy_columns(conn, "organizational_positions")
+    # A position reports to another position, which keeps the management ladder
+    # readable before anybody is placed on it. A retired position stops opening a
+    # signing desk without being deleted.
+    if "reports_to_position_id" not in position_columns:
+        conn.execute(
+            "ALTER TABLE organizational_positions"
+            " ADD COLUMN reports_to_position_id INTEGER")
+    if "is_active" not in position_columns:
+        conn.execute("""
+            ALTER TABLE organizational_positions
+            ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1
+        """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_positions_reports_to
+        ON organizational_positions(reports_to_position_id)
+    """)
 
     user_columns = hierarchy_columns(conn, "users")
     if user_columns:
@@ -108,10 +199,29 @@ def ensure_position(conn, title, level, department_id=None):
     """, (title, department_id, level)).lastrowid
 
 
+def sync_department_head(conn, department, head_employee_id):
+    """Point a department at its head and move that person into the unit.
+
+    The head is stored as an employee id, and the employee row plus every linked
+    sign-in account follow the department so HR, User Management and the chart
+    name the same place. Returns the head's name for the audit trail.
+    """
+    if not head_employee_id:
+        return ""
+    employee = conn.execute(
+        "SELECT id, full_name FROM employees WHERE id = ?",
+        (head_employee_id,)).fetchone()
+    if employee is None:
+        raise ValueError("Selected department head does not exist.")
+    conn.execute("UPDATE employees SET department = ? WHERE id = ?",
+                 (department["name"], head_employee_id))
+    conn.execute("UPDATE users SET department_id = ? WHERE employee_id = ?",
+                 (department["id"], head_employee_id))
+    return employee["full_name"]
+
+
 def table_exists(conn, name):
-    return conn.execute(
-        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
-        (name,)).fetchone() is not None
+    return database_config.table_exists(conn, name)
 
 
 def migrate_account_assignments(db):
@@ -205,15 +315,7 @@ def ensure_hierarchy_schema():
         ensure_org_tables(conn)
 
         # Do not create a second employee table if HR already has one.
-        existing_tables = {
-            row["name"]
-            for row in conn.execute("""
-                SELECT name FROM sqlite_master
-                WHERE type = 'table'
-            """).fetchall()
-        }
-
-        if "employees" not in existing_tables:
+        if not database_config.table_exists(conn, "employees"):
             conn.execute("""
                 CREATE TABLE employees (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -229,6 +331,13 @@ def ensure_hierarchy_schema():
             """)
 
         employee_columns = hierarchy_columns(conn, "employees")
+
+        # Two more HR registers the desks read every day. They only existed in a
+        # one-off migration script, so a brand new database never gained them and
+        # leave and training broke on the first query. Same shape as the live
+        # table, so an existing file is left exactly as it is.
+        conn.execute(LEAVE_REQUESTS_DDL)
+        conn.execute(EMPLOYEE_TRAINING_DDL)
 
         # Add only missing columns to the existing HR employee table.
         if "manager_id" not in employee_columns:
@@ -317,6 +426,72 @@ def clean_department_position(value):
 def department_position_level(position):
     """Chart rung for an open department seat: Executive, Director or Manager."""
     return ORG_LEVEL_BY_TITLE.get(clean_department_position(position) or "Director", 3)
+
+
+def department_ancestor_ids(departments, department_id):
+    """The ids above one department, walking parent links once.
+
+    Used before a save so a department cannot be made to sit inside its own
+    branch, which would leave the chart with a loop and nothing to draw.
+    """
+    parents = {row["id"]: row["parent_id"] for row in departments}
+    seen, cursor = set(), parents.get(department_id)
+    while cursor is not None and cursor not in seen:
+        seen.add(cursor)
+        cursor = parents.get(cursor)
+    return seen
+
+
+def build_department_tree(items):
+    """Nest department rows under their parents for the structure chart.
+
+    Items are dicts holding at least id, name, parent_id and unit_type. A row
+    whose parent is missing or points at itself is a root; a corrupt loop is
+    detached rather than drawn, so the page always renders.
+    """
+    by_id = {}
+    for item in items:
+        node = dict(item)
+        node["children"] = []
+        by_id[node["id"]] = node
+
+    roots = []
+    for node in by_id.values():
+        parent = by_id.get(node.get("parent_id"))
+        if parent is None or parent is node:
+            roots.append(node)
+        else:
+            parent["children"].append(node)
+
+    seen = set()
+
+    def prune(node):
+        seen.add(node["id"])
+        kept = []
+        for child in node["children"]:
+            if child["id"] in seen:
+                continue
+            kept.append(child)
+            prune(child)
+        node["children"] = kept
+
+    for root in roots:
+        prune(root)
+
+    def sort_nodes(nodes):
+        nodes.sort(key=lambda node: (node["unit_type"] != "Directorate",
+                                     (node["name"] or "").lower()))
+        for node in nodes:
+            sort_nodes(node["children"])
+
+    sort_nodes(roots)
+
+    # A loop with no top would otherwise disappear from the page.
+    for node in by_id.values():
+        if node["id"] not in seen:
+            roots.append(node)
+            prune(node)
+    return roots
 
 
 ORG_ROLE_DEPARTMENT = {
@@ -856,8 +1031,13 @@ def organization_snapshot(db, user=None, public=False):
     sort_tree(roots)
 
     department_rows = db.execute(
-        "SELECT name, description, is_active, leadership_position "
-        "FROM departments ORDER BY name").fetchall()
+        "SELECT id, name, description, is_active, leadership_position,"
+        "       parent_id, head_employee_id, unit_type"
+        " FROM departments ORDER BY name").fetchall()
+    head_names = {
+        row["id"]: row["full_name"]
+        for row in db.execute("SELECT id, full_name FROM employees").fetchall()
+    }
     department_notes = {
         (row["name"] or "").strip().lower(): row["description"] or ""
         for row in department_rows
@@ -918,6 +1098,7 @@ def organization_snapshot(db, user=None, public=False):
         profile = org_department_profile(department["name"])
         members = roster_for(department["name"])
         departments.append({
+            "id": department["id"],
             "name": department["name"],
             "description": department["description"] or "",
             "count": len(members),
@@ -929,6 +1110,10 @@ def organization_snapshot(db, user=None, public=False):
                 clean_department_position(department["leadership_position"])
                 or "Director"
             ),
+            "parent_id": department["parent_id"],
+            "head_employee_id": department["head_employee_id"],
+            "head_name": head_names.get(department["head_employee_id"], ""),
+            "unit_type": clean_unit_type(department["unit_type"]),
         })
     for key, members in rosters.items():
         if key in named:
@@ -942,6 +1127,7 @@ def organization_snapshot(db, user=None, public=False):
                 break
         profile = org_department_profile(name)
         departments.append({
+            "id": None,
             "name": name,
             "description": "",
             "count": len(members),
@@ -950,8 +1136,17 @@ def organization_snapshot(db, user=None, public=False):
             "label": profile["label"],
             "is_active": True,
             "leadership_position": "",
+            "parent_id": None,
+            "head_employee_id": None,
+            "head_name": "",
+            "unit_type": "Department",
         })
     departments.sort(key=lambda item: (-item["count"], item["name"].lower()))
+
+    # Only registered rows can be nested: a roster name that HR never saved as a
+    # department has no id and nothing to hang it under.
+    department_tree = build_department_tree(
+        [item for item in departments if item["id"] is not None])
 
     positions = db.execute(
         "SELECT COUNT(*) AS n FROM organizational_positions").fetchone()["n"]
@@ -966,6 +1161,8 @@ def organization_snapshot(db, user=None, public=False):
         "employees": len(people),
         "accounts": len(active_accounts),
         "departments": len(departments),
+        "directorates": sum(1 for item in departments
+                            if item["unit_type"] == "Directorate"),
         "positions": positions,
         "lines": sum(1 for node in people.values()
                      if node["manager_id"] in people),
@@ -1007,6 +1204,7 @@ def organization_snapshot(db, user=None, public=False):
         "org_leadership": leadership_roots,
         "org_leadership_tiers": leadership_tiers,
         "org_departments": departments,
+        "org_department_tree": department_tree,
         "org_stats": stats,
         "org_unassigned": unassigned,
         "org_me": org_me,

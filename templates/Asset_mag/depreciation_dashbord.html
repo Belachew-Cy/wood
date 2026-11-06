@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container-fluid py-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3>Asset Depreciation Management</h3>
+            <p class="text-muted">
+                Calculate and monitor asset financial values.
+            </p>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+
+        <div class="col-md-4">
+            <div class="card shadow-sm p-3">
+                <h6>Total Recorded Depreciation</h6>
+                <h3>
+                    {{ "{:,.2f}".format(total_depreciation or 0) }}
+                    <small>ETB</small>
+                </h3>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card shadow-sm p-3">
+                <h6>Depreciable Assets</h6>
+                <h3>{{ assets|length }}</h3>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card shadow-sm p-3">
+                <h6>Depreciation Records</h6>
+                <h3>{{ records|length }}</h3>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="card shadow-sm p-4 mb-4">
+
+        <h5>Calculate Depreciation</h5>
+
+        <form method="POST"
+              action="{{ url_for('asset_management.calculate_asset_depreciation') }}">
+
+            <input type="hidden"
+                   name="csrf_token"
+                   value="{{ csrf_token() }}">
+
+            <div class="row g-3">
+
+                <div class="col-md-6">
+
+                    <label class="form-label">Select Asset</label>
+
+                    <select name="asset_id"
+                            class="form-select"
+                            required>
+
+                        <option value="">Select Asset</option>
+
+                        {% for asset in assets %}
+                        <option value="{{ asset.id }}">
+                            {{ asset.asset_code }} - {{ asset.name }}
+                        </option>
+                        {% endfor %}
+
+                    </select>
+
+                </div>
+
+                <div class="col-md-4">
+
+                    <label class="form-label">Financial Year</label>
+
+                    <input type="number"
+                           name="financial_year"
+                           class="form-control"
+                           min="1900"
+                           max="{{ now_year }}"
+                           value="{{ now_year }}"
+                           required>
+
+                </div>
+
+                <div class="col-md-2 d-flex align-items-end">
+
+                    <button class="btn btn-success w-100">
+                        Calculate
+                    </button>
+
+                </div>
+
+            </div>
+
+        </form>
+
+    </div>
+
+    <div class="card shadow-sm">
+
+        <div class="card-header">
+            <h5 class="mb-0">Depreciation History</h5>
+        </div>
+
+        <div class="table-responsive">
+
+            <table class="table table-hover align-middle mb-0">
+
+                <thead class="table-light">
+                    <tr>
+                        <th>Asset</th>
+                        <th>Financial Year</th>
+                        <th>Opening Value</th>
+                        <th>Depreciation</th>
+                        <th>Accumulated</th>
+                        <th>Closing Value</th>
+                        <th>Method</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for item in records %}
+
+                    <tr>
+                        <td>
+                            {{ item.asset.asset_code }}
+                            - {{ item.asset.name }}
+                        </td>
+
+                        <td>{{ item.financial_year }}</td>
+
+                        <td>{{ "{:,.2f}".format(item.opening_book_value) }}</td>
+
+                        <td>{{ "{:,.2f}".format(item.depreciation_amount) }}</td>
+
+                        <td>{{ "{:,.2f}".format(item.accumulated_depreciation) }}</td>
+
+                        <td>{{ "{:,.2f}".format(item.closing_book_value) }}</td>
+
+                        <td>{{ item.calculation_method }}</td>
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="7" class="text-center py-4">
+                            No depreciation records available.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

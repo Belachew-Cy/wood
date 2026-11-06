@@ -1,0 +1,87 @@
+{% extends "public_base.html" %}
+
+{% block title %}Vacancies | Dereje Belay Wood &amp; Kitchen Cabinet Finishing{% endblock %}
+
+{% block content %}
+<section class="page-hero">
+  <div class="container">
+    <span class="eyebrow">Careers</span>
+    <h1>Open Positions</h1>
+    <p>Every post we are currently hiring for. Apply on the spot with a CV, or send it
+      by email - the same reference reaches the desk that reads it either way.</p>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    <form method="GET" action="{{ url_for('recruitment.vacancies') }}" class="filter-form">
+      <input type="search" name="search" value="{{ search }}"
+             placeholder="Job title, department, type or location"
+             aria-label="Search vacancies">
+      <button class="btn btn-sm" type="submit">Search</button>
+      {% if search %}
+      <a class="btn btn-outline btn-sm" href="{{ url_for('recruitment.vacancies') }}">Clear</a>
+      {% endif %}
+    </form>
+
+    <p class="panel-note">
+      {{ vacancies | length }} {{ 'post' if vacancies | length == 1 else 'posts' }}
+      open{% if search %} for &ldquo;{{ search }}&rdquo;{% endif %}.
+      {% if user %}
+      Signed in as {{ user.full_name }} - posts reserved for staff are listed too.
+      {% else %}
+      <a href="{{ url_for('login') }}">Sign in</a> to see the posts reserved for our own staff.
+      {% endif %}
+    </p>
+
+    {% if vacancies %}
+    <div class="vacancy-grid">
+      {% for vacancy in vacancies %}
+      <article class="dir-card">
+        <div class="dir-card-head">
+          <div>
+            <span class="eyebrow dir-eyebrow">{{ vacancy.department }}</span>
+            <h2>{{ vacancy.job_title }}</h2>
+            <p>{{ vacancy.job_type }}{% if vacancy.location %} · {{ vacancy.location }}{% endif %}</p>
+          </div>
+          <span class="status-badge {{ 'active' if vacancy.status == 'Open' else 'neutral' }}">
+            {{ vacancy.status }}
+          </span>
+        </div>
+        <div class="dir-card-body">
+          <ul class="chip-row">
+            <li class="chip">{{ vacancy.openings }} {{ 'opening' if vacancy.openings == 1 else 'openings' }}</li>
+            {% if vacancy.internal_only %}<li class="chip">Staff only</li>{% endif %}
+            {% if vacancy.minimum_gpa %}<li class="chip">Min GPA {{ '%.2f' | format(vacancy.minimum_gpa) }}</li>{% endif %}
+            {% if vacancy.minimum_age %}<li class="chip">Aged {{ vacancy.minimum_age }}+</li>{% endif %}
+            {% if vacancy.maximum_age %}<li class="chip">Up to {{ vacancy.maximum_age }}</li>{% endif %}
+            <li class="chip">
+              {% if vacancy.closing_date %}
+              Closes {{ vacancy.closing_date | friendly_date }}
+              {% else %}
+              No closing date
+              {% endif %}
+            </li>
+          </ul>
+          <p class="cell-note">{{ (vacancy.description or '') | truncate(220, true) or
+            'The description for this post is on request from the HR desk.' }}</p>
+        </div>
+        <div class="dir-card-foot">
+          <a class="btn btn-sm" href="{{ url_for('recruitment.apply', vacancy_id=vacancy.id) }}">
+            Apply now
+          </a>
+          {% if vacancy.reference %}<span class="cell-note">{{ vacancy.reference }}</span>{% endif %}
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="empty-state">
+      <strong>No open posts{% if search %} match that search{% endif %}.</strong>
+      Try another department or send your CV to
+      <a href="{{ url_for('contact') }}">the contact desk</a> and we will keep it on file.
+    </p>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

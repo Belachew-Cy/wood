@@ -1,0 +1,288 @@
+
+{% extends "base.html" %}
+
+{% block title %}Cash and Bank Management | Finance{% endblock %}
+
+{% block content %}
+{% set bank_accounts = bank_accounts|default([], true) %}
+{% set transactions = transactions|default([], true) %}
+{% set summary = summary|default({}, true) %}
+
+<div class="finance-cash-bank-page">
+
+    <header class="page-header finance-page-header">
+        <div>
+            <h1>Cash and Bank Management</h1>
+            <p>Monitor cash balances, bank transactions and reconciliation.</p>
+        </div>
+
+        <a href="{{ url_for('finance.dashboard') }}"
+           class="btn btn-secondary">
+            Back to Dashboard
+        </a>
+    </header>
+
+    {% if error %}
+        <div class="alert alert-danger" role="alert">
+            {{ error }}
+        </div>
+    {% endif %}
+
+    {% if success %}
+        <div class="alert alert-success" role="alert">
+            {{ success }}
+        </div>
+    {% endif %}
+
+    <!-- Summary -->
+    <section class="finance-ledger-summary">
+
+        <div class="finance-summary-card">
+            <span>Total Cash Balance</span>
+            <strong>
+                {{ currency_symbol|default('ETB') }}
+                {{ "%.2f"|format(summary.get('cash_balance', 0)|float) }}
+            </strong>
+        </div>
+
+        <div class="finance-summary-card">
+            <span>Total Bank Balance</span>
+            <strong>
+                {{ currency_symbol|default('ETB') }}
+                {{ "%.2f"|format(summary.get('bank_balance', 0)|float) }}
+            </strong>
+        </div>
+
+        <div class="finance-summary-card">
+            <span>Unreconciled Transactions</span>
+            <strong>{{ summary.get('unreconciled_count', 0) }}</strong>
+        </div>
+
+        <div class="finance-summary-card">
+            <span>Pending Reconciliation</span>
+            <strong>
+                {{ currency_symbol|default('ETB') }}
+                {{ "%.2f"|format(summary.get('pending_reconciliation', 0)|float) }}
+            </strong>
+        </div>
+
+    </section>
+
+    <!-- Cash and Bank Accounts -->
+    <section class="finance-panel">
+        <div class="finance-panel-header">
+            <div>
+                <h2>Cash and Bank Accounts</h2>
+                <p>Balances linked to the existing Chart of Accounts.</p>
+            </div>
+        </div>
+
+        <div class="finance-table-wrapper">
+            <table class="table finance-table">
+                <thead>
+                    <tr>
+                        <th>Account Code</th>
+                        <th>Account Name</th>
+                        <th>Account Category</th>
+                        <th>Currency</th>
+                        <th>Current Balance</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for account in bank_accounts %}
+                    <tr>
+                        <td>{{ account.get('account_code', '—') }}</td>
+
+                        <td>
+                            <strong>{{ account.get('account_name', '—') }}</strong>
+                        </td>
+
+                        <td>{{ account.get('account_category', '—') }}</td>
+
+                        <td>{{ account.get('currency', 'ETB') }}</td>
+
+                        <td>
+                            {{ "%.2f"|format(account.get('balance', 0)|float) }}
+                        </td>
+
+                        <td>
+                            {% if account.get('status') == 'Active' %}
+                                <span class="status-badge status-active">Active</span>
+                            {% else %}
+                                <span class="status-badge status-inactive">
+                                    {{ account.get('status', 'Unknown') }}
+                                </span>
+                            {% endif %}
+                        </td>
+                    </tr>
+
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="finance-empty-state">
+                            No cash or bank accounts are available.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- Transaction Filters -->
+    <section class="finance-panel">
+        <div class="finance-panel-header">
+            <h2>Transaction Search</h2>
+        </div>
+
+        <form method="GET"
+              action="{{ url_for('finance.cash_bank') }}"
+              class="finance-filter-form">
+
+            <div class="finance-form-grid">
+
+                <div class="form-group">
+                    <label for="account_id">Account</label>
+                    <select id="account_id" name="account_id">
+                        <option value="">All Accounts</option>
+
+                        {% for account in bank_accounts %}
+                            <option value="{{ account.get('id') }}"
+                                {% if selected_account_id|string == account.get('id')|string %}
+                                    selected
+                                {% endif %}>
+                                {{ account.get('account_code') }} -
+                                {{ account.get('account_name') }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="transaction_type">Transaction Type</label>
+                    <select id="transaction_type" name="transaction_type">
+                        <option value="">All Transactions</option>
+
+                        {% for transaction_type in [
+                            'Deposit',
+                            'Withdrawal',
+                            'Transfer',
+                            'Payment',
+                            'Receipt'
+                        ] %}
+                            <option value="{{ transaction_type }}"
+                                {% if selected_transaction_type|default('') == transaction_type %}
+                                    selected
+                                {% endif %}>
+                                {{ transaction_type }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="start_date">Start Date</label>
+                    <input type="date"
+                           id="start_date"
+                           name="start_date"
+                           value="{{ start_date|default('') }}">
+                </div>
+
+                <div class="form-group">
+                    <label for="end_date">End Date</label>
+                    <input type="date"
+                           id="end_date"
+                           name="end_date"
+                           value="{{ end_date|default('') }}">
+                </div>
+
+            </div>
+
+            <div class="finance-form-actions">
+                <a href="{{ url_for('finance.cash_bank') }}"
+                   class="btn btn-secondary">
+                    Reset
+                </a>
+
+                <button type="submit" class="btn btn-primary">
+                    Search Transactions
+                </button>
+            </div>
+        </form>
+    </section>
+
+    <!-- Transaction Register -->
+    <section class="finance-panel">
+        <div class="finance-panel-header">
+            <div>
+                <h2>Cash and Bank Transactions</h2>
+                <p>Transactions recorded through approved Finance workflows.</p>
+            </div>
+        </div>
+
+        <div class="finance-table-wrapper">
+            <table class="table finance-table">
+
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Reference</th>
+                        <th>Account</th>
+                        <th>Transaction Type</th>
+                        <th>Description</th>
+                        <th>Debit</th>
+                        <th>Credit</th>
+                        <th>Reconciliation</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for transaction in transactions %}
+                    <tr>
+                        <td>{{ transaction.get('transaction_date', '—') }}</td>
+
+                        <td>{{ transaction.get('reference', '—') }}</td>
+
+                        <td>{{ transaction.get('account_name', '—') }}</td>
+
+                        <td>{{ transaction.get('transaction_type', '—') }}</td>
+
+                        <td>{{ transaction.get('description', '—') }}</td>
+
+                        <td>
+                            {{ "%.2f"|format(transaction.get('debit', 0)|float) }}
+                        </td>
+
+                        <td>
+                            {{ "%.2f"|format(transaction.get('credit', 0)|float) }}
+                        </td>
+
+                        <td>
+                            {% if transaction.get('reconciliation_status') == 'Reconciled' %}
+                                <span class="status-badge status-active">
+                                    Reconciled
+                                </span>
+                            {% else %}
+                                <span class="status-badge status-pending">
+                                    {{ transaction.get('reconciliation_status', 'Pending') }}
+                                </span>
+                            {% endif %}
+                        </td>
+                    </tr>
+
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="finance-empty-state">
+                            No cash or bank transactions found.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+
+            </table>
+        </div>
+    </section>
+
+</div>
+{% endblock %}

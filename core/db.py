@@ -1,10 +1,11 @@
 """SQLite connections, schema migrations and database maintenance."""
 
 from core.config import BACKUP_DIR
-from core.config import DB_PATH
 from core.config import MODULES
 from core.config import USER_ROLES
 from core.config import USER_STATUS
+from core.config import env_flag
+from database import database_config
 from datetime import datetime
 from flask import g
 from pathlib import Path
@@ -12,24 +13,22 @@ from werkzeug.security import generate_password_hash
 import finance
 import letters_db
 import os
+import secrets
 import sqlite3
+import sys
 
 
 def connect_db(path=None):
     """One connection carrying the pragmas every caller relies on.
 
-    WAL is set once at boot (it is a property of the file). Each connection gets
-    a busy timeout instead, so two desks writing at tea time wait for each other
-    rather than failing with "database is locked".
+    The connection opens the user database and attaches a module file the first
+    time a statement names a table that lives in it, so a request pays for the
+    modules it actually reads. WAL is set once per file at boot (it is a
+    property of the file); each connection gets a busy timeout instead, so two
+    desks writing at tea time wait for each other rather than failing with
+    "database is locked".
     """
-    conn = sqlite3.connect(path or DB_PATH, timeout=15)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    conn.execute("PRAGMA busy_timeout = 15000")
-    conn.execute("PRAGMA synchronous = NORMAL")
-    finance.attach(conn)
-    letters_db.attach(conn)
-    return conn
+    return database_config.connect(path)
 
 
 def get_db():
@@ -38,16 +37,18 @@ def get_db():
     return g.db
 
 
-FINANCE_TABLES = finance.TABLE_SET
-LETTER_TABLES = letters_db.TABLE_SET
+FINANCE_SCHEMA = "finance"
+LETTER_SCHEMA = "letter"
+FINANCE_TABLES = frozenset(name for name, schema
+                           in database_config.TABLE_SCHEMA.items()
+                           if schema == FINANCE_SCHEMA)
+LETTER_TABLES = frozenset(name for name, schema
+                          in database_config.TABLE_SCHEMA.items()
+                          if schema == LETTER_SCHEMA)
 
 
 def qualified_table(table):
-    if table in FINANCE_TABLES:
-        return finance.ref(table)
-    if table in LETTER_TABLES:
-        return letters_db.ref(table)
-    return table
+    return database_config.qualified(table)
 
 
 def close_db(_exc):
@@ -56,8 +57,18 @@ def close_db(_exc):
         db.close()
 
 
-def check_in(column, values):
-    return f"CHECK ({column} IN ({', '.join(repr(v) for v in values)}))"
+def check_in(column, values, blank=False):
+    """A CHECK clause over one vocabulary column.
+
+    A descriptive column may default to the empty string, so its check lets blank
+    through as well; a status or a currency always carries one of the words. Every
+    desk builds its selects from the same tuple it hands here, so a stale browser
+    tab cannot invent a value the table would not accept.
+    """
+    quoted = ", ".join(repr(v) for v in values)
+    if blank:
+        return "CHECK ({0} = '' OR {0} IN ({1}))".format(column, quoted)
+    return f"CHECK ({column} IN ({quoted}))"
 
 
 USERS_DDL = """
@@ -213,6 +224,9 @@ ROLES_DDL = """
         description TEXT NOT NULL DEFAULT '',
         landing TEXT NOT NULL DEFAULT 'dashboard',
         is_system INTEGER NOT NULL DEFAULT 0 CHECK (is_system IN (0, 1)),
+        is_standard INTEGER NOT NULL DEFAULT 0 CHECK (is_standard IN (0, 1)),
+        department_id INTEGER NOT NULL DEFAULT 0,
+        active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
@@ -241,10 +255,67 @@ USER_ROLES_DDL = """
 """
 
 
+# The fine-grained ticks behind the six permission categories. Keys are checked
+# against the catalogue in Python rather than a CHECK constraint, so adding a
+# permission needs no table rebuild and old rows stay readable. A role with no
+# rows at all falls back to what its module ticks imply, which is what keeps
+# every existing role working the day this table is created.
+ROLE_PERMISSION_GRANTS_DDL = """
+    CREATE TABLE IF NOT EXISTS role_permission_grants (
+        role_key TEXT NOT NULL,
+        permission TEXT NOT NULL,
+        allowed INTEGER NOT NULL DEFAULT 1 CHECK (allowed IN (0, 1)),
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (role_key, permission),
+        FOREIGN KEY (role_key) REFERENCES roles(key) ON DELETE CASCADE
+    )
+"""
+
+
+USER_PERMISSION_GRANTS_DDL = """
+    CREATE TABLE IF NOT EXISTS user_permission_grants (
+        user_id INTEGER NOT NULL,
+        permission TEXT NOT NULL,
+        allowed INTEGER NOT NULL DEFAULT 1 CHECK (allowed IN (0, 1)),
+        granted_by INTEGER,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (user_id, permission),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (granted_by) REFERENCES users(id) ON DELETE SET NULL
+    )
+"""
+
+
+# A binding says "accounts in this unit, at this rung, also carry this role".
+# department_id 0 is the whole company and position_level -1 is every rung, so
+# the primary key can carry a NULL-free answer. Departments live in the HR file,
+# so the id is checked in Python rather than by a second database's foreign key;
+# the role key does cascade, because roles and bindings share the user file.
+DEPARTMENT_ROLES_DDL = """
+    CREATE TABLE IF NOT EXISTS department_roles (
+        department_id INTEGER NOT NULL DEFAULT 0,
+        role_key TEXT NOT NULL,
+        position_level INTEGER NOT NULL DEFAULT -1,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (department_id, role_key, position_level),
+        FOREIGN KEY (role_key) REFERENCES roles(key) ON DELETE CASCADE
+    )
+"""
+
+
+def ensure_permission_grant_schema(db):
+    db.execute(ROLE_PERMISSION_GRANTS_DDL)
+    db.execute(USER_PERMISSION_GRANTS_DDL)
+    db.execute("CREATE INDEX IF NOT EXISTS idx_user_permission_grants_user"
+               " ON user_permission_grants (user_id)")
+
+
+
 def init_db():
     from core.access import init_roles
     from services.accounts import migrate_account_identity, migrate_login_locks, reconcile_employee_links
     from services.budget import init_budget_schema
+    from services.department_access import create_standard_roles
     from services.links import migrate_approval_links
     from services.org import ensure_org_tables, migrate_account_assignments
     from services.procurement import migrate_procurement_capture
@@ -333,6 +404,7 @@ def init_db():
         migrate_users(db)
         migrate_user_permissions(db)
         init_roles(db)
+        ensure_permission_grant_schema(db)
         init_management_policy(db)
         init_approval_routes(db)
 
@@ -398,6 +470,68 @@ def init_db():
             )
         """)
 
+        # Overtime is one request per worked extra session: the manager decision,
+        # the HR verification, the attendance day it is matched against and the
+        # payroll import all point at this row rather than re-deriving it.
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS hr_overtime_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                employee_id INTEGER NOT NULL,
+                overtime_date TEXT NOT NULL,
+                start_time TEXT NOT NULL,
+                end_time TEXT NOT NULL,
+                break_minutes INTEGER NOT NULL DEFAULT 0,
+                requested_hours NUMERIC NOT NULL DEFAULT 0,
+                approved_hours NUMERIC NOT NULL DEFAULT 0,
+                multiplier NUMERIC NOT NULL DEFAULT 1.5,
+                reason TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'Pending Manager'
+                    CHECK (status IN (
+                        'Pending Manager', 'Pending HR', 'Approved', 'Rejected'
+                    )),
+                attendance_id INTEGER,
+                manager_id INTEGER,
+                manager_comment TEXT DEFAULT '',
+                manager_decided_at TEXT,
+                hr_user_id INTEGER,
+                hr_comment TEXT DEFAULT '',
+                hr_decided_at TEXT,
+                created_by INTEGER,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT,
+                FOREIGN KEY (employee_id) REFERENCES employees(id),
+                FOREIGN KEY (attendance_id) REFERENCES attendance(id)
+            )
+        """)
+        db.execute("""
+            CREATE INDEX IF NOT EXISTS idx_hr_overtime_employee_date
+                ON hr_overtime_requests(employee_id, overtime_date)
+        """)
+        db.execute("""
+            CREATE INDEX IF NOT EXISTS idx_hr_overtime_status
+                ON hr_overtime_requests(status, overtime_date)
+        """)
+        # One row per transition; the request itself keeps only the latest
+        # decision, so this trail is what the overtime audit page reads.
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS hr_overtime_audit_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                overtime_request_id INTEGER NOT NULL,
+                action TEXT NOT NULL,
+                previous_status TEXT,
+                new_status TEXT,
+                performed_by INTEGER,
+                comment TEXT DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (overtime_request_id)
+                    REFERENCES hr_overtime_requests(id)
+            )
+        """)
+        db.execute("""
+            CREATE INDEX IF NOT EXISTS idx_hr_overtime_audit_request
+                ON hr_overtime_audit_logs(overtime_request_id)
+        """)
+
         # Create payroll table
         db.execute("""
             CREATE TABLE IF NOT EXISTS payroll (
@@ -417,43 +551,9 @@ def init_db():
             )
         """)
 
-        db.execute("""
-            CREATE TABLE IF NOT EXISTS job_vacancies (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                job_title TEXT NOT NULL,
-                department TEXT NOT NULL,
-                job_type TEXT NOT NULL DEFAULT 'Full-time',
-                location TEXT DEFAULT '',
-                description TEXT DEFAULT '',
-                requirements TEXT DEFAULT '',
-                openings INTEGER NOT NULL DEFAULT 1,
-                closing_date TEXT,
-                status TEXT NOT NULL DEFAULT 'Open'
-                    CHECK (status IN ('Open', 'Closed')),
-                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-
-        db.execute("""
-            CREATE TABLE IF NOT EXISTS job_applications (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                vacancy_id INTEGER NOT NULL,
-                full_name TEXT NOT NULL,
-                email TEXT NOT NULL,
-                phone TEXT NOT NULL,
-                education TEXT DEFAULT '',
-                experience TEXT DEFAULT '',
-                resume_filename TEXT DEFAULT '',
-                cover_letter TEXT DEFAULT '',
-                status TEXT NOT NULL DEFAULT 'Applied'
-                    CHECK (status IN (
-                        'Applied', 'Shortlisted', 'Interview',
-                        'Selected', 'Rejected', 'Hired'
-                    )),
-                applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (vacancy_id) REFERENCES job_vacancies(id)
-            )
-        """)
+        # The recruitment tables - job_vacancies and job_applications - belong to
+        # services.recruitment, which is where their columns and status lists are
+        # kept in step with the screens that read them. app.py calls it after this.
 
         existing_columns = {row[1] for row in db.execute("PRAGMA table_info(employees)")}
         for column, definition in (
@@ -504,6 +604,21 @@ def init_db():
             )
         """)
 
+        inventory_columns = {
+            row[1] for row in db.execute("PRAGMA table_info(inventory_items)")
+        }
+        for column, definition in (
+            ("updated_by", "INTEGER"),
+            ("updated_by_name", "TEXT"),
+            ("updated_at", "TEXT"),
+            # How many to buy when the shelf runs low; zero falls back to the
+            # shortfall against the minimum level.
+            ("reorder_qty", "REAL NOT NULL DEFAULT 0"),
+        ):
+            if column not in inventory_columns:
+                db.execute("ALTER TABLE inventory_items ADD COLUMN {} {}".format(
+                    column, definition))
+
         db.execute("""
             CREATE TABLE IF NOT EXISTS stock_movements (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -512,9 +627,61 @@ def init_db():
                 quantity REAL NOT NULL CHECK (quantity > 0),
                 reference_type TEXT NOT NULL DEFAULT 'Manual',
                 reference_no TEXT DEFAULT '',
+                procurement_order_id INTEGER,
                 notes TEXT DEFAULT '',
                 created_by TEXT NOT NULL,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (item_id) REFERENCES inventory_items(id)
+            )
+        """)
+
+        movement_columns = {
+            row[1] for row in db.execute("PRAGMA table_info(stock_movements)")
+        }
+        if "procurement_order_id" not in movement_columns:
+            # The order lives in finance.db, so stock.db keeps its id without a
+            # foreign key; the movement screen checks it against the order desk.
+            db.execute("ALTER TABLE stock_movements"
+                       " ADD COLUMN procurement_order_id INTEGER")
+
+        # A stocktake freezes the shelf as the system knows it, records what the
+        # counter actually found, and - once approved - posts the differences as
+        # ordinary stock movements. No line ever edits a balance directly.
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS inventory_stocktakes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                number TEXT NOT NULL UNIQUE,
+                title TEXT NOT NULL,
+                count_date TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'COUNTING'
+                    CHECK (status IN ('COUNTING', 'SUBMITTED', 'APPROVED',
+                                      'POSTED', 'REJECTED')),
+                notes TEXT DEFAULT '',
+                created_by INTEGER NOT NULL,
+                created_by_name TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                submitted_at TEXT,
+                decided_at TEXT,
+                decided_by INTEGER,
+                decided_by_name TEXT,
+                decision_note TEXT DEFAULT '',
+                posted_at TEXT
+            )
+        """)
+
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS inventory_stocktake_lines (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                stocktake_id INTEGER NOT NULL,
+                item_id INTEGER NOT NULL,
+                expected_qty REAL NOT NULL DEFAULT 0,
+                counted_qty REAL,
+                variance REAL NOT NULL DEFAULT 0,
+                counted_by_name TEXT,
+                counted_at TEXT,
+                UNIQUE (stocktake_id, item_id),
+                FOREIGN KEY (stocktake_id)
+                    REFERENCES inventory_stocktakes(id) ON DELETE CASCADE,
                 FOREIGN KEY (item_id) REFERENCES inventory_items(id)
             )
         """)
@@ -640,16 +807,35 @@ def init_db():
             )
         """)
 
-        # Create the demo accounts, but only into a brand new database.
+        # An empty database still needs one administrator to sign in with, but a
+        # password written in the source is a credential anyone who reads it can
+        # use - so the first administrator takes WK_ADMIN_PASSWORD or a random
+        # password printed once, and has to replace it at the first sign-in. The
+        # demo colleague account is a teaching convenience and stays opt-in.
         if not db.execute("SELECT 1 FROM users LIMIT 1").fetchone():
-            seed = [
-                ("Dereje Belay (Administrator)", "admin@derejebelay.com", "+251911123456", "Admin@123", "admin"),
-                ("Member Demo", "member@derejebelay.com", "+251911987654", "Member@123", "member"),
-            ]
-            db.executemany(
-                "INSERT INTO users (full_name, email, phone, password_hash, role) VALUES (?, ?, ?, ?, ?)",
-                [(n, e, p, generate_password_hash(h), r) for n, e, p, h, r in seed],
+            admin_password = os.environ.get("WK_ADMIN_PASSWORD", "").strip()
+            generated = ""
+            if not admin_password:
+                admin_password = generated = secrets.token_urlsafe(12)
+            db.execute(
+                "INSERT INTO users (full_name, email, phone, password_hash,"
+                " role, must_change_password)"
+                " VALUES (?, ?, ?, ?, 'admin', 1)",
+                ("Dereje Belay (Administrator)", "admin@derejebelay.com",
+                 "+251911123456", generate_password_hash(admin_password)),
             )
+            if generated:
+                print("First run: the administrator (admin@derejebelay.com) was"
+                      " created with this one-time password: {}\nIt is shown here"
+                      " once and must be changed at the first sign-in."
+                      .format(generated), file=sys.stderr)
+            if env_flag("WK_ALLOW_DEMO_SEED"):
+                db.execute(
+                    "INSERT INTO users (full_name, email, phone, password_hash,"
+                    " role, must_change_password) VALUES (?, ?, ?, ?, 'member', 1)",
+                    ("Member Demo", "member@derejebelay.com", "+251911987654",
+                     generate_password_hash("Member@123")),
+                )
 
         # ---------- identity, purchasing and chain links ----------
         # These run after the tables above and after the seed block, because a
@@ -661,6 +847,10 @@ def init_db():
         # runs before anything reads a requisition or an order.
         finance.init(db)
         letters_db.init(db)
+        # The standard role bundles are seeded after the register exists, because
+        # a correspondence role also writes its starting letter actions. Seeding
+        # is additive: an existing role keeps whatever the administrator set.
+        create_standard_roles(db)
         init_budget_schema(db)
         migrate_procurement_capture(db)
         migrate_approval_links(db)
@@ -676,56 +866,74 @@ def init_db():
         db.close()
 
 
+INDEX_STATEMENTS = (
+    ("employees", "CREATE INDEX IF NOT EXISTS idx_employees_status"
+                  " ON employees(employment_status)"),
+    ("employees", "CREATE INDEX IF NOT EXISTS idx_employees_user"
+                  " ON employees(user_id)"),
+    ("employees", "CREATE INDEX IF NOT EXISTS idx_employees_position"
+                  " ON employees(position_id)"),
+    ("attendance", "CREATE INDEX IF NOT EXISTS idx_attendance_date"
+                   " ON attendance(attendance_date)"),
+    ("attendance", "CREATE INDEX IF NOT EXISTS idx_attendance_employee"
+                   " ON attendance(employee_id, attendance_date)"),
+    ("payroll", "CREATE INDEX IF NOT EXISTS idx_payroll_month"
+                " ON payroll(payroll_month)"),
+    ("payroll", "CREATE INDEX IF NOT EXISTS idx_payroll_status"
+                " ON payroll(payment_status)"),
+    ("payroll", "CREATE INDEX IF NOT EXISTS idx_payroll_employee"
+                " ON payroll(employee_id, payroll_month)"),
+    ("leave_requests", "CREATE INDEX IF NOT EXISTS idx_leave_status"
+                       " ON leave_requests(status)"),
+    ("leave_requests", "CREATE INDEX IF NOT EXISTS idx_leave_employee"
+                       " ON leave_requests(employee_id, start_date)"),
+    ("employee_training", "CREATE INDEX IF NOT EXISTS idx_training_employee"
+                          " ON employee_training(employee_id, start_date)"),
+    ("performance_reviews", "CREATE INDEX IF NOT EXISTS idx_reviews_employee"
+                            " ON performance_reviews(employee_id, review_date)"),
+    ("inventory_items", "CREATE INDEX IF NOT EXISTS idx_inventory_active"
+                        " ON inventory_items(active, quantity)"),
+    ("stock_movements", "CREATE INDEX IF NOT EXISTS idx_stock_movements_item"
+                        " ON stock_movements(item_id, created_at)"),
+    ("inventory_stocktakes", "CREATE INDEX IF NOT EXISTS idx_stocktake_status"
+                             " ON inventory_stocktakes(status, count_date)"),
+    ("inventory_stocktake_lines",
+     "CREATE INDEX IF NOT EXISTS idx_stocktake_line_session"
+     " ON inventory_stocktake_lines(stocktake_id)"),
+    ("budget_requests", "CREATE INDEX IF NOT EXISTS idx_budget_req_status"
+                        " ON budget_requests(status, created_at)"),
+    ("budget_allocations", "CREATE INDEX IF NOT EXISTS idx_budget_alloc_plan"
+                           " ON budget_allocations(plan_id)"),
+    ("approval_actions", "CREATE INDEX IF NOT EXISTS idx_approval_actions_request"
+                         " ON approval_actions(request_id)"),
+    ("approval_requests", "CREATE INDEX IF NOT EXISTS idx_approval_creator"
+                          " ON approval_requests(created_by, created_at)"),
+    ("notifications", "CREATE INDEX IF NOT EXISTS idx_notifications_created"
+                      " ON notifications(user_id, created_at)"),
+    ("audit_logs", "CREATE INDEX IF NOT EXISTS idx_audit_outcome"
+                   " ON audit_logs(outcome, occurred_at)"),
+    ("audit_logs", "CREATE INDEX IF NOT EXISTS idx_audit_module"
+                   " ON audit_logs(module, id DESC)"),
+    ("users", "CREATE INDEX IF NOT EXISTS idx_users_status ON users(status)"),
+)
+
+
 def init_indexes():
     """Indexes for the filters every dashboard and module list runs.
 
     Idempotent, so it is safe on an existing database; the indexes only make the
-    same queries faster and never change their results.
+    same queries faster and never change their results. A table that no module
+    has created is skipped rather than stopping the boot: an index is worth
+    having, but never worth the whole application.
     """
     conn = connect_db()
     try:
-        conn.executescript("""
-            CREATE INDEX IF NOT EXISTS idx_employees_status
-                ON employees(employment_status);
-            CREATE INDEX IF NOT EXISTS idx_employees_user
-                ON employees(user_id);
-            CREATE INDEX IF NOT EXISTS idx_employees_position
-                ON employees(position_id);
-            CREATE INDEX IF NOT EXISTS idx_attendance_date
-                ON attendance(attendance_date);
-            CREATE INDEX IF NOT EXISTS idx_attendance_employee
-                ON attendance(employee_id, attendance_date);
-            CREATE INDEX IF NOT EXISTS idx_payroll_month
-                ON payroll(payroll_month);
-            CREATE INDEX IF NOT EXISTS idx_payroll_status
-                ON payroll(payment_status);
-            CREATE INDEX IF NOT EXISTS idx_payroll_employee
-                ON payroll(employee_id, payroll_month);
-            CREATE INDEX IF NOT EXISTS idx_leave_status
-                ON leave_requests(status);
-            CREATE INDEX IF NOT EXISTS idx_leave_employee
-                ON leave_requests(employee_id, start_date);
-            CREATE INDEX IF NOT EXISTS idx_inventory_active
-                ON inventory_items(active, quantity);
-            CREATE INDEX IF NOT EXISTS idx_stock_movements_item
-                ON stock_movements(item_id, created_at);
-            CREATE INDEX IF NOT EXISTS idx_budget_req_status
-                ON budget_requests(status, created_at);
-            CREATE INDEX IF NOT EXISTS idx_budget_alloc_plan
-                ON budget_allocations(plan_id);
-            CREATE INDEX IF NOT EXISTS idx_approval_actions_request
-                ON approval_actions(request_id);
-            CREATE INDEX IF NOT EXISTS idx_approval_creator
-                ON approval_requests(created_by, created_at);
-            CREATE INDEX IF NOT EXISTS idx_notifications_created
-                ON notifications(user_id, created_at);
-            CREATE INDEX IF NOT EXISTS idx_audit_outcome
-                ON audit_logs(outcome, occurred_at);
-            CREATE INDEX IF NOT EXISTS idx_audit_module
-                ON audit_logs(module, id DESC);
-            CREATE INDEX IF NOT EXISTS idx_users_status
-                ON users(status);
-        """)
+        statements = []
+        for table, statement in INDEX_STATEMENTS:
+            if database_config.table_exists(conn, table):
+                statements.append(statement)
+        if statements:
+            conn.executescript(";\n".join(statements) + ";")
         conn.execute("PRAGMA optimize")
         conn.commit()
     finally:
@@ -745,15 +953,18 @@ def _snapshot_db(source_path, target_path):
 
 
 def backup_db_command():
-    """Snapshot users.db, finance.db and letter.db into WK_BACKUP_DIR."""
+    """Snapshot every module database into WK_BACKUP_DIR.
+
+    One file per module per run, so a restore can take back a single desk (say
+    payroll) without touching the rest of the system.
+    """
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     try:
         keep = max(1, int(os.environ.get("WK_BACKUP_KEEP", "14")))
     except ValueError:
         keep = 14
-    for label, source in (("users", DB_PATH), ("finance", finance.DB_PATH),
-                          ("letter", letters_db.DB_PATH)):
+    for label, source in database_config.database_files():
         if not Path(source).exists():
             continue
         target = BACKUP_DIR / "{}_{}.db".format(label, stamp)
@@ -770,8 +981,7 @@ def backup_db_command():
 
 def check_db_command():
     """Run SQLite's integrity and foreign-key checks on each database."""
-    for label, path in (("users.db", DB_PATH), ("finance.db", finance.DB_PATH),
-                        ("letter.db", letters_db.DB_PATH)):
+    for label, path in database_config.database_files():
         if not Path(path).exists():
             continue
         conn = sqlite3.connect(str(path), timeout=15)
@@ -780,5 +990,5 @@ def check_db_command():
             problems = conn.execute("PRAGMA foreign_key_check").fetchall()
         finally:
             conn.close()
-        print("{}: integrity_check {}, foreign_key_check {} problem(s)".format(
-            label, integrity, len(problems)))
+        print("{} ({}): integrity_check {}, foreign_key_check {} problem(s)".format(
+            label, Path(path).parent.name, integrity, len(problems)))

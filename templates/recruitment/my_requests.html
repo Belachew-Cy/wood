@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi with context %}
+
+{% block title %}My recruitment requests{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Recruitment</span>
+      <h1>My recruitment requests</h1>
+      <p>The posts this account raised, with the approval desk each one is standing at
+        and the candidates behind it.</p>
+    </div>
+    <nav class="stock-actions" aria-label="Recruitment actions">
+      {% if can_request %}
+      <a class="btn btn-sm" href="{{ url_for('recruitment.create_vacancy') }}">
+        Raise a request
+      </a>
+      {% endif %}
+      {% if can_register %}
+      <a class="btn btn-outline btn-sm" href="{{ url_for('recruitment.hr_vacancies') }}">
+        Vacancy register
+      </a>
+      {% endif %}
+      <a class="btn btn-outline btn-sm" href="{{ url_for('recruitment.my_applications') }}">
+        My applications
+      </a>
+    </nav>
+  </div>
+</section>
+
+<section class="container finance-page">
+  <div class="hr-stats">
+    {{ kpi('Requests raised', vacancies | length, 'by this account', 'flat', 'clipboard') }}
+    {{ kpi('Still drafts', vacancies | selectattr('status', 'equalto', 'Draft') | list | length,
+           'not yet submitted', 'down', 'clock') }}
+    {{ kpi('Waiting on a desk', vacancies | selectattr('approval_status', 'equalto', 'Pending') | list | length,
+           'inside the approval route', 'flat', 'shield') }}
+    {{ kpi('Published', vacancies | selectattr('status', 'equalto', 'Open') | list | length,
+           'accepting applications', 'up', 'check') }}
+  </div>
+
+  <div class="dash-panel hr-table-panel">
+    <h2>What you asked for</h2>
+    <div class="hr-table-wrap table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Reference</th>
+            <th>Post</th>
+            <th>Department</th>
+            <th>Openings</th>
+            <th>Estimated cost (ETB)</th>
+            <th>Post status</th>
+            <th>Approval</th>
+            <th>Applicants</th>
+            <th aria-label="Actions"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for vacancy in vacancies %}
+          <tr>
+            <td class="nowrap">{{ vacancy.reference or '#' ~ vacancy.id }}</td>
+            <td class="wrap-cell">
+              <strong>{{ vacancy.job_title }}</strong>
+              <span class="cell-note">{{ vacancy.job_type }}
+                {%- if vacancy.location %} · {{ vacancy.location }}{% endif %}</span>
+            </td>
+            <td>{{ vacancy.registered_department or vacancy.department }}</td>
+            <td class="nowrap">{{ vacancy.openings }}</td>
+            <td>{{ "{:,.2f}".format(vacancy.estimated_cost | float) }}</td>
+            <td>
+              <span class="status-badge {{ 'active' if vacancy.status == 'Open'
+                                            else 'off' if vacancy.status == 'Closed'
+                                            else 'neutral' }}">{{ vacancy.status }}</span>
+            </td>
+            <td class="nowrap">
+              {% if vacancy.approval_status %}
+              <span class="status-badge {{ 'active' if vacancy.approval_status == 'Approved'
+                                            else 'off' if vacancy.approval_status in ('Rejected', 'Returned')
+                                            else 'neutral' }}">{{ vacancy.approval_status }}</span>
+              {% else %}
+              <span class="cell-note">Not submitted</span>
+              {% endif %}
+            </td>
+            <td class="nowrap">{{ vacancy.applicant_count }} ·
+              <span class="cell-note">{{ vacancy.filled_count }} filled</span></td>
+            <td class="nowrap">
+              <a class="btn btn-outline btn-sm"
+                 href="{{ url_for('recruitment.vacancy_detail', vacancy_id=vacancy.id) }}">Open</a>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="9" class="employee-empty">
+              You have not raised a recruitment request yet.
+              {% if can_request %}
+              <a href="{{ url_for('recruitment.create_vacancy') }}">Raise the first one</a>.
+              {% else %}
+              A department seat at Manager level or above is needed to raise one.
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="panel-note">Submitting a draft hands it to the company's approval route -
+      the same desks that sign a purchase requisition - and the post publishes itself when
+      the last signature lands.</p>
+  </div>
+</section>
+{% endblock %}

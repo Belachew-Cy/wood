@@ -1,8 +1,11 @@
 """Public pages, shared dashboard, notifications, search and HTTP hardening."""
 
 from core.access import current_user
+from core.access import account_role_keys
 from core.access import dashboard_url
+from core.access import effective_granted_permissions
 from core.access import effective_permissions
+from core.access import has_permission
 from core.access import login_required
 from core.access import role_catalogue
 from core.access import role_name_for
@@ -77,6 +80,10 @@ def inject_user():
         if user is not None and user["status"] != "Active":
             user = None
         permissions = effective_permissions(user) if user else set()
+        # What the account may actually use, not just what its matrices name: a
+        # tick whose module is closed cannot drive a button either.
+        granted_keys = ({key for key in effective_granted_permissions(user)
+                         if has_permission(key, user)} if user else set())
         groups = sidebar_groups(user, permissions)
         # The bell follows the account across every page, public ones included.
         notes, note_count = notification_summary(db, user) if user else ([], 0)
@@ -96,6 +103,7 @@ def inject_user():
                 "role_names": role_names,
                 "can_manage_policy": can_manage_approval_policy(user),
                 "permissions": permissions,
+                "granted_permissions": granted_keys,
                 "sidebar_groups": groups,
                 "notifications": notes,
                 "notification_count": note_count,
@@ -108,6 +116,7 @@ def inject_user():
         return {"user": None, "dashboard_home": None, "role_label": None,
                 "extra_roles": [], "role_names": dict(ROLE_LABEL),
                 "can_manage_policy": False, "permissions": set(),
+                "granted_permissions": set(),
                 "sidebar_groups": (), "notifications": [],
                 "notification_count": 0,
                 "ms_login_enabled": ms_login_enabled(),
@@ -167,10 +176,12 @@ MODULE_TILES = (
      "payroll_dashboard", "file"),
     ("inventory", "Inventory & Stock", "Items, stock levels and movements",
      "inventory.dashboard", "box"),
-    ("procurement", "Procurement", "Suppliers, requests and purchase orders",
+    ("procurement", "Procurement Management", "Suppliers, requests and purchase orders",
      "procurement.dashboard", "inbox"),
     ("accounts", "Administration", "Accounts, roles and access control",
      "admin_users", "lock"),
+    ("integrations", "System Integration", "External systems, credentials and sync",
+     "integrations.dashboard", "network"),
     ("reports", "Reports", "Department reports, exports and audit views",
      "reports_centre", "chart"),
 )
@@ -187,10 +198,18 @@ QUICK_ACTIONS = (
     ("budget", "Allocations", "budget.allocations", "box"),
     ("budget", "Expenditure Register", "budget.expenditures", "inbox"),
     ("payroll", "Run Payroll", "payroll_dashboard", "calendar"),
-    ("inventory", "Stock In / Out", "inventory.stock_movement", "box"),
+    ("inventory", "Stock In / Out", "inventory.stock_movement", "box",
+     "inventory_movements"),
+    ("inventory", "Open Stocktake", "inventory.stocktakes", "clipboard",
+     "inventory_stocktake"),
+    ("inventory", "Reorder Alerts", "inventory.alerts", "box",
+     "inventory_alerts"),
+    ("inventory", "Stock Reports", "inventory.reports", "chart",
+     "inventory_reports"),
     ("procurement", "Raise Purchase Request", "procurement.requisition_new", "inbox"),
     ("audit", "Activity Logs", "audit.audit_dashboard", "clock"),
     ("accounts", "User Management", "admin_users", "lock"),
+    ("integrations", "Register A Connection", "integrations.add", "network"),
 )
 
 
@@ -260,14 +279,17 @@ def dashboard():
             "label": "Low Stock Items", "value": low, "icon": "box",
             "note": "of {} stocked items".format(items),
             "tone": "down" if low else "flat",
-            "href": url_for("inventory.dashboard"),
+            "href": (url_for("inventory.alerts")
+                     if has_permission("inventory_alerts", user)
+                     else url_for("inventory.dashboard")),
         })
     if "payroll" in granted:
         pending = db.execute(
-            "SELECT COUNT(*) AS n FROM payroll WHERE payment_status = 'Pending'"
+            "SELECT COUNT(*) AS n FROM payroll_records"
+            " WHERE payment_status = 'Pending'"
         ).fetchone()["n"]
         cost = db.execute(
-            "SELECT COALESCE(SUM(net_salary), 0) AS n FROM payroll"
+            "SELECT COALESCE(SUM(net_salary), 0) AS n FROM payroll_records"
             " WHERE payroll_month = ?", (this_month,),
         ).fetchone()["n"]
         tiles.append({
@@ -275,7 +297,7 @@ def dashboard():
             "note": "{} ETB booked for {}".format(money_etb(cost),
                                                   month_short(this_month)),
             "tone": "down" if pending else "flat",
-            "href": url_for("payroll_dashboard"),
+            "href": url_for("payroll.payroll_dashboard"),
         })
     if "procurement" in granted:
         open_orders = db.execute("""
@@ -323,14 +345,16 @@ def dashboard():
         })
         role_rows = db.execute(
             "SELECT COUNT(*) AS total, SUM(CASE WHEN is_system = 0 THEN 1 ELSE 0 END)"
-            " AS custom FROM roles").fetchone()
+            " AS custom, SUM(CASE WHEN active = 0 THEN 1 ELSE 0 END) AS parked"
+            " FROM roles").fetchone()
         extra_assignments = db.execute(
             "SELECT COUNT(*) AS n FROM user_roles").fetchone()["n"]
         tiles.append({
             "label": "Roles", "value": int(role_rows["total"] or 0),
             "icon": "users",
-            "note": "{} custom · {} additional assignment(s)".format(
-                int(role_rows["custom"] or 0), extra_assignments),
+            "note": "{} custom · {} parked · {} additional assignment(s)".format(
+                int(role_rows["custom"] or 0), int(role_rows["parked"] or 0),
+                extra_assignments),
             "tone": "flat", "href": url_for("admin_roles"),
         })
 
@@ -523,9 +547,15 @@ def dashboard():
 
     modules = dashboard_modules(db, user, granted)
 
-    actions = [{
-        "label": label, "icon": icon, "href": url_for(endpoint),
-    } for module, label, endpoint, icon in QUICK_ACTIONS if module in granted]
+    actions = []
+    for module, label, endpoint, icon, *needed in QUICK_ACTIONS:
+        # A shortcut may narrow its module to one right so a desk is never
+        # offered a button the guard would refuse.
+        if module not in granted:
+            continue
+        if needed and not has_permission(needed[0], user):
+            continue
+        actions.append({"label": label, "icon": icon, "href": url_for(endpoint)})
 
     return render_template(
         "dashboard.html", user=user, granted=granted, tiles=tiles,
@@ -547,6 +577,7 @@ def tile_count(db, module):
         "procurement": "SELECT COUNT(*) AS n FROM finance.procurement_orders",
         "accounts": "SELECT COUNT(*) AS n FROM users",
         "audit": "SELECT COUNT(*) AS n FROM audit_logs",
+        "integrations": "SELECT COUNT(*) AS n FROM integrations",
     }.get(module)
     if table is None:
         return 0
@@ -566,7 +597,7 @@ def dashboard_modules(db, user, granted):
     rows = []
     for module, label, note, endpoint, icon in MODULE_TILES:
         if module == "reports":
-            ctx = reporting.context(db, user, user_extra_roles(db, user["id"]))
+            ctx = reporting.context(db, user, account_role_keys(db, user)[1:])
             count = len([item for item in reporting.catalogue(
                 ctx, granted, auditor_table_names(db)) if item["available"]])
         elif module in granted:
@@ -654,7 +685,7 @@ def read_all_notifications():
 
 
 @route("/search")
-@login_required("admin", "hr", "finance", "payroll", "inventory")
+@login_required()
 def search():
     term = request.args.get("q", "").strip()
     groups, total = [], 0
@@ -662,7 +693,7 @@ def search():
         db = get_db()
         granted = effective_permissions(current_user())
         like = "%" + term.replace("\\", "\\\\").replace("%", r"\%").replace("_", r"\_") + "%"
-        for modules, label, table, columns in SEARCH_SCOPES:
+        for modules, label, table, columns, *needed in SEARCH_SCOPES:
             if table == "letters":
                 # Letters open on an account grant, which no role module tick
                 # implies, so the scope is gated on the grant itself.
@@ -670,6 +701,11 @@ def search():
                 if not letter_module_visible(current_user()):
                     continue
             elif not (set(modules) & granted):
+                continue
+            # A scope may name the action rights that open its rows, so a hit is
+            # never offered to an account whose guard would refuse the page.
+            elif needed and not any(has_permission(key, current_user())
+                                    for key in needed[0]):
                 continue
             where = " LIKE ? ESCAPE '\\' OR ".join(columns) + " LIKE ? ESCAPE '\\'"
             params = [like] * len(columns)

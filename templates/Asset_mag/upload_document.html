@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container py-4">
+
+    <h3>Upload Asset Document</h3>
+
+    <p class="text-muted">
+        Asset: {{ asset.asset_code }} - {{ asset.name }}
+    </p>
+
+    <div class="card shadow-sm border-0 mt-3">
+
+        <div class="card-body">
+
+            <form method="POST"
+                  enctype="multipart/form-data">
+
+                <input type="hidden"
+                       name="csrf_token"
+                       value="{{ csrf_token() }}">
+
+                <div class="mb-3">
+                    <label class="form-label">Document Name</label>
+                    <input type="text"
+                           name="document_name"
+                           class="form-control"
+                           required>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Document Category</label>
+
+                    <select name="document_type"
+                            class="form-select"
+                            required>
+
+                        <option value="">Select Category</option>
+                        <option>Purchase Invoice</option>
+                        <option>Purchase Order</option>
+                        <option>Delivery Note</option>
+                        <option>Warranty Certificate</option>
+                        <option>Insurance Policy</option>
+                        <option>Maintenance Report</option>
+                        <option>Transfer Document</option>
+                        <option>Disposal Approval</option>
+                        <option>Verification Evidence</option>
+                        <option>Other</option>
+
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Description</label>
+                    <textarea name="description"
+                              class="form-control"
+                              rows="3"></textarea>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Select Document</label>
+                    <input type="file"
+                           name="document"
+                           class="form-control"
+                           accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx"
+                           required>
+                    <small class="text-muted">
+                        Maximum file size: 10 MB.
+                    </small>
+                </div>
+
+                <div class="form-check mb-3">
+                    <input type="checkbox"
+                           name="is_confidential"
+                           class="form-check-input"
+                           id="confidential">
+
+                    <label class="form-check-label"
+                           for="confidential">
+                        Confidential Document
+                    </label>
+                </div>
+
+                <button type="submit"
+                        class="btn btn-success">
+                    Upload Document
+                </button>
+
+            </form>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

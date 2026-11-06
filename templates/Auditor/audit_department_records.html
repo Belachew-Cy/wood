@@ -1,0 +1,319 @@
+
+{% extends "base.html" %}
+
+{% block title %}Department Records | Audit Management{% endblock %}
+
+{% block content %}
+
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Audit Management / Department Data</span>
+            <h1>Department Records</h1>
+            <p>
+                Read-only access to registered departmental records
+                for authorized audit and verification activities.
+            </p>
+        </div>
+
+        <div class="stock-actions">
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.department_overview') }}">
+                Department Overview
+            </a>
+
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.dashboard') }}">
+                Dashboard
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="container finance-page">
+
+    <!-- SOURCE INFORMATION -->
+
+    <div class="dash-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Source Information</h2>
+                <p>Selected departmental database and table.</p>
+            </div>
+
+            <span class="status-badge active">
+                Read Only
+            </span>
+        </div>
+
+        <div class="form-grid">
+
+            <div>
+                <span class="eyebrow">Department / Module</span>
+                <h3>{{ module_name | default('Unknown') }}</h3>
+            </div>
+
+            <div>
+                <span class="eyebrow">Table</span>
+                <h3>{{ table_name | default('Unknown') }}</h3>
+            </div>
+
+            <div>
+                <span class="eyebrow">Total Records</span>
+                <h3>{{ total_records | default('—') }}</h3>
+            </div>
+
+            <div>
+                <span class="eyebrow">Connection</span>
+                {% if connection_available | default(false) %}
+                    <span class="status-badge active">Available</span>
+                {% else %}
+                    <span class="status-badge off">Unavailable</span>
+                {% endif %}
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- SEARCH AND FILTER -->
+
+    <div class="dash-panel">
+
+        <h2>Find Department Records</h2>
+
+        <form method="GET"
+              action="{{ url_for(
+                  'audit.department_records',
+                  module_name=module_name,
+                  table=table_name
+              ) }}">
+
+            <div class="form-grid">
+
+                <div class="form-group">
+                    <label for="search">Search</label>
+                    <input type="text"
+                           id="search"
+                           name="search"
+                           value="{{ filters.search | default('') }}"
+                           placeholder="Search supported record fields">
+                </div>
+
+                <div class="form-group">
+                    <label for="limit">Records per page</label>
+                    <select id="limit" name="limit">
+                        {% for value in [25, 50, 100, 250] %}
+                            <option value="{{ value }}"
+                                {% if limit | default(25) == value %}selected{% endif %}>
+                                {{ value }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    Search Records
+                </button>
+
+                <a class="btn btn-outline"
+                   href="{{ url_for(
+                       'audit.department_records',
+                       module_name=module_name,
+                       table=table_name
+                   ) }}">
+                    Clear
+                </a>
+            </div>
+
+        </form>
+
+        <p class="eyebrow">
+            Search is subject to the fields and filters supported by the backend.
+        </p>
+
+    </div>
+
+
+    <!-- RECORD TABLE -->
+
+    <div class="dash-panel hr-table-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Departmental Data</h2>
+                <p>
+                    Displaying records retrieved from the selected source.
+                </p>
+            </div>
+
+            <span class="status-badge neutral">
+                {{ records | length }} Displayed
+            </span>
+        </div>
+
+        {% if connection_available | default(false) %}
+
+            {% if columns | default([]) %}
+
+            <div class="table-scroll">
+
+                <table class="report-table">
+
+                    <thead>
+                        <tr>
+                            {% for column in columns %}
+                                <th>{{ column }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+
+                    <tbody>
+
+                        {% for record in records | default([]) %}
+
+                        <tr>
+
+                            {% for column in columns %}
+
+                            <td>
+                                {% set value = record.get(column) %}
+
+                                {% if value is none %}
+                                    —
+                                {% elif value is string %}
+                                    {{ value | truncate(150, true, '...') }}
+                                {% else %}
+                                    {{ value }}
+                                {% endif %}
+                            </td>
+
+                            {% endfor %}
+
+                        </tr>
+
+                        {% else %}
+
+                        <tr>
+                            <td colspan="{{ columns | length }}"
+                                class="report-empty">
+                                No records were found for this selection.
+                            </td>
+                        </tr>
+
+                        {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+            {% else %}
+
+            <p class="report-empty">
+                No permitted columns are available for display.
+            </p>
+
+            {% endif %}
+
+        {% else %}
+
+            <div class="dash-panel">
+                <span class="status-badge off">Source Unavailable</span>
+                <p>
+                    The selected departmental data source could not be accessed.
+                    Please check the integration status.
+                </p>
+
+                <a class="btn btn-outline btn-sm"
+                   href="{{ url_for('audit.integration_status') }}">
+                    Check Integration Status
+                </a>
+            </div>
+
+        {% endif %}
+
+    </div>
+
+
+    <!-- PAGINATION -->
+
+    {% if pagination is defined and pagination %}
+
+    <div class="dash-panel">
+
+        <div class="dash-panel-head">
+
+            <p>
+                Page {{ pagination.page | default(1) }}
+                of {{ pagination.pages | default(1) }}
+            </p>
+
+            <div class="stock-actions">
+
+                {% if pagination.has_prev | default(false) %}
+
+                <a class="btn btn-outline btn-sm"
+                   href="{{ url_for(
+                       'audit.department_records',
+                       module_name=module_name,
+                       table=table_name,
+                       page=pagination.page - 1,
+                       limit=limit
+                   ) }}">
+                    Previous
+                </a>
+
+                {% endif %}
+
+                {% if pagination.has_next | default(false) %}
+
+                <a class="btn btn-outline btn-sm"
+                   href="{{ url_for(
+                       'audit.department_records',
+                       module_name=module_name,
+                       table=table_name,
+                       page=pagination.page + 1,
+                       limit=limit
+                   ) }}">
+                    Next
+                </a>
+
+                {% endif %}
+
+            </div>
+
+        </div>
+
+    </div>
+
+    {% endif %}
+
+
+    <!-- READ-ONLY NOTICE -->
+
+    <div class="dash-panel">
+
+        <h2>Read-Only Audit Access</h2>
+
+        <ul>
+            <li>Records are retrieved from existing departmental databases.</li>
+            <li>Audit users cannot edit or delete departmental transactions through this page.</li>
+            <li>Only registered tables and permitted fields can be displayed.</li>
+            <li>Database queries must use parameterized values.</li>
+            <li>Passwords, tokens, secrets and other sensitive fields must be excluded.</li>
+            <li>All access must follow the existing Audit Management permissions.</li>
+            <li>Audit observations and findings must be saved separately in the Audit Management database.</li>
+        </ul>
+
+    </div>
+
+</section>
+
+{% endblock %}

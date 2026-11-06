@@ -11,9 +11,10 @@ import os
 import sqlite3
 from pathlib import Path
 
+from database import database_config
+
 BASE_DIR = Path(__file__).resolve().parent
-DB_PATH = Path(os.environ.get(
-    "WK_LETTERS_DB_PATH", str(BASE_DIR / "letter.db"))).resolve()
+DB_PATH = database_config.module_path("letter")
 
 SCHEMA = "letter"
 
@@ -22,14 +23,17 @@ LETTER_TYPES = ("official", "incoming", "outgoing", "memo", "hr", "finance",
                 "procurement", "legal", "confidential")
 
 TABLES = ("letters", "letter_permissions", "letter_category_permissions",
-          "letter_deliveries", "letter_reads", "letter_approval_steps")
+          "letter_role_permissions", "letter_deliveries", "letter_reads",
+          "letter_approval_steps", "letter_audit_logs")
 TABLE_SET = frozenset(TABLES)
 
 # Parents before children: the copy assigns no ids, so a child row can only
 # land once its letter exists. The drop runs the other way round.
 COPY_ORDER = ("letters", "letter_permissions", "letter_category_permissions",
-              "letter_deliveries", "letter_reads", "letter_approval_steps")
-DROP_ORDER = ("letter_approval_steps", "letter_reads", "letter_deliveries",
+              "letter_role_permissions", "letter_deliveries", "letter_reads",
+              "letter_approval_steps", "letter_audit_logs")
+DROP_ORDER = ("letter_audit_logs", "letter_approval_steps", "letter_reads",
+              "letter_deliveries", "letter_role_permissions",
               "letter_category_permissions", "letter_permissions", "letters")
 
 
@@ -86,6 +90,15 @@ LETTERS_DDL = _letters_table_sql() + """;
         PRIMARY KEY (user_id, category)
     );
 
+    CREATE TABLE IF NOT EXISTS letter.letter_role_permissions (
+        role_key TEXT NOT NULL,
+        permission TEXT NOT NULL,
+        allowed INTEGER NOT NULL DEFAULT 0
+            CHECK (allowed IN (0, 1)),
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (role_key, permission)
+    );
+
     CREATE TABLE IF NOT EXISTS letter.letter_deliveries (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         letter_id INTEGER NOT NULL REFERENCES letters(id) ON DELETE CASCADE,
@@ -140,6 +153,18 @@ LETTERS_DDL = _letters_table_sql() + """;
         ON letters(recipient_department_id);
     CREATE INDEX IF NOT EXISTS letter.idx_letters_approval_step
         ON letters(status, approval_step);
+
+    CREATE TABLE IF NOT EXISTS letter.letter_audit_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        letter_id INTEGER,
+        action TEXT NOT NULL,
+        details TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS letter.idx_letter_audit_letter
+        ON letter_audit_logs(letter_id, created_at);
 """
 
 
@@ -150,10 +175,7 @@ def ref(table):
 
 def attach(db):
     """Attach letter.db once per connection."""
-    for row in db.execute("PRAGMA database_list"):
-        if row[1] == SCHEMA:
-            return
-    db.execute("ATTACH DATABASE ? AS {}".format(SCHEMA), (str(DB_PATH),))
+    database_config.ensure_attached(db, SCHEMA)
 
 
 def table_names(db):

@@ -1,0 +1,1721 @@
+{% extends "base.html" %}
+{% from "base.html" import dash_icon, kpi with context %}
+
+{% block title %}Department Management | Dereje Belay Wood &amp; Kitchen{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* ============================================================
+     Department Management — interactive console styles
+     All original rules preserved; new interactive layers appended.
+     ============================================================ */
+
+  /* ---------- tabs ---------- */
+  .dm-tabs {
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding: 0.3rem;
+    margin-bottom: 1rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--white);
+    scrollbar-width: thin;
+    position: relative;
+  }
+  .dm-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 0.9rem;
+    border-radius: calc(var(--radius) - 2px);
+    color: var(--muted);
+    font-size: 0.84rem;
+    font-weight: 600;
+    white-space: nowrap;
+    text-decoration: none;
+    transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease;
+  }
+  .dm-tab:hover { background: var(--surface, #f6f7f5); color: inherit; }
+  .dm-tab:active { transform: scale(0.97); }
+  .dm-tab.is-active { background: var(--ink, #1f2a24); color: var(--btn-dark-ink); }
+  [data-theme="dark"] .dm-tab.is-active { background: var(--walnut); color: var(--on-accent); }
+  .dm-tab span {
+    display: inline-flex;
+    min-width: 1.4rem;
+    justify-content: center;
+    padding: 0.05rem 0.35rem;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.08);
+    font-size: 0.72rem;
+    transition: background 0.15s;
+  }
+  .dm-tab.is-active span { background: rgba(255, 255, 255, 0.2); }
+
+  .dm-section { scroll-margin-top: 5rem; }
+
+  /* ---------- prev / next department strip ---------- */
+  .dm-dept-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+  }
+  .dm-dept-nav .dm-binding-meta {
+    text-align: center;
+    flex: 1 1 auto;
+    color: var(--muted);
+    font-size: 0.78rem;
+    line-height: 1.5;
+  }
+  .dm-dept-nav .btn {
+    transition: transform 0.12s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  }
+  .dm-dept-nav .btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
+    border-color: var(--line-strong);
+  }
+  .dm-dept-nav .btn:active:not(:disabled) { transform: translateY(0); }
+  @media (max-width: 720px) {
+    .dm-dept-nav { justify-content: center; }
+    .dm-dept-nav .dm-binding-meta { order: -1; flex-basis: 100%; }
+  }
+
+  /* ---------- department cards ---------- */
+  .dm-dept-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr));
+    gap: 0.9rem;
+  }
+  .dm-dept-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    padding: 0.85rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--white);
+    transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.15s ease;
+  }
+  .dm-dept-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.07);
+    border-color: var(--line-strong);
+  }
+  .dm-dept-card:focus-within {
+    border-color: var(--ink, #1f2a24);
+    box-shadow: 0 0 0 3px rgba(31, 42, 36, 0.1);
+  }
+  .dm-dept-card.is-inactive { opacity: 0.72; border-style: dashed; }
+  .dm-dept-card .dm-row-actions { margin-top: auto; padding-top: 0.2rem; }
+  .dm-dept-card .dm-row-actions .btn { flex: 1 1 auto; }
+
+  .dm-dept-card-title { margin: 0; font-size: 0.95rem; }
+  .dm-unit-name {
+    font-weight: 600;
+    color: inherit;
+    text-decoration: none;
+    background-image: linear-gradient(currentColor, currentColor);
+    background-size: 0 1px;
+    background-repeat: no-repeat;
+    background-position: 0 100%;
+    transition: background-size 0.2s ease;
+  }
+  .dm-unit-name:hover { background-size: 100% 1px; }
+
+  .dm-manager-line {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+  }
+  .dm-manager-line svg { width: 15px; height: 15px; flex: 0 0 auto; }
+  .dm-manager-line a { transition: color 0.15s; }
+  .dm-manager-line a:hover { color: var(--ink, #1f2a24); text-decoration: underline; }
+
+  .dm-dept-meta {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.25rem 0.6rem;
+    color: var(--muted);
+    font-size: 0.76rem;
+  }
+  .dm-dept-meta b { color: inherit; font-weight: 700; }
+
+  /* ---------- one view at a time ---------- */
+  body.dm-js .dm-section { display: none; }
+  body.dm-js .dm-section.is-view { display: block; animation: dmFadeIn 0.2s ease; }
+  body.dm-js .dm-dept-nav.is-hidden { display: none; }
+  @keyframes dmFadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ---------- task tables ---------- */
+  .dm-task-table td { vertical-align: top; }
+  .dm-task-table tr.dm-task-group td {
+    background: var(--surface, #f6f7f5);
+    border-top: 2px solid var(--line);
+    padding-top: 0.55rem;
+    padding-bottom: 0.55rem;
+  }
+  .dm-task-table tr.dm-task-group:first-child td { border-top: 0; }
+  .dm-task-desk { font-weight: 700; }
+  .dm-task-count {
+    margin-left: 0.5rem;
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 500;
+  }
+  .dm-task-requires .dm-chip { margin: 0 0.2rem 0.2rem 0; }
+  .dm-task-desks { margin-bottom: 0.75rem; }
+  .dm-task-table .cell-sub { display: block; margin-top: 0.15rem; }
+  .dm-task-table tbody tr:not(.dm-task-group) {
+    transition: background 0.12s ease;
+  }
+  .dm-task-table tbody tr:not(.dm-task-group):hover {
+    background: var(--surface, #f6f7f5);
+  }
+
+  .dir-page .hr-table-wrap { position: relative; }
+
+  .dir-page .btn svg,
+  .dir-page .dir-text-btn svg,
+  .dir-page .dm-chip svg,
+  .dir-page .dm-perm-list svg,
+  .dm-perm-cat summary svg,
+  .dm-details > summary svg {
+    width: 15px;
+    height: 15px;
+    flex: 0 0 auto;
+  }
+
+  /* ---------- two-column layouts ---------- */
+  .dm-two {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
+    gap: 1rem;
+    align-items: start;
+  }
+  .dm-facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
+    gap: 0.7rem;
+    margin-bottom: 0.9rem;
+  }
+  .dm-fact {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0.6rem 0.7rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface, #f6f7f5);
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .dm-fact:hover { border-color: var(--line-strong); background: var(--white); }
+  .dm-fact b { font-size: 0.84rem; }
+  .dm-fact em {
+    color: var(--muted);
+    font-size: 0.68rem;
+    font-style: normal;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  /* ---------- inline forms ---------- */
+  .dm-inline-form {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+  .dm-inline-form.is-block { width: 100%; }
+  .dm-inline-form select,
+  .dm-inline-form input[type="text"] {
+    width: auto;
+    min-width: 9rem;
+    padding: 0.35rem 0.5rem;
+    margin: 0;
+  }
+
+  .dm-plain-form {
+    display: block;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+  .dm-plain-form.is-spaced { margin-bottom: 1rem; }
+  .dm-plain-form + .dm-plain-form,
+  .dm-details-body > .dm-plain-form + .dm-inline-form { margin-top: 0.75rem; }
+
+  .dm-gap { margin-top: 1rem; }
+  .dm-push { margin-left: auto; }
+
+  .dm-subhead {
+    margin: 1.1rem 0 0.5rem;
+    font-size: 0.84rem;
+    font-weight: 700;
+  }
+  .dm-subhead:first-child { margin-top: 0; }
+
+  /* ---------- action cells ---------- */
+  th.dm-actions,
+  td.dm-actions {
+    text-align: right;
+    min-width: 15rem;
+  }
+  .dir-page .dir-text-btn { white-space: nowrap; }
+  td.dm-actions .dm-details { contain: inline-size; }
+  td.dm-actions .dm-row-actions {
+    justify-content: flex-end;
+    max-width: 21rem;
+  }
+  td.dm-actions .dm-row-actions .dm-details {
+    order: 3;
+    flex-basis: 100%;
+    max-width: 21rem;
+  }
+
+  .dir-page .dm-text-danger { color: var(--danger-ink); font-weight: 600; }
+  .dir-page .dm-text-danger:hover { color: var(--danger); }
+  .dir-page .dm-text-danger:disabled { color: var(--muted); font-weight: 500; }
+
+  .dm-row-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+  }
+
+  /* ---------- chips ---------- */
+  .dm-chips { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+  .dm-chip {
+    padding: 0.12rem 0.5rem;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--surface, #f6f7f5);
+    color: var(--muted);
+    font-size: 0.7rem;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: border-color 0.15s, background 0.15s, color 0.15s;
+  }
+  .dm-chip:hover { border-color: var(--line-strong); background: var(--white); }
+  a.dm-chip { text-decoration: none; }
+  a.dm-chip:hover { border-color: var(--line-strong); color: inherit; }
+
+  /* ---------- bindings ---------- */
+  .dm-binding {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    padding: 0.4rem 0.55rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface, #f6f7f5);
+    margin-bottom: 0.4rem;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .dm-binding:hover { border-color: var(--line-strong); background: var(--white); }
+  .dm-binding.is-parked { opacity: 0.7; border-style: dashed; }
+  .dm-binding-meta { color: var(--muted); font-size: 0.72rem; }
+
+  /* ---------- permissions matrix ---------- */
+  .dm-perm-tools {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin: 0.2rem 0 0.9rem;
+  }
+  .dm-perm-tools input[type="search"],
+  .dm-perm-tools select {
+    width: auto;
+    flex: 1 1 12rem;
+    max-width: 22rem;
+    padding: 0.4rem 0.6rem;
+    margin: 0;
+  }
+  .dm-perm[hidden], .dm-perm-cat[hidden] { display: none !important; }
+
+  .dm-perm-cat {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    margin-bottom: 0.5rem;
+    overflow: hidden;
+    transition: border-color 0.15s;
+  }
+  .dm-perm-cat:hover { border-color: var(--line-strong); }
+  .dm-perm-cat summary {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.6rem 0.75rem;
+    cursor: pointer;
+    list-style: none;
+    transition: background 0.12s;
+  }
+  .dm-perm-cat summary:hover { background: var(--surface, #f6f7f5); }
+  .dm-perm-cat summary::-webkit-details-marker { display: none; }
+  .dm-perm-cat summary strong { font-size: 0.85rem; }
+  .dm-perm-cat summary .dm-count {
+    margin-left: auto;
+    color: var(--muted);
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+  .dm-perm-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr));
+    gap: 0.4rem;
+    padding: 0.6rem 0.75rem;
+    border-top: 1px solid var(--line);
+  }
+  .dm-perm {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    padding: 0.25rem 0.35rem;
+    border-radius: var(--radius-sm, 4px);
+    transition: background 0.12s, padding 0.12s;
+  }
+  .dm-perm:hover { background: var(--surface, #f6f7f5); }
+  .dm-perm.is-off { opacity: 0.5; }
+  .dm-perm b { font-size: 0.78rem; }
+  .dm-perm em {
+    color: var(--muted);
+    font-size: 0.7rem;
+    font-style: normal;
+  }
+
+  /* ---------- details panels ---------- */
+  .dm-details { margin-bottom: 0.6rem; }
+  .dm-details.is-flush { margin: 0; }
+  .dm-details > summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.6rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    list-style: none;
+    transition: background 0.12s, border-color 0.15s, color 0.12s;
+  }
+  .dm-details > summary:hover {
+    border-color: var(--line-strong);
+    color: inherit;
+    background: var(--surface, #f6f7f5);
+  }
+  .dm-details > summary::-webkit-details-marker { display: none; }
+  .dm-details[open] > summary { background: var(--surface, #f6f7f5); color: inherit; }
+  .dm-details-body {
+    padding: 0.7rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    margin-top: 0.45rem;
+    background: var(--surface, #f6f7f5);
+    width: 21rem;
+    max-width: 100%;
+    animation: dmFadeIn 0.18s ease;
+  }
+
+  .dm-danger {
+    padding: 0.75rem;
+    border: 1px solid var(--danger-border);
+    border-radius: var(--radius);
+    background: var(--danger-bg);
+  }
+  .dm-note { color: var(--muted); font-size: 0.78rem; margin: 0.35rem 0 0; }
+
+  /* ---------- forms ---------- */
+  .dm-form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr));
+    gap: 0.6rem;
+    margin-bottom: 0.7rem;
+  }
+  .dm-form-grid.is-single { grid-template-columns: 1fr; }
+  .dm-form-grid.is-two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dm-form-grid .dm-wide { grid-column: 1 / -1; }
+  .dm-form-grid label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--muted);
+  }
+  .dm-plain-form > label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--muted);
+  }
+  .dm-form-grid .dir-form-note { margin: 0; }
+  .dm-form-foot {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  /* ---------- buttons ---------- */
+  .dir-page .btn {
+    transition: background 0.15s, border-color 0.15s, transform 0.1s, box-shadow 0.15s;
+  }
+  .dir-page .btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+  }
+  .dir-page .btn:active:not(:disabled) { transform: translateY(0); box-shadow: none; }
+  .dir-page .dir-text-btn {
+    transition: color 0.15s, background 0.15s, padding 0.1s;
+    border-radius: var(--radius-sm, 4px);
+    padding: 0.15rem 0.4rem;
+  }
+  .dir-page .dir-text-btn:hover:not(:disabled) { background: var(--surface, #f6f7f5); }
+
+  /* ---------- interactive table rows ---------- */
+  .dir-page .dir-table tbody tr {
+    transition: background 0.12s ease;
+  }
+  .dir-page .dir-table tbody tr:hover {
+    background: var(--surface, #f6f7f5);
+  }
+  .dir-page .dir-table tbody tr:focus-within {
+    background: var(--surface, #f6f7f5);
+    outline: 1px solid var(--line-strong);
+    outline-offset: -1px;
+  }
+
+  /* ---------- dialog polish ---------- */
+  .dir-page dialog.dir-dialog {
+    animation: dmDialogIn 0.22s ease;
+  }
+  .dir-page dialog.dir-dialog::backdrop {
+    background: rgba(15, 20, 17, 0.45);
+    backdrop-filter: blur(2px);
+    animation: dmBackdropIn 0.2s ease;
+  }
+  @keyframes dmDialogIn {
+    from { opacity: 0; transform: translateY(8px) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  @keyframes dmBackdropIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  /* ---------- focus rings ---------- */
+  .dir-page input:focus-visible,
+  .dir-page select:focus-visible,
+  .dir-page textarea:focus-visible {
+    outline: none;
+    border-color: var(--ink, #1f2a24);
+    box-shadow: 0 0 0 3px rgba(31, 42, 36, 0.12);
+  }
+
+  /* ---------- reduced motion ---------- */
+  @media (prefers-reduced-motion: reduce) {
+    .dir-page *,
+    .dir-page *::before,
+    .dir-page *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+    }
+    .dm-dept-card:hover,
+    .dir-page .btn:hover:not(:disabled) { transform: none; }
+  }
+
+  /* ---------- responsive ---------- */
+  @media (max-width: 900px) {
+    .dir-table th.dm-actions,
+    .dir-table td.dm-actions { display: table-cell; }
+  }
+  @media (max-width: 720px) {
+    .dm-tab { flex: 1 0 auto; justify-content: center; }
+    .dm-head-actions { width: 100%; }
+    .dm-binding, .dm-row-actions { align-items: flex-start; }
+    .dm-binding .dm-push { margin-left: 0; }
+    .dm-form-grid.is-two { grid-template-columns: 1fr; }
+    th.dm-actions,
+    td.dm-actions { text-align: left; }
+  }
+</style>
+{% endblock %}
+
+{% macro ui(name) -%}
+  {%- set paths = {
+    'plus': '<path d="M12 5v14"/><path d="M5 12h14"/>',
+    'edit': '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+    'trash': '<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/>',
+    'search': '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
+    'users': '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+    'briefcase': '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 12h18"/>',
+    'shield': '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>',
+    'check': '<path d="M20 6L9 17l-5-5"/>',
+    'person': '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>'
+  } -%}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ paths.get(name, paths['person']) | safe }}</svg>
+{%- endmacro %}
+
+{% macro status_pill(active) -%}
+<span class="status-badge {{ 'active' if active else 'neutral' }}">
+  <span class="status-dot"></span>{{ 'Active' if active else 'Inactive' }}</span>
+{%- endmacro %}
+
+{% block content %}
+{% set dept = selected %}
+
+<section class="dir-page">
+  <div class="container">
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <header class="dir-head">
+      <div class="dir-head-copy">
+        <span class="dir-eyebrow">Admin Management</span>
+        <h1>Department Management</h1>
+        <p class="dir-sub">One console for every unit the company runs: the department itself,
+          its manager and the positions opened on it. The accounts placed in a unit and the
+          roles and permissions that reach it are managed on Role &amp; Permissions, so a
+          unit registered here, a position retired or a role granted is the same record the
+          Organization chart, Role &amp; Permissions and User Management already read, and
+          nothing is copied into a second register.</p>
+        <p class="dir-summary">
+          <span><span class="dir-swatch"></span><strong>{{ units | length }}</strong>
+            unit{{ '' if units | length == 1 else 's' }}</span>
+          <span><span class="dir-swatch success"></span>
+            <strong>{{ stats.active_units }}</strong> active</span>
+          <span><span class="dir-swatch warning"></span>
+            <strong>{{ stats.inactive_units }}</strong> inactive</span>
+          <span><span class="dir-swatch muted"></span>
+            <strong>{{ stats.accounts }}</strong>
+            placed account{{ '' if stats.accounts == 1 else 's' }}</span>
+          {% if stats.unplaced %}
+          <span><span class="dir-swatch warning"></span>
+            <strong>{{ stats.unplaced }}</strong> unplaced</span>
+          {% endif %}
+        </p>
+      </div>
+      <div class="dir-head-actions dm-head-actions">
+        <a class="dir-quiet-link" href="{{ url_for('organization') }}">Organization chart</a>
+        <a class="dir-quiet-link" href="{{ url_for('admin_roles') }}">Role &amp; Permissions</a>
+        <a class="dir-quiet-link" href="{{ url_for('admin_users') }}">User management</a>
+        <button type="button" class="btn btn-sm dir-add" data-open-dialog="newDepartmentDialog">
+          {{ ui('plus') }} Register department
+        </button>
+      </div>
+    </header>
+
+    <div class="hr-stats">
+      {{ kpi('Departments', stats.units,
+             '{} active · {} inactive'.format(stats.active_units, stats.inactive_units)) }}
+      {{ kpi('Positions', stats.active_positions,
+             '{} open of {} registered'.format(stats.active_positions, stats.positions)) }}
+      {{ kpi('Filed roles', stats.roles,
+             '{} binding{} on units'.format(stats.bindings, '' if stats.bindings == 1 else 's'),
+             'flat' if stats.roles else 'warn') }}
+      {{ kpi('Placed accounts', stats.accounts,
+             '{} unplaced, {} staff on register'.format(stats.unplaced, stats.staff),
+             'warn' if stats.unplaced else 'flat') }}
+    </div>
+
+    <nav class="dm-tabs" aria-label="Department management sections">
+      <a class="dm-tab" href="{{ url_for('admin_departments', department=selected_id, _anchor='registry') }}">
+        Departments <span>{{ units | length }}</span></a>
+      {% if dept %}
+      <a class="dm-tab" href="{{ url_for('admin_departments', department=dept.id, _anchor='tasks') }}">
+        Tasks <span>{{ dept.tasks.total }}</span></a>
+      <a class="dm-tab" href="{{ url_for('admin_departments', department=dept.id, _anchor='positions') }}">
+        Positions <span>{{ dept.positions_total }}</span></a>
+      {% endif %}
+      {% if dept and 'admin_users' in granted_permissions %}
+      <a class="dm-tab" href="{{ url_for('admin_departments', department=selected_id, _anchor='admins') }}">
+        Admins <span>{{ admins | length }}</span></a>
+      {% endif %}
+    </nav>
+
+    {% if dept %}
+    <nav class="dm-dept-nav" aria-label="Previous and next department">
+      {% if previous_unit %}
+      <a id="deptPrevLink" class="btn btn-sm btn-outline"
+         href="{{ url_for('admin_departments', department=previous_unit.id, _anchor='overview') }}">
+        &#8249; Previous &mdash; {{ previous_unit.name }}</a>
+      {% else %}
+      <button type="button" class="btn btn-sm btn-outline" disabled>&#8249; Previous</button>
+      {% endif %}
+      <span class="dm-binding-meta">
+        <strong>{{ dept.name }}</strong>
+        · unit {{ unit_ordinal.index }} of {{ unit_ordinal.total }}
+        · {{ dept.leadership_position }} seat:
+        {{ dept.manager.name if dept.manager else 'unassigned' }}</span>
+      {% if next_unit %}
+      <a id="deptNextLink" class="btn btn-sm btn-outline"
+         href="{{ url_for('admin_departments', department=next_unit.id, _anchor='overview') }}">
+        {{ next_unit.name }} &mdash; Next &#8250;</a>
+      {% else %}
+      <button type="button" class="btn btn-sm btn-outline" disabled>Next &#8250;</button>
+      {% endif %}
+    </nav>
+    {% endif %}
+
+    <div class="dir-stack">
+
+      {# ------------------------------------------------------ the register #}
+      <div class="dir-card dm-section" id="registry">
+        <div class="dir-card-head">
+          <div>
+            <span class="dir-eyebrow">Register</span>
+            <h2>All departments</h2>
+            <p>Each unit in the approved chart is displayed on its own card: its manager,
+              the accounts and staff placed on it, its open positions and its roles.
+              Manage opens that unit as its own view; the arrows step between units.</p>
+          </div>
+          <button type="button" class="btn btn-sm dir-add" data-open-dialog="newDepartmentDialog">
+            {{ ui('plus') }} Register department
+          </button>
+        </div>
+
+        <div class="dir-toolbar">
+          <div class="dir-search">
+            {{ dash_icon('search') }}
+            <label class="sr-only" for="unitSearch">Search departments</label>
+            <input id="unitSearch" type="search" placeholder="Search by name, type, parent or manager…"
+                   autocomplete="off" aria-controls="unitGrid" />
+          </div>
+          <p class="dir-count" id="unitCount" aria-live="polite">
+            Showing all {{ units | length }} unit{{ '' if units | length == 1 else 's' }}</p>
+        </div>
+
+        <div class="dm-dept-grid" id="unitGrid">
+          {% for unit in units %}
+          <div class="dm-dept-card{{ '' if unit.is_active else ' is-inactive' }}"
+               data-search="{{ (unit.name ~ ' ' ~ unit.unit_type ~ ' ' ~ unit.parent_name ~ ' ' ~ unit.manager_name) | lower }}">
+            <div>
+              <h3 class="dm-dept-card-title">
+                <a class="dm-unit-name"
+                   href="{{ url_for('admin_departments', department=unit.id, _anchor='overview') }}">{{ unit.name }}</a>
+              </h3>
+              <span class="cell-sub">{{ unit.unit_type }} &middot;
+                {{ unit.parent_name or 'Top of the chart' }}
+                {%- if unit.child_count %} &middot; {{ unit.child_count }}
+                  sub-unit{{ '' if unit.child_count == 1 else 's' }}{% endif %}</span>
+            </div>
+            <div class="dm-manager-line">
+              {{ ui('person') }}
+              {% if unit.manager_name %}
+                {% if unit.manager_account_id %}
+                <a href="{{ url_for('admin_role_account', user_id=unit.manager_account_id) }}">{{ unit.manager_name }}</a>
+                {% else %}
+                <strong>{{ unit.manager_name }}</strong>
+                {% endif %}
+                <span class="cell-sub">{{ unit.leadership_position }} seat
+                  {%- if unit.manager_title %} &middot; {{ unit.manager_title }}{% endif %}</span>
+              {% else %}
+              <span class="dm-chip">No manager named</span>
+              {% endif %}
+              <span class="dm-push">{{ status_pill(unit.is_active) }}</span>
+            </div>
+            <div class="dm-dept-meta">
+              <span><b>{{ unit.user_count }}</b> account{{ '' if unit.user_count == 1 else 's' }}</span>
+              <span><b>{{ unit.staff_count }}</b> staff</span>
+              <span><b>{{ unit.active_position_count }}/{{ unit.position_count }}</b> positions open</span>
+              <span><b>{{ unit.role_count }}</b> role{{ '' if unit.role_count == 1 else 's' }}
+                &middot; {{ unit.binding_count }} bound</span>
+            </div>
+            <div class="dm-row-actions">
+              <a class="btn btn-sm"
+                 href="{{ url_for('admin_departments', department=unit.id, _anchor='overview') }}">Manage</a>
+              <a class="btn btn-sm btn-outline"
+                 href="{{ url_for('admin_departments', department=unit.id, _anchor='positions') }}">
+                {{ ui('briefcase') }} Positions</a>
+              <form method="POST" action="{{ url_for('admin_departments_action') }}" class="dm-inline-form">
+                {{ csrf_field() }}
+                <input type="hidden" name="action" value="set_department_status" />
+                <input type="hidden" name="department_id" value="{{ unit.id }}" />
+                <input type="hidden" name="anchor" value="overview" />
+                <input type="hidden" name="active" value="{{ 0 if unit.is_active else 1 }}" />
+                <button type="submit" class="dir-text-btn">{{ 'Deactivate' if unit.is_active else 'Activate' }}</button>
+              </form>
+            </div>
+          </div>
+          {% else %}
+          <div class="dir-empty">
+            <strong>No departments are registered</strong>
+            <span>Register the first unit to start placing managers, positions and people.</span>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="dir-empty" id="unitEmptyRow" hidden>
+          <strong>No department matches this search</strong>
+          <span>Try a different name or clear the filter.</span>
+        </div>
+      </div>
+
+      {# ------------------------------------------------------ admin list #}
+      {% if 'admin_users' in granted_permissions %}
+      <div class="dir-card dm-section" id="admins">
+        <div class="dir-card-head">
+          <div>
+            <span class="dir-eyebrow">Accounts</span>
+            <h2>Admin list</h2>
+            <p>Every account that reaches the administration desks: the ones whose
+              primary role is Administrator — which carries the whole catalogue by
+              definition — and the ones explicitly granted <em>admin_access</em> on
+              top of their role. {{ admins | length }}
+              account{{ '' if admins | length == 1 else 's' }} registered.</p>
+          </div>
+          <a class="btn btn-sm btn-outline" href="{{ url_for('admin_users') }}">
+            {{ ui('users') }} User management</a>
+        </div>
+
+        <div class="hr-table-wrap">
+          <table class="dir-table">
+            <thead>
+              <tr>
+                <th scope="col">Administrator</th>
+                <th scope="col">Sign-in</th>
+                <th scope="col">Basis</th>
+                <th scope="col">Department</th>
+                <th scope="col">Position</th>
+                <th scope="col">Status</th>
+                <th scope="col">Last signed in</th>
+                <th scope="col" class="dm-actions"><span class="sr-only">Open</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for admin in admins %}
+              <tr>
+                <td>
+                  <strong>{{ admin.full_name }}</strong>
+                  <span class="cell-sub">{{ admin.email or 'No email on file' }}</span>
+                </td>
+                <td class="cell-sub">{% if admin.username %}@{{ admin.username }}{% else %}—{% endif %}</td>
+                <td>
+                  <span class="dm-chip"
+                        title="{{ 'Primary role is Administrator' if admin.role == 'admin' else 'admin_access granted on this account' }}">
+                    {{ admin.basis }}</span>
+                </td>
+                <td>{{ admin.department_name or '—' }}</td>
+                <td>{{ admin.position_title or '—' }}</td>
+                <td>
+                  {{ status_pill(admin.status == 'Active') }}
+                  {% if admin.lock_state != 'unlocked' %}
+                  <span class="dm-chip"
+                        title="{{ 'Locked until ' ~ admin.lock_until if admin.lock_state == 'temporary' else 'Locked until an administrator unlocks it' }}">
+                    Locked</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {{ (admin.last_login | audit_time) if admin.last_login else 'Never' }}
+                  {% if admin.must_change_password %}
+                  <span class="cell-sub">Initial password pending</span>
+                  {% endif %}
+                </td>
+                <td class="dm-actions">
+                  <div class="dm-row-actions">
+                    <a class="btn btn-sm btn-outline"
+                       href="{{ url_for('admin_role_account', user_id=admin.id) }}">
+                      {{ ui('shield') }} Permissions</a>
+                    <a class="btn btn-sm btn-outline"
+                       href="{{ url_for('admin_departments', department=admin.department_id, _anchor='overview') if admin.department_id else url_for('admin_departments') }}">
+                      In their department</a>
+                  </div>
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="8">
+                  <div class="dir-empty">
+                    <strong>No administrator accounts are registered</strong>
+                    <span>Every account here sits on a normal role. Promote one from
+                      User Management &rarr; Role permissions.</span>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <p class="dm-note">Administrator rows are read live from the same register User
+          Management and Role &amp; Permissions edit; nothing here changes an account.</p>
+      </div>
+      {% endif %}
+
+      {% if not dept %}
+      <div class="dir-card">
+        <div class="dir-empty">
+          <strong>Nothing selected</strong>
+          <span>Register a department or open one from the list to manage its structure.</span>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if dept %}
+
+      {# ------------------------------------------- department + manager #}
+      <div class="dm-two dm-section" id="overview">
+        <div class="dir-card">
+          <div class="dir-card-head">
+            <div>
+              <span class="dir-eyebrow">{{ dept.unit_type }}</span>
+              <h2>{{ dept.name }}</h2>
+              <p>{{ dept.description or 'No description is stored for this unit yet.' }}</p>
+            </div>
+          </div>
+
+          <div class="dm-facts">
+            <div class="dm-fact">
+              <em>Status</em>
+              <b>{{ 'Active' if dept.is_active else 'Inactive' }}</b>
+            </div>
+            <div class="dm-fact">
+              <em>Reports under</em>
+              <b>{{ dept.parent_name or 'Top of the chart' }}</b>
+            </div>
+            <div class="dm-fact">
+              <em>Leadership seat</em>
+              <b>{{ dept.leadership_position }}</b>
+            </div>
+            <div class="dm-fact">
+              <em>Sub-units</em>
+              <b>{{ dept.children | length }}</b>
+            </div>
+            <div class="dm-fact">
+              <em>Accounts</em>
+              <b>{{ dept.account_count }}</b>
+            </div>
+            <div class="dm-fact">
+              <em>Positions</em>
+              <b>{{ dept.positions_active }}/{{ dept.positions_total }}</b>
+            </div>
+            <div class="dm-fact">
+              <em>Filed roles</em>
+              <b>{{ dept.owned_roles | length }}</b>
+            </div>
+            <div class="dm-fact">
+              <em>Permissions open</em>
+              <b>{{ dept.permission_open }}/{{ dept.permission_total }}</b>
+            </div>
+            <div class="dm-fact">
+              <em>Tasks registered</em>
+              <b>{{ dept.tasks.total }}</b>
+            </div>
+          </div>
+
+          <details class="dm-details">
+            <summary>{{ ui('edit') }} Edit this department</summary>
+            <div class="dm-details-body">
+              <form method="POST" action="{{ url_for('admin_departments_action') }}"
+                    class="dm-plain-form">
+                {{ csrf_field() }}
+                <input type="hidden" name="action" value="update_department" />
+                <input type="hidden" name="department_id" value="{{ dept.id }}" />
+                <input type="hidden" name="anchor" value="overview" />
+                <div class="dm-form-grid">
+                  <div>
+                    <label for="edit-unit-name">Name *</label>
+                    <input id="edit-unit-name" name="name" value="{{ dept.name }}"
+                           maxlength="120" required />
+                  </div>
+                  <div>
+                    <label for="edit-unit-type">Unit type</label>
+                    <select id="edit-unit-type" name="unit_type">
+                      {% for kind in ['Directorate', 'Department', 'Team'] %}
+                      <option value="{{ kind }}"
+                              {% if dept.unit_type == kind %}selected{% endif %}>{{ kind }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div>
+                    <label for="edit-unit-leadership">Leadership seat</label>
+                    <select id="edit-unit-leadership" name="leadership_position">
+                      {% for seat in ['Executive', 'Director', 'Manager'] %}
+                      <option value="{{ seat }}"
+                              {% if dept.leadership_position == seat %}selected{% endif %}>{{ seat }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div>
+                    <label for="edit-unit-parent">Reports under</label>
+                    <select id="edit-unit-parent" name="parent_id">
+                      <option value="">None (top of the chart)</option>
+                      {% for choice in dept.parent_choices %}
+                      <option value="{{ choice.id }}"
+                              {% if choice.id == dept.parent_id %}selected{% endif %}>
+                        {{ choice.name }} &mdash; {{ choice.unit_type }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div>
+                    <label for="edit-unit-manager">Manager</label>
+                    <select id="edit-unit-manager" name="head_employee_id">
+                      <option value="">No manager named</option>
+                      {% for person in dept.manager_candidates %}
+                      <option value="{{ person.id }}"
+                              {% if person.id == dept.head_employee_id %}selected{% endif %}>
+                        {{ person.name }}{% if person.title %} &mdash; {{ person.title }}{% endif %}{% if not person.active %} (inactive){% endif %}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div class="dm-wide">
+                    <label for="edit-unit-description">Description</label>
+                    <input id="edit-unit-description" name="description"
+                           value="{{ dept.description or '' }}" maxlength="300"
+                           placeholder="What this unit is responsible for" />
+                  </div>
+                </div>
+                <p class="dm-note">Renaming a unit re-points the staff, budget, vacancy and
+                  integration rows that carry its name, so the change is written once and every
+                  screen follows it.</p>
+                <div class="dm-form-foot">
+                  <button type="submit" class="btn btn-sm">Save department</button>
+                </div>
+              </form>
+            </div>
+          </details>
+
+          <div class="dm-row-actions">
+            <form method="POST" action="{{ url_for('admin_departments_action') }}"
+                  class="dm-inline-form">
+              {{ csrf_field() }}
+              <input type="hidden" name="action" value="set_department_status" />
+              <input type="hidden" name="department_id" value="{{ dept.id }}" />
+              <input type="hidden" name="anchor" value="overview" />
+              <input type="hidden" name="active" value="{{ 0 if dept.is_active else 1 }}" />
+              <button type="submit" class="btn btn-sm btn-outline">
+                {{ 'Deactivate department' if dept.is_active else 'Activate department' }}</button>
+            </form>
+            <a class="btn btn-sm btn-outline" href="{{ url_for('organization') }}">
+              View in the chart</a>
+          </div>
+
+          <div class="dm-danger dm-gap">
+            <h3 class="dm-subhead">Delete this department</h3>
+            {% if dept.blockers %}
+            <p class="dm-note">Nothing was removed. {{ dept.name }} still holds
+              {{ dept.blockers | join(', ') }}. Move or retire them first, or deactivate the
+              unit instead so its history stays where it is.</p>
+            {% else %}
+            <p class="dm-note">This unit holds no positions, people, roles, bindings or linked
+              records, so it can be removed. Type the name exactly to confirm.</p>
+            <form method="POST" action="{{ url_for('admin_departments_action') }}"
+                  class="dm-inline-form is-block">
+              {{ csrf_field() }}
+              <input type="hidden" name="action" value="delete_department" />
+              <input type="hidden" name="department_id" value="{{ dept.id }}" />
+              <label class="sr-only" for="delete-confirm">Type the department name</label>
+              <input id="delete-confirm" name="confirm_name" type="text" autocomplete="off"
+                     placeholder="{{ dept.name }}" required />
+              <button type="submit" class="btn btn-sm btn-danger">Delete permanently</button>
+            </form>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="dir-card">
+          <div class="dir-card-head">
+            <div>
+              <span class="dir-eyebrow">Leadership</span>
+              <h2>Department manager</h2>
+              <p>The manager heads the unit on the chart. Choosing a person here writes the same
+                seat the Organization &amp; Hierarchy screen shows.</p>
+            </div>
+          </div>
+
+          {% if dept.manager %}
+          <div class="dm-facts">
+            <div class="dm-fact">
+              <em>Manager</em>
+              <b>{{ dept.manager.name }}</b>
+            </div>
+            <div class="dm-fact">
+              <em>Job title</em>
+              <b>{{ dept.manager.title or 'Not recorded' }}</b>
+            </div>
+            <div class="dm-fact">
+              <em>Sign-in account</em>
+              <b>{% if dept.manager.account_id %}
+                <a href="{{ url_for('admin_role_account', user_id=dept.manager.account_id) }}">Open</a>
+                {% else %}No account linked{% endif %}</b>
+            </div>
+          </div>
+          {% else %}
+          <p class="dm-note">No manager is named for {{ dept.name }}. A unit without a head
+            still appears on the chart, but nobody owns its approvals.</p>
+          {% endif %}
+
+          <form method="POST" action="{{ url_for('admin_departments_action') }}"
+                class="dm-plain-form dm-gap">
+            {{ csrf_field() }}
+            <input type="hidden" name="action" value="assign_manager" />
+            <input type="hidden" name="department_id" value="{{ dept.id }}" />
+            <input type="hidden" name="anchor" value="overview" />
+            <div class="dm-form-grid">
+              <div class="dm-wide">
+                <label for="assign-manager">Assign the {{ dept.leadership_position }} seat to</label>
+                <select id="assign-manager" name="head_employee_id">
+                  <option value="">No manager named</option>
+                  {% for person in dept.manager_candidates %}
+                  <option value="{{ person.id }}"
+                          {% if person.id == dept.head_employee_id %}selected{% endif %}>
+                    {{ person.name }}{% if person.title %} &mdash; {{ person.title }}{% endif %}
+                    {%- if person.department %} ({{ person.department }}){% endif %}
+                    {%- if not person.active %} (inactive){% endif %}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+            <div class="dm-form-foot">
+              <button type="submit" class="btn btn-sm">Save manager</button>
+            </div>
+          </form>
+
+          {% if dept.children %}
+          <div class="dm-gap">
+            <h3 class="dm-subhead">Sub-units</h3>
+            <div class="dm-chips">
+              {% for child in dept.children %}
+              <a class="dm-chip"
+                 href="{{ url_for('admin_departments', department=child.id, _anchor='overview') }}">{{ child.name }}</a>
+              {% endfor %}
+            </div>
+            <p class="dm-note">A binding on {{ dept.name }} also reaches every sub-unit here.</p>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      {# --------------------------------------- tasks, functions & reports #}
+      <div class="dir-card dm-section" id="tasks">
+        <div class="dir-card-head">
+          <div>
+            <span class="dir-eyebrow">Functions</span>
+            <h2>Tasks on {{ dept.name }}</h2>
+            <p>Every task the system registers for this unit, read from the same
+              navigation each desk uses, so a screen added to the rail appears here
+              without a second list. {{ dept.tasks.open }} of {{ dept.tasks.total }}
+              tasks are currently granted by the unit's roles.</p>
+          </div>
+          <a class="btn btn-sm btn-outline"
+             href="{{ url_for('reports_centre') }}">Reports centre</a>
+        </div>
+
+        {% if dept.tasks.desks %}
+        <div class="dm-chips dm-task-desks">
+          {% for desk in dept.tasks.desks %}
+          <span class="dm-chip">{{ desk }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="hr-table-wrap" tabindex="0" role="region"
+             aria-label="Tasks on {{ dept.name }}">
+          <table class="dir-table dm-task-table">
+            <thead>
+              <tr>
+                <th scope="col">Task</th>
+                <th scope="col">Requires</th>
+                <th scope="col">Access</th>
+                <th scope="col" class="dm-actions"><span class="sr-only">Open</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for group in dept.tasks.groups %}
+              <tr class="dm-task-group">
+                <td colspan="4">
+                  <span class="dm-task-desk">{{ group.label }}</span>
+                  <span class="dm-task-count">{{ group.open }}/{{ group.tasks | length }} granted</span>
+                </td>
+              </tr>
+              {% for task in group.tasks %}
+              <tr>
+                <td>
+                  <a href="{{ task.href }}">{{ task.label }}</a>
+                  <span class="cell-sub">{{ task.kind }}</span>
+                </td>
+                <td class="dm-task-requires">
+                  {% for need in task.requires %}
+                  <span class="dm-chip">{{ need }}</span>
+                  {% endfor %}
+                </td>
+                <td>
+                  {% if task.held %}
+                  <span class="status-badge active"><span class="status-dot"></span>Granted</span>
+                  {% elif task.held is none %}
+                  <span class="status-badge neutral"><span class="status-dot"></span>Per account</span>
+                  {% else %}
+                  <span class="status-badge neutral"><span class="status-dot"></span>Not granted</span>
+                  {% endif %}
+                </td>
+                <td class="dm-actions">
+                  <a class="btn btn-sm btn-outline" href="{{ task.href }}">Open</a>
+                </td>
+              </tr>
+              {% endfor %}
+              {% else %}
+              <tr>
+                <td colspan="4">
+                  <div class="dir-empty">
+                    <strong>No task is registered for {{ dept.name }} yet</strong>
+                    <span>File a role on the unit or give it a name that matches its
+                      desk; the tasks its roles open appear here automatically.</span>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <p class="dm-note">“Not granted” means the unit's roles do not yet carry the
+          right the task needs; grant it on the role below, and the link opens for
+          everyone who holds that role. Letter tasks are granted per account, so they
+          are shown as “Per account”.</p>
+      </div>
+
+      {# ------------------------------------------------------- positions #}
+      <div class="dir-card dm-section" id="positions">
+        <div class="dir-card-head">
+          <div>
+            <span class="dir-eyebrow">Structure</span>
+            <h2>Positions</h2>
+            <p>{{ dept.positions_active }} of {{ dept.positions_total }} positions are open in
+              {{ dept.name }}. A retired position keeps its history but can no longer be given to
+              an account, and a position that still names a person cannot be deleted.</p>
+          </div>
+        </div>
+
+        <form method="POST" action="{{ url_for('admin_departments_action') }}"
+              class="dm-plain-form is-spaced">
+          {{ csrf_field() }}
+          <input type="hidden" name="action" value="create_position" />
+          <input type="hidden" name="department_id" value="{{ dept.id }}" />
+          <input type="hidden" name="anchor" value="positions" />
+          <div class="dm-form-grid">
+            <div>
+              <label for="new-position-title">Title *</label>
+              <input id="new-position-title" name="title" maxlength="120" required
+                     placeholder="e.g. Workshop supervisor" />
+            </div>
+            <div>
+              <label for="new-position-level">Rung</label>
+              <select id="new-position-level" name="level">
+                {% for value, name in level_choices %}
+                {% if value >= 0 %}
+                <option value="{{ value }}" {% if value == 4 %}selected{% endif %}>{{ name }}</option>
+                {% endif %}
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label for="new-position-reports">Reports to</label>
+              <select id="new-position-reports" name="reports_to_position_id">
+                <option value="">No reporting line</option>
+                {% for position in dept.positions %}
+                <option value="{{ position.id }}">{{ position.title }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label for="new-position-role">Role to grant at this rung</label>
+              <select id="new-position-role" name="bind_role_key">
+                <option value="">No role grant</option>
+                {% for group in role_groups %}
+                <optgroup label="{{ group.label }}">
+                  {% for role in group.roles %}
+                  <option value="{{ role.key }}">{{ role.name }}</option>
+                  {% endfor %}
+                </optgroup>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="dm-form-foot">
+            <button type="submit" class="btn btn-sm">{{ ui('plus') }} Add position</button>
+            <span class="dm-note">A repeated title inside {{ dept.name }} is refused.
+              A chosen role is granted to the seat's rung on {{ dept.name }} in the same save.</span>
+          </div>
+        </form>
+
+        <div class="hr-table-wrap">
+          <table class="dir-table">
+            <thead>
+              <tr>
+                <th scope="col">Position</th>
+                <th scope="col">Rung</th>
+                <th scope="col">Reports to</th>
+                <th scope="col">Held by</th>
+                <th scope="col">Bound roles</th>
+                <th scope="col">Status</th>
+                <th scope="col" class="dm-actions"><span class="sr-only">Action</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for position in dept.positions %}
+              <tr>
+                <td>
+                  <strong>{{ position.title }}</strong>
+                  <span class="cell-sub">{{ position.child_count }} position{{ '' if position.child_count == 1 else 's' }}
+                    report here</span>
+                </td>
+                <td>{{ position.level_label }}</td>
+                <td>{{ position.reports_to_title or '—' }}</td>
+                <td>
+                  <span class="cell-sub">{{ position.staff_count }} staff ·
+                    {{ position.account_count }} account{{ '' if position.account_count == 1 else 's' }}</span>
+                  {% if position.holder_names %}
+                  <div class="dm-chips">
+                    {% for name in position.holder_names %}
+                    <span class="dm-chip">{{ name }}</span>
+                    {% endfor %}
+                  </div>
+                  {% endif %}
+                </td>
+                <td>
+                  <div class="dm-chips">
+                    {%- set seat_binding_count = [] -%}
+                    {% for binding in dept.direct_bindings + dept.inherited_bindings %}
+                    {% if binding.role_active
+                          and (binding.level == position.level or binding.level == -1) %}
+                    {%- set _ = seat_binding_count.append(1) -%}
+                    <span class="dm-chip"
+                          title="{{ binding.source }} · {{ binding.level_label }}">{{ binding.role_name }}</span>
+                    {% endif %}
+                    {% endfor %}
+                    {% if not seat_binding_count %}
+                    <span class="dm-binding-meta">None at this rung</span>
+                    {% endif %}
+                  </div>
+                </td>
+                <td>{{ status_pill(position.is_active) }}</td>
+                <td class="dm-actions">
+                  <div class="dm-row-actions">
+                    <details class="dm-details is-flush">
+                      <summary>{{ ui('edit') }} Edit</summary>
+                      <div class="dm-details-body">
+                        <form method="POST" action="{{ url_for('admin_departments_action') }}"
+                              class="dm-plain-form">
+                          {{ csrf_field() }}
+                          <input type="hidden" name="action" value="update_position" />
+                          <input type="hidden" name="department_id" value="{{ dept.id }}" />
+                          <input type="hidden" name="anchor" value="positions" />
+                          <input type="hidden" name="position_id" value="{{ position.id }}" />
+                          <div class="dm-form-grid is-single">
+                            <div>
+                              <label for="pos-title-{{ position.id }}">Title</label>
+                              <input id="pos-title-{{ position.id }}" name="title"
+                                     value="{{ position.title }}" maxlength="120" required />
+                            </div>
+                            <div>
+                              <label for="pos-level-{{ position.id }}">Rung</label>
+                              <select id="pos-level-{{ position.id }}" name="level">
+                                {% for value, name in level_choices %}
+                                {% if value >= 0 %}
+                                <option value="{{ value }}"
+                                        {% if value == position.level %}selected{% endif %}>{{ name }}</option>
+                                {% endif %}
+                                {% endfor %}
+                              </select>
+                            </div>
+                            <div>
+                              <label for="pos-reports-{{ position.id }}">Reports to</label>
+                              <select id="pos-reports-{{ position.id }}" name="reports_to_position_id">
+                                <option value="">No reporting line</option>
+                                {% for other in dept.positions %}
+                                {% if other.id != position.id %}
+                                <option value="{{ other.id }}"
+                                        {% if other.id == position.reports_to_id %}selected{% endif %}>{{ other.title }}</option>
+                                {% endif %}
+                                {% endfor %}
+                              </select>
+                              <span class="dm-note">A reporting line that loops back on itself
+                                is refused.</span>
+                            </div>
+                          </div>
+                          <button type="submit" class="btn btn-sm">Save position</button>
+                        </form>
+                      </div>
+                    </details>
+
+                    <form method="POST" action="{{ url_for('admin_departments_action') }}"
+                          class="dm-inline-form">
+                      {{ csrf_field() }}
+                      <input type="hidden" name="action" value="set_position_status" />
+                      <input type="hidden" name="department_id" value="{{ dept.id }}" />
+                      <input type="hidden" name="anchor" value="positions" />
+                      <input type="hidden" name="position_id" value="{{ position.id }}" />
+                      <input type="hidden" name="active" value="{{ 0 if position.is_active else 1 }}" />
+                      <button type="submit" class="dir-text-btn"
+                              {% if position.is_active and not position.can_retire %}disabled{% endif %}>
+                        {{ 'Retire' if position.is_active else 'Restore' }}</button>
+                    </form>
+
+                    <form method="POST" action="{{ url_for('admin_departments_action') }}"
+                          class="dm-inline-form"
+                          onsubmit="return confirm({{ ('Delete ' ~ position.title ~ ' from ' ~ dept.name ~ '? This cannot be undone.') | tojson }});">
+                      {{ csrf_field() }}
+                      <input type="hidden" name="action" value="delete_position" />
+                      <input type="hidden" name="department_id" value="{{ dept.id }}" />
+                      <input type="hidden" name="anchor" value="positions" />
+                      <input type="hidden" name="position_id" value="{{ position.id }}" />
+                      <button type="submit" class="dir-text-btn dm-text-danger"
+                              {% if not position.can_delete %}disabled
+                              title="Still held by a person or another position reports to it"{% endif %}>
+                        {{ ui('trash') }} Delete</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="7">
+                  <div class="dir-empty">
+                    <strong>No positions on {{ dept.name }}</strong>
+                    <span>Add the seats this unit needs before placing people into them.</span>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {# --------------------------------------------------- permissions #}
+      <div class="dir-card dm-section" id="permissions">
+        <div class="dir-card-head">
+          <div>
+            <span class="dir-eyebrow">Matrix</span>
+            <h2>Permissions that reach {{ dept.name }}</h2>
+            <p>{{ dept.permission_open }} of {{ dept.permission_total }} permissions are open
+              through the {{ dept.effective_role_count }} role{{ '' if dept.effective_role_count == 1 else 's' }}
+              filed here or bound to this unit. Each row names the roles behind the tick, so a
+              permission nobody granted is listed once and greyed.</p>
+            <p class="dm-note">Read only. Roles, their permissions and the units they are bound
+              to are edited on
+              <a href="{{ url_for('admin_roles', _anchor='bindings') }}">Role &amp; Permissions</a>.</p>
+          </div>
+        </div>
+
+        {% if dept.letter_actions %}
+        <p class="dm-note">Letter actions in force here:
+          <span class="dm-chips">
+            {% for action in dept.letter_actions %}
+            <span class="dm-chip">{{ action }}</span>
+            {% endfor %}
+          </span>
+        </p>
+        {% endif %}
+
+        <div class="dm-perm-tools">
+          <label class="sr-only" for="permSearch">Filter permissions</label>
+          <input id="permSearch" type="search" placeholder="Search this matrix…" autocomplete="off" />
+          <label class="sr-only" for="permState">Open or closed</label>
+          <select id="permState">
+            <option value="all">Open and closed</option>
+            <option value="open">Open only</option>
+            <option value="closed">Closed only</option>
+          </select>
+          <span class="dm-binding-meta" id="permCount" aria-live="polite"></span>
+        </div>
+
+        {% for category in dept.permission_categories %}
+        <details class="dm-perm-cat" {% if category.open or loop.first %}open{% endif %}>
+          <summary>
+            {{ dash_icon(category.icon) }}
+            <strong>{{ category.label }}</strong>
+            <span class="dm-count">{{ category.open }}/{{ category.total }}</span>
+          </summary>
+          <div class="dm-perm-list">
+            {% for row in category.permissions %}
+            <div class="dm-perm {{ '' if row.checked else 'is-off' }}">
+              <b>{% if row.checked %}&#10003;{% else %}&#183;{% endif %} {{ row.label }}</b>
+              <em>{{ row.roles | join(', ') or 'No role reaches this unit' }}</em>
+            </div>
+            {% endfor %}
+          </div>
+        </details>
+        {% endfor %}
+      </div>
+
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+{# ------------------------------------------------------------- dialogs #}
+<dialog class="dir-dialog" id="newDepartmentDialog" aria-labelledby="newDepartmentTitle">
+  <div class="dir-dialog-head">
+    <div class="dir-dialog-title">
+      <h2 id="newDepartmentTitle">Register a department</h2>
+      <p>A new unit starts empty: name it, place it in the chart and give it a manager.</p>
+    </div>
+    <button type="button" class="dir-dialog-close" data-close-dialog aria-label="Close">&times;</button>
+  </div>
+  <form method="POST" action="{{ url_for('admin_departments_action') }}">
+    {{ csrf_field() }}
+    <input type="hidden" name="action" value="create_department" />
+    <input type="hidden" name="anchor" value="overview" />
+    <div class="dir-dialog-body">
+      <div class="dm-form-grid">
+        <div>
+          <label for="new-unit-name">Name *</label>
+          <input id="new-unit-name" name="name" maxlength="120" required
+                 placeholder="e.g. Finishing &amp; Paint" />
+        </div>
+        <div>
+          <label for="new-unit-type">Unit type</label>
+          <select id="new-unit-type" name="unit_type">
+            {% for kind in ['Directorate', 'Department', 'Team'] %}
+            <option value="{{ kind }}" {% if kind == 'Department' %}selected{% endif %}>{{ kind }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="new-unit-leadership">Leadership seat *</label>
+          <select id="new-unit-leadership" name="leadership_position" required>
+            <option value="">Choose a seat…</option>
+            {% for seat in ['Executive', 'Director', 'Manager'] %}
+            <option value="{{ seat }}">{{ seat }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="new-unit-parent">Reports under</label>
+          <select id="new-unit-parent" name="parent_id">
+            <option value="">None (top of the chart)</option>
+            {% for unit in units %}
+            <option value="{{ unit.id }}">{{ unit.name }} — {{ unit.unit_type }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="new-unit-manager">Manager</label>
+          <select id="new-unit-manager" name="head_employee_id">
+            <option value="">No manager named</option>
+            {% for person in manager_candidates %}
+            <option value="{{ person.id }}">
+              {{ person.name }}{% if person.title %} — {{ person.title }}{% endif %}
+              {%- if person.department %} ({{ person.department }}){% endif %}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="dm-wide">
+          <label for="new-unit-description">Description</label>
+          <input id="new-unit-description" name="description" maxlength="300"
+                 placeholder="What this unit is responsible for" />
+        </div>
+      </div>
+      <p class="dm-note">A name already used by another unit is refused, so the register never
+        holds two departments in the same spelling.</p>
+    </div>
+    <div class="dir-dialog-actions">
+      <button type="button" class="btn btn-sm btn-outline" data-close-dialog>Cancel</button>
+      <button type="submit" class="btn btn-sm">Register department</button>
+    </div>
+  </form>
+</dialog>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    document.querySelectorAll("[data-open-dialog]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var dialog = document.getElementById(button.dataset.openDialog);
+        if (dialog) dialog.showModal();
+      });
+    });
+
+    document.querySelectorAll("[data-close-dialog]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var dialog = button.closest("dialog");
+        if (dialog) dialog.close();
+      });
+    });
+
+    document.querySelectorAll("dialog.dir-dialog").forEach(function (dialog) {
+      dialog.addEventListener("click", function (event) {
+        if (event.target === dialog) dialog.close();
+      });
+    });
+
+    // ---------- one view at a time ----------
+    document.body.classList.add("dm-js");
+    var sections = Array.prototype.slice.call(document.querySelectorAll(".dm-section"));
+    var tabs = Array.prototype.slice.call(document.querySelectorAll(".dm-tab"));
+    var deptNav = document.querySelector(".dm-dept-nav");
+    var PILL_ALIAS = {};
+    var SELECTED_ID = {{ selected_id if selected_id else 0 }};
+    function departmentOf(search) {
+      var match = /[?&]department=(\d+)/.exec(search || "");
+      return match ? match[1] : String(SELECTED_ID || "");
+    }
+
+    function sectionExists(id) {
+      return sections.some(function (s) { return s.id === id; });
+    }
+
+    function showView(id) {
+      if (!sectionExists(id)) id = sectionExists("registry") ? "registry" : "";
+      sections.forEach(function (s) { s.classList.toggle("is-view", s.id === id); });
+      tabs.forEach(function (tab) {
+        var target = (tab.getAttribute("href").split("#")[1]) || "";
+        tab.classList.toggle("is-active",
+          (PILL_ALIAS[target] || target) === (PILL_ALIAS[id] || id));
+      });
+      if (deptNav) {
+        deptNav.classList.toggle("is-hidden", id === "registry" || id === "admins" || !id);
+      }
+      [document.getElementById("deptPrevLink"),
+       document.getElementById("deptNextLink")].forEach(function (link) {
+        if (link) link.href = link.href.split("#")[0] + "#" + id;
+      });
+    }
+
+    window.addEventListener("hashchange", function () {
+      showView((window.location.hash || "").slice(1));
+    });
+    tabs.forEach(function (tab) {
+      tab.addEventListener("click", function (event) {
+        var url = new URL(tab.href, window.location.href);
+        if (url.pathname === window.location.pathname &&
+            departmentOf(url.search) === departmentOf(window.location.search)) {
+          event.preventDefault();
+          var id = url.hash.slice(1);
+          if (window.location.hash === "#" + id) showView(id);
+          else window.location.hash = "#" + id;
+        }
+      });
+    });
+    showView((window.location.hash || "").slice(1) ||
+             (sectionExists("overview") ? "overview" : "registry"));
+
+    // ---------- the register's card search ----------
+    var search = document.getElementById("unitSearch");
+    var grid = document.getElementById("unitGrid");
+    var counter = document.getElementById("unitCount");
+    var empty = document.getElementById("unitEmptyRow");
+    if (search && grid) {
+      var cards = Array.prototype.slice.call(grid.querySelectorAll(".dm-dept-card"));
+      var total = cards.length;
+      function renderUnits() {
+        var term = (search.value || "").trim().toLowerCase();
+        var shown = 0;
+        cards.forEach(function (card) {
+          var ok = !term || (card.getAttribute("data-search") || "").indexOf(term) !== -1;
+          card.hidden = !ok;
+          if (ok) shown += 1;
+        });
+        if (empty) empty.hidden = !term || shown > 0;
+        counter.textContent = term
+          ? "Showing " + shown + " of " + total + " departments"
+          : "Showing all " + total + " department" + (total === 1 ? "" : "s");
+      }
+      search.addEventListener("input", renderUnits);
+      renderUnits();
+    }
+
+    // ---------- permissions matrix filter ----------
+    var permSearch = document.getElementById("permSearch");
+    var permState = document.getElementById("permState");
+    var permCount = document.getElementById("permCount");
+    var matrix = document.getElementById("permissions");
+    if (permSearch && permState && permCount && matrix) {
+      var categories = Array.prototype.slice.call(
+        matrix.querySelectorAll(".dm-perm-cat"));
+      var permTotal = matrix.querySelectorAll(".dm-perm").length;
+      var renderPerms = function () {
+        var term = (permSearch.value || "").trim().toLowerCase();
+        var state = permState.value;
+        var shown = 0;
+        categories.forEach(function (cat) {
+          var inCat = 0;
+          Array.prototype.forEach.call(cat.querySelectorAll(".dm-perm"), function (row) {
+            var closed = row.classList.contains("is-off");
+            var ok = (!term || row.textContent.toLowerCase().indexOf(term) >= 0)
+              && (state === "all" || (state === "open" ? !closed : closed));
+            row.hidden = !ok;
+            if (ok) { inCat += 1; shown += 1; }
+          });
+          cat.hidden = inCat === 0;
+          if (inCat && (term || state !== "all")) cat.open = true;
+        });
+        permCount.textContent = shown === permTotal
+          ? "All " + permTotal + " permissions"
+          : shown + " of " + permTotal + " permissions shown";
+      };
+      permSearch.addEventListener("input", renderPerms);
+      permState.addEventListener("change", renderPerms);
+      renderPerms();
+    }
+
+    // ---------- keyboard shortcuts ----------
+    // "/" focuses whichever search is currently on screen.
+    document.addEventListener("keydown", function (e) {
+      if (e.key !== "/" || e.target.isContentEditable) return;
+      var tag = (e.target.tagName || "").toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") return;
+      var visible = document.querySelector(".dm-section.is-view");
+      var box = visible && visible.querySelector('input[type="search"], input[name="name"]');
+      if (!box) {
+        box = document.getElementById("unitSearch") || permSearch;
+      }
+      if (box) {
+        e.preventDefault();
+        box.focus();
+        box.select && box.select();
+      }
+    });
+
+    // Esc closes any open dialog and blurs the active field.
+    document.addEventListener("keydown", function (e) {
+      if (e.key !== "Escape") return;
+      document.querySelectorAll("dialog[open]").forEach(function (d) { d.close(); });
+      if (document.activeElement && document.activeElement.blur) {
+        document.activeElement.blur();
+      }
+    });
+
+    // Arrow keys move between Prev / Next department links when a
+    // department is open and no field has focus.
+    document.addEventListener("keydown", function (e) {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      var tag = (e.target.tagName || "").toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") return;
+      if (document.querySelector("dialog[open]")) return;
+      var link = e.key === "ArrowLeft"
+        ? document.getElementById("deptPrevLink")
+        : document.getElementById("deptNextLink");
+      if (link) {
+        e.preventDefault();
+        link.click();
+      }
+    });
+  })();
+</script>
+{% endblock %}

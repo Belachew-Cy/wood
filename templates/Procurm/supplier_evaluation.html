@@ -1,0 +1,221 @@
+
+{% extends "base.html" %}
+
+{% block title %}Supplier Evaluation | Dereje Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Procurement / Supplier Evaluation</span>
+            <h1>Supplier Evaluation</h1>
+            <p>Evaluate supplier performance and maintain evaluation history.</p>
+        </div>
+
+        <nav class="stock-actions">
+            <a href="{{ url_for('procurement.supplier_details',
+                                supplier_id=supplier.id) }}"
+               class="btn btn-outline btn-sm">
+                Back to Supplier
+            </a>
+        </nav>
+    </div>
+</section>
+
+<section class="container finance-page">
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+            <div class="finance-alert {{ category }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endwith %}
+
+    <div class="finance-panel">
+        <h2>{{ supplier.name }}</h2>
+
+        <div class="finance-grid">
+            <div>
+                <label>Contact person</label>
+                <p>{{ supplier.contact_person or '—' }}</p>
+            </div>
+
+            <div>
+                <label>Phone</label>
+                <p>{{ supplier.phone or '—' }}</p>
+            </div>
+
+            <div>
+                <label>Email</label>
+                <p>{{ supplier.email or '—' }}</p>
+            </div>
+
+            <div>
+                <label>Supplier status</label>
+                <p>{{ supplier.status }}</p>
+            </div>
+        </div>
+    </div>
+
+    {% if can_evaluate %}
+    <div class="finance-panel">
+        <h2>New Supplier Evaluation</h2>
+
+        <p class="panel-note">
+            Rate each category from 1 (Poor) to 5 (Excellent).
+            Use evidence from completed procurement transactions.
+        </p>
+
+        <form method="post"
+              action="{{ url_for('procurement.save_supplier_evaluation',
+                                 supplier_id=supplier.id) }}"
+              class="finance-form">
+
+            {{ csrf_field() }}
+
+            <div class="finance-grid">
+
+                <div>
+                    <label for="price_score">Price competitiveness *</label>
+                    <select name="price_score" id="price_score" required>
+                        <option value="">Select rating</option>
+                        {% for score in range(1, 6) %}
+                        <option value="{{ score }}">{{ score }} / 5</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label for="quality_score">Product/service quality *</label>
+                    <select name="quality_score" id="quality_score" required>
+                        <option value="">Select rating</option>
+                        {% for score in range(1, 6) %}
+                        <option value="{{ score }}">{{ score }} / 5</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label for="delivery_score">Delivery reliability *</label>
+                    <select name="delivery_score" id="delivery_score" required>
+                        <option value="">Select rating</option>
+                        {% for score in range(1, 6) %}
+                        <option value="{{ score }}">{{ score }} / 5</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label for="communication_score">Communication *</label>
+                    <select name="communication_score"
+                            id="communication_score" required>
+                        <option value="">Select rating</option>
+                        {% for score in range(1, 6) %}
+                        <option value="{{ score }}">{{ score }} / 5</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="full">
+                    <label for="evaluation_period">Evaluation period *</label>
+                    <input type="text"
+                           name="evaluation_period"
+                           id="evaluation_period"
+                           maxlength="80"
+                           placeholder="Example: October 2026"
+                           required>
+                </div>
+
+                <div class="full">
+                    <label for="comments">Evaluation comments</label>
+                    <textarea name="comments"
+                              id="comments"
+                              rows="4"
+                              maxlength="2000"
+                              placeholder="Explain the evaluation and supporting evidence..."></textarea>
+                </div>
+
+                <div class="full">
+                    <label for="recommendation">Recommendation *</label>
+                    <select name="recommendation"
+                            id="recommendation" required>
+                        <option value="">Select recommendation</option>
+                        <option value="Preferred">Preferred supplier</option>
+                        <option value="Approved">Approved supplier</option>
+                        <option value="Conditional">Conditional supplier</option>
+                        <option value="Not Recommended">Not recommended</option>
+                    </select>
+                </div>
+
+            </div>
+
+            <div class="finance-form-actions">
+                <button type="submit" class="finance-btn primary">
+                    Save Evaluation
+                </button>
+            </div>
+
+        </form>
+    </div>
+    {% else %}
+    <div class="finance-alert info">
+        You have read-only access to supplier evaluations.
+    </div>
+    {% endif %}
+
+    <div class="dash-panel hr-table-panel">
+        <h2>Evaluation History</h2>
+
+        <div class="hr-table-wrap table-scroll">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Evaluation period</th>
+                        <th>Price</th>
+                        <th>Quality</th>
+                        <th>Delivery</th>
+                        <th>Communication</th>
+                        <th>Overall score</th>
+                        <th>Recommendation</th>
+                        <th>Evaluated by</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for evaluation in evaluations %}
+                    <tr>
+                        <td>{{ evaluation.evaluation_period }}</td>
+                        <td>{{ evaluation.price_score }}/5</td>
+                        <td>{{ evaluation.quality_score }}/5</td>
+                        <td>{{ evaluation.delivery_score }}/5</td>
+                        <td>{{ evaluation.communication_score }}/5</td>
+                        <td>
+                            <strong>{{ "%.2f"|format(
+                                evaluation.overall_score
+                            ) }}/5</strong>
+                        </td>
+                        <td>{{ evaluation.recommendation }}</td>
+                        <td>{{ evaluation.evaluator_name }}</td>
+                        <td>
+                            {{ evaluation.created_at[:10]
+                               if evaluation.created_at else '—' }}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="9" class="employee-empty">
+                            No supplier evaluations recorded yet.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</section>
+
+{% endblock %}

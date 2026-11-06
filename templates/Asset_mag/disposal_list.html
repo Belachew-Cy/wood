@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container-fluid py-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+
+        <div>
+            <h3>Asset Disposal Management</h3>
+            <p class="text-muted">
+                Review and manage asset disposal requests.
+            </p>
+        </div>
+
+        <a href="{{ url_for('asset_management.create_asset_disposal') }}"
+           class="btn btn-success">
+            New Disposal Request
+        </a>
+
+    </div>
+
+    <div class="card shadow-sm">
+
+        <div class="table-responsive">
+
+            <table class="table table-hover align-middle">
+
+                <thead class="table-light">
+                    <tr>
+                        <th>Asset</th>
+                        <th>Disposal Type</th>
+                        <th>Request Date</th>
+                        <th>Estimated Value</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for item in records %}
+
+                    <tr>
+
+                        <td>
+                            {{ item.asset.asset_code }}
+                            - {{ item.asset.name }}
+                        </td>
+
+                        <td>{{ item.disposal_type }}</td>
+
+                        <td>{{ item.request_date }}</td>
+
+                        <td>
+                            {{ "{:,.2f}".format(item.estimated_value or 0) }}
+                        </td>
+
+                        <td>{{ item.status }}</td>
+
+                        <td>
+
+                            {% if item.status == "Pending" %}
+
+                            <form method="POST"
+                                  action="{{ url_for(
+                                      'asset_management.inspect_asset_disposal',
+                                      disposal_id=item.id
+                                  ) }}">
+
+                                <input type="hidden"
+                                       name="csrf_token"
+                                       value="{{ csrf_token() }}">
+
+                                <textarea name="condition_report"
+                                          class="form-control form-control-sm mb-1"
+                                          placeholder="Inspection report"
+                                          required></textarea>
+
+                                <input type="number"
+                                       name="estimated_value"
+                                       class="form-control form-control-sm mb-1"
+                                       min="0"
+                                       step="0.01"
+                                       placeholder="Estimated value"
+                                       required>
+
+                                <button class="btn btn-sm btn-primary">
+                                    Submit Inspection
+                                </button>
+
+                            </form>
+
+                            {% elif item.status == "Inspected" %}
+
+                            <form method="POST"
+                                  action="{{ url_for(
+                                      'asset_management.approve_asset_disposal',
+                                      disposal_id=item.id
+                                  ) }}">
+
+                                <input type="hidden"
+                                       name="csrf_token"
+                                       value="{{ csrf_token() }}">
+
+                                <button class="btn btn-sm btn-success">
+                                    Approve
+                                </button>
+
+                            </form>
+
+                            {% elif item.status == "Approved" %}
+
+                            <form method="POST"
+                                  action="{{ url_for(
+                                      'asset_management.complete_asset_disposal',
+                                      disposal_id=item.id
+                                  ) }}">
+
+                                <input type="hidden"
+                                       name="csrf_token"
+                                       value="{{ csrf_token() }}">
+
+                                <input type="number"
+                                       name="book_value"
+                                       class="form-control form-control-sm mb-1"
+                                       min="0"
+                                       step="0.01"
+                                       placeholder="Verified book value"
+                                       required>
+
+                                <input type="number"
+                                       name="sale_proceeds"
+                                       class="form-control form-control-sm mb-1"
+                                       min="0"
+                                       step="0.01"
+                                       placeholder="Sale proceeds"
+                                       value="0"
+                                       required>
+
+                                <button class="btn btn-sm btn-primary">
+                                    Complete Disposal
+                                </button>
+
+                            </form>
+
+                            {% else %}
+
+                            <span class="text-muted">Completed</span>
+
+                            {% endif %}
+
+                        </td>
+
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="6" class="text-center py-4">
+                            No disposal records found.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

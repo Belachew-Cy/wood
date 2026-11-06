@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container-fluid py-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+
+        <div>
+            <h3>Asset Documents</h3>
+            <p class="text-muted">
+                {{ asset.asset_code }} - {{ asset.name }}
+            </p>
+        </div>
+
+        <a href="{{ url_for(
+            'asset_management.upload_asset_document',
+            asset_id=asset.id
+        ) }}"
+        class="btn btn-success">
+            <i class="fas fa-upload"></i> Upload Document
+        </a>
+
+    </div>
+
+    <div class="card border-0 shadow-sm">
+
+        <div class="table-responsive">
+
+            <table class="table table-hover align-middle mb-0">
+
+                <thead>
+                    <tr>
+                        <th>Document Name</th>
+                        <th>Category</th>
+                        <th>Filename</th>
+                        <th>Version</th>
+                        <th>Uploaded Date</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for document in documents %}
+
+                    <tr>
+                        <td>{{ document.document_name }}</td>
+                        <td>{{ document.document_type }}</td>
+                        <td>{{ document.original_filename }}</td>
+                        <td>v{{ document.version }}</td>
+                        <td>{{ document.created_at.strftime('%Y-%m-%d') }}</td>
+
+                        <td>
+                            <a href="{{ url_for(
+                                'asset_management.download_asset_document',
+                                document_id=document.id
+                            ) }}"
+                            class="btn btn-sm btn-outline-success">
+                                Download
+                            </a>
+                        </td>
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="6" class="text-center py-4">
+                            No documents uploaded for this asset.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

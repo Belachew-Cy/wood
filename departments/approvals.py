@@ -60,6 +60,21 @@ def dashboard():
     """).fetchall()
 
     visible = [row for row in rows if can_view_request(row, user, acted)]
+
+    # The PR and PO rails open the same queue narrowed to the purchase chains:
+    # a pending view for the requisitions waiting on a signature, and the
+    # approved view for the purchases that may now become purchase orders.
+    selected_type = (request.args.get("type") or "").strip()
+    if selected_type not in REQUEST_TYPES:
+        selected_type = ""
+    selected_status = (request.args.get("status") or "").strip()
+    if selected_status not in ("Pending", "Returned", "Approved", "Rejected"):
+        selected_status = ""
+    if selected_type:
+        visible = [row for row in visible if row["request_type"] == selected_type]
+    if selected_status:
+        visible = [row for row in visible if row["status"] == selected_status]
+
     decidable = {row["id"] for row in visible if can_decide_request(row, user)}
 
     counts = {
@@ -115,6 +130,8 @@ def dashboard():
         activity=activity,
         returned=returned,
         status_rows=status_rows,
+        selected_type=selected_type,
+        selected_status=selected_status,
     )
 
 
@@ -174,7 +191,7 @@ def new_request():
         flash("Your request has been submitted for approval.", "success")
         return redirect(url_for("approvals.detail", request_id=request_id))
 
-    return render_template("approval/new_request.html")
+    return render_template("procurm/requistions.html")
 
 
 @approvals_bp.route("/<int:request_id>")

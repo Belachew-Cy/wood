@@ -1,0 +1,313 @@
+
+{% extends "base.html" %}
+
+{% block title %}Audit Export Center | Audit Management{% endblock %}
+
+{% block content %}
+
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Audit Management / Reporting</span>
+            <h1>Audit Export Center</h1>
+            <p>
+                Generate and manage authorized audit exports
+                while maintaining confidentiality and traceability.
+            </p>
+        </div>
+
+        <div class="stock-actions">
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.dashboard') }}">
+                Dashboard
+            </a>
+
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.audit_reports') }}">
+                Audit Reports
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="container finance-page">
+
+    <!-- EXPORT SUMMARY -->
+
+    <div class="hr-stats">
+
+        <div class="dash-panel">
+            <span class="eyebrow">Total Exports</span>
+            <h2>{{ stats.total | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Successful</span>
+            <h2>{{ stats.successful | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Pending</span>
+            <h2>{{ stats.pending | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Failed</span>
+            <h2>{{ stats.failed | default(0) }}</h2>
+        </div>
+
+    </div>
+
+
+    <!-- EXPORT REQUEST -->
+
+    <div class="dash-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Generate Audit Export</h2>
+                <p>
+                    Select an authorized dataset and export format.
+                </p>
+            </div>
+
+            <span class="status-badge neutral">
+                Controlled Export
+            </span>
+        </div>
+
+        {% if can_export | default(false) %}
+
+        <form method="POST"
+              action="{{ url_for('audit.export_audit_reports') }}">
+
+            {% if csrf_token is defined %}
+                {{ csrf_token() }}
+            {% endif %}
+
+            <div class="form-grid">
+
+                <div class="form-group">
+                    <label for="export_type">Export Dataset</label>
+
+                    <select id="export_type"
+                            name="export_type"
+                            required>
+
+                        <option value="">Select Dataset</option>
+
+                        <option value="audit_reports">Audit Reports</option>
+                        <option value="audit_findings">Audit Findings</option>
+                        <option value="corrective_actions">Corrective Actions</option>
+                        <option value="risk_assessments">Risk Assessments</option>
+                        <option value="compliance_records">Compliance Records</option>
+                        <option value="audit_evidence">Evidence Register</option>
+                        <option value="audit_plans">Audit Plans</option>
+
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="format">Export Format</label>
+
+                    <select id="format"
+                            name="format"
+                            required>
+
+                        <option value="csv">CSV</option>
+                        <option value="xlsx">Excel</option>
+                        <option value="pdf">PDF</option>
+
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="date_from">Start Date</label>
+
+                    <input type="date"
+                           id="date_from"
+                           name="date_from">
+                </div>
+
+                <div class="form-group">
+                    <label for="date_to">End Date</label>
+
+                    <input type="date"
+                           id="date_to"
+                           name="date_to">
+                </div>
+
+                <div class="form-group form-full">
+                    <label for="reason">Export Purpose</label>
+
+                    <textarea id="reason"
+                              name="reason"
+                              rows="3"
+                              maxlength="1000"
+                              placeholder="Explain why this export is required"
+                              required></textarea>
+                </div>
+
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    Generate Export
+                </button>
+            </div>
+
+        </form>
+
+        {% else %}
+
+        <p>
+            You do not have permission to generate audit exports.
+            Contact the system administrator if access is required.
+        </p>
+
+        {% endif %}
+
+    </div>
+
+
+    <!-- EXPORT HISTORY -->
+
+    <div class="dash-panel hr-table-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Export History</h2>
+                <p>
+                    Review previous export requests and their processing status.
+                </p>
+            </div>
+
+            <span class="status-badge neutral">
+                {{ exports | length }} Records
+            </span>
+        </div>
+
+        <div class="table-scroll">
+
+            <table class="report-table">
+
+                <thead>
+                    <tr>
+                        <th>Export Reference</th>
+                        <th>Dataset</th>
+                        <th>Format</th>
+                        <th>Requested By</th>
+                        <th>Request Date</th>
+                        <th>Purpose</th>
+                        <th>Status</th>
+                        <th>Download</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for item in exports | default([]) %}
+
+                    <tr>
+
+                        <td>
+                            {{ item.export_number
+                               | default(item.id | default('—')) }}
+                        </td>
+
+                        <td>
+                            {{ item.dataset | default('—') }}
+                        </td>
+
+                        <td>
+                            {{ item.format | default('—') | upper }}
+                        </td>
+
+                        <td>
+                            {{ item.requested_by_name
+                               | default(item.requested_by | default('—')) }}
+                        </td>
+
+                        <td>
+                            {{ item.created_at | default('—') }}
+                        </td>
+
+                        <td>
+                            {{ item.reason | default('—') }}
+                        </td>
+
+                        <td>
+
+                            {% set status = item.status | default('Pending') %}
+
+                            <span class="status-badge
+                                {{ 'active' if status == 'Completed'
+                                else ('off' if status == 'Failed'
+                                else 'neutral') }}">
+                                {{ status }}
+                            </span>
+
+                        </td>
+
+                        <td>
+
+                            {% if item.download_url and item.status == 'Completed' %}
+
+                                <a class="btn btn-outline btn-sm"
+                                   href="{{ item.download_url }}">
+                                    Download
+                                </a>
+
+                            {% else %}
+
+                                <span class="eyebrow">
+                                    Not Available
+                                </span>
+
+                            {% endif %}
+
+                        </td>
+
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="8" class="report-empty">
+                            No export history is available.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <!-- EXPORT SECURITY -->
+
+    <div class="dash-panel">
+
+        <h2>Export Security and Data Protection</h2>
+
+        <ul>
+            <li>Only users with the existing audit export permission may generate exports.</li>
+            <li>Validate dataset names and formats on the server using an allowlist.</li>
+            <li>Apply the user's authorization to the underlying records before exporting.</li>
+            <li>Exclude passwords, tokens, credentials and other sensitive fields.</li>
+            <li>Store generated files outside the public static directory.</li>
+            <li>Use permission-checked download routes rather than exposing filesystem paths.</li>
+            <li>Record export requester, purpose, timestamp, dataset and result.</li>
+            <li>Apply appropriate retention and deletion policies to generated files.</li>
+        </ul>
+
+    </div>
+
+</section>
+
+{% endblock %}

@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi with context %}
+
+{% block title %}Project Register | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+{% set ns = namespace(drafts=0, pending=0, live=0, value=0.0) %}
+{% for item in projects %}
+  {% if item["status"] == "Draft" %}{% set ns.drafts = ns.drafts + 1 %}{% endif %}
+  {% if item["status"] == "Pending" %}{% set ns.pending = ns.pending + 1 %}{% endif %}
+  {% if item["status"] in ("In Progress", "On Hold") %}{% set ns.live = ns.live + 1 %}{% endif %}
+  {% if item["status"] in ("Draft", "Pending") %}
+    {% set ns.value = ns.value + (item["budget"] | float) %}
+  {% endif %}
+{% endfor %}
+
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">PROJECT MANAGEMENT</span>
+      <h1>Project Register</h1>
+      <p>Every job the company has promised a client, from the draft to the
+        sign-off.</p>
+    </div>
+    <div class="row-actions">
+      <a class="btn btn-outline" href="{{ url_for('project.dashboard') }}">
+        ← Project desk
+      </a>
+      {% if can_register %}
+      <a class="btn" href="{{ url_for('project.create_project') }}">New project →</a>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="hr-stats">
+      {{ kpi('Jobs listed', projects | length, 'matching this filter') }}
+      {{ kpi('Drafts', ns.drafts, 'not yet submitted') }}
+      {{ kpi('Awaiting a signature', ns.pending, 'with the approval desk') }}
+      {{ kpi('Live', ns.live, 'in progress or on hold') }}
+      {{ kpi('Unpublished value', "{:,.2f}".format(ns.value),
+             'ETB in draft and pending jobs') }}
+    </div>
+
+    <form method="GET" class="stock-search">
+      <label for="search">Search</label>
+      <input id="search" name="search" value="{{ search }}"
+             placeholder="Code, project, client or site" />
+      <label for="status">Status</label>
+      <select id="status" name="status">
+        <option value="">All statuses</option>
+        {% for value in project_statuses %}
+        <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ value }}</option>
+        {% endfor %}
+      </select>
+      <label for="department">Desk</label>
+      <select id="department" name="department">
+        <option value="">Every department</option>
+        {% for row in departments %}
+        <option value="{{ row['id'] }}"
+          {% if department == row['id'] | string %}selected{% endif %}>
+          {{ row["name"] }}
+        </option>
+        {% endfor %}
+      </select>
+      {% if can_register %}
+      <label for="archived">Archive</label>
+      <select id="archived" name="archived">
+        <option value="">Live register</option>
+        <option value="1" {% if archived %}selected{% endif %}>Archived jobs</option>
+      </select>
+      {% endif %}
+      <button class="btn" type="submit">Search</button>
+      <a class="btn btn-outline" href="{{ url_for('project.projects') }}">Reset</a>
+    </form>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>{% if projects %}{{ projects | length }} project{{ '' if projects | length == 1 else 's' }}{% else %}Projects{% endif %}</h2>
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Job</th><th>Client / site</th><th>Manager</th><th>Dates</th>
+              <th>Budget</th><th>Progress</th><th>Status</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in projects %}
+            <tr>
+              <td>
+                <a href="{{ url_for('project.project_detail', project_id=item['id']) }}">
+                  {{ item["project_name"] }}
+                </a>
+                <br><span class="feed-meta">{{ item["project_code"] }}</span>
+              </td>
+              <td>
+                {{ item["client_name"] or '—' }}
+                <br><span class="feed-meta">{{ item["location"] or 'No site set' }}</span>
+              </td>
+              <td>
+                {{ item["manager_name"] or '—' }}
+                <br><span class="feed-meta">{{ item["department_name"] or item["department"] }}</span>
+              </td>
+              <td class="nowrap">
+                {{ item["start_date"] or '—' }}
+                <br><span class="feed-meta">to {{ item["end_date"] or '—' }}</span>
+              </td>
+              <td class="nowrap">
+                {{ "{:,.2f}".format(item["budget"] | float) }}
+                <span class="feed-meta">{{ item["currency"] }}</span>
+                {% if item["committed"] %}
+                <br><span class="feed-meta">
+                  {{ "{:,.0f}".format(item["committed"] | float) }} reserved
+                </span>
+                {% endif %}
+              </td>
+              <td class="nowrap">
+                <div class="bar-track">
+                  <div class="bar-fill" style="width: {{ item['progress'] | int }}%"></div>
+                </div>
+                <span class="feed-meta">
+                  {{ item["progress"] | int }}% · {{ item["open_tasks"] }} open
+                </span>
+              </td>
+              <td>
+                <span class="status-badge {{ 'active' if item['status'] in ('In Progress', 'Completed')
+                      else 'off' if item['status'] in ('Cancelled', 'On Hold') else 'neutral' }}">
+                  {{ item["status"] }}
+                </span>
+                {% if item["is_archived"] %}
+                <br><span class="feed-meta">Archived</span>
+                {% endif %}
+              </td>
+              <td class="row-actions">
+                <a class="btn btn-outline"
+                   href="{{ url_for('project.project_detail', project_id=item['id']) }}">Open</a>
+
+                {% if can_register and not item["is_archived"]
+                      and item["status"] in ('Draft', 'Pending') %}
+                <a class="btn"
+                   href="{{ url_for('project.edit_project', project_id=item['id']) }}">Edit</a>
+                {% endif %}
+
+                {% if can_register and item["status"] == 'Draft' and not item["is_archived"] %}
+                <form method="POST"
+                      action="{{ url_for('project.submit_project', project_id=item['id']) }}">
+                  {{ csrf_field() }}
+                  <button class="btn btn-outline" type="submit">Submit</button>
+                </form>
+                {% endif %}
+
+                {% if can_register and not item["is_archived"] %}
+                <form method="POST"
+                      action="{{ url_for('project.archive_project', project_id=item['id']) }}"
+                      onsubmit="return confirm('Archive this project? It leaves the live register.');">
+                  {{ csrf_field() }}
+                  <button class="btn-danger" type="submit">Archive</button>
+                </form>
+                {% elif can_register and item["is_archived"] %}
+                <form method="POST"
+                      action="{{ url_for('project.restore_project', project_id=item['id']) }}">
+                  {{ csrf_field() }}
+                  <button class="btn btn-outline" type="submit">Restore</button>
+                </form>
+                {% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="8">No projects match this filter.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="dash-panel">
+      <h2>Control</h2>
+      <p>A new job starts as a draft and authorises nothing by itself. Submitting
+        it wakes the shared approval chain; the desks that sign see the client, the
+        site, the delivery dates and the allocation the job will draw on. A
+        signature starts the work and reserves that allocation, a refusal cancels
+        the job, and a return comes back here for a revision before it is sent
+        again.</p>
+    </div>
+  </div>
+</section>
+{% endblock %}

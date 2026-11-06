@@ -1,0 +1,96 @@
+
+{% extends "base.html" %}
+
+{% block title %}
+{{ 'Edit' if category else 'Create' }} Asset Category
+{% endblock %}
+
+{% block content %}
+
+<div class="asset-dashboard">
+
+    <div class="asset-page-header">
+        <div>
+            <h2>{{ 'Edit' if category else 'Create New' }} Category</h2>
+            <p>Configure asset classification information.</p>
+        </div>
+    </div>
+
+    <div class="asset-panel">
+
+        <form method="POST">
+
+            <input type="hidden"
+                   name="csrf_token"
+                   value="{{ csrf_token() }}">
+
+            <div class="asset-form-grid">
+
+                <div class="asset-form-group">
+                    <label>Category Code *</label>
+                    <input type="text"
+                           name="code"
+                           value="{{ category.code if category else '' }}"
+                           placeholder="e.g. CAT-001"
+                           required>
+                </div>
+
+                <div class="asset-form-group">
+                    <label>Category Name *</label>
+                    <input type="text"
+                           name="name"
+                           value="{{ category.name if category else '' }}"
+                           placeholder="Enter category name"
+                           required>
+                </div>
+
+                <div class="asset-form-group">
+                    <label>Parent Category</label>
+
+                    <select name="parent_id">
+                        <option value="">Main Category</option>
+
+                        {% for parent in parent_categories %}
+
+                        <option value="{{ parent.id }}"
+                            {% if category and category.parent_id == parent.id %}
+                                selected
+                            {% endif %}>
+                            {{ parent.name }}
+                        </option>
+
+                        {% endfor %}
+
+                    </select>
+                </div>
+
+                <div class="asset-form-group full-width">
+                    <label>Description</label>
+                    <textarea name="description"
+                              rows="4">{{ category.description if category else '' }}</textarea>
+                </div>
+
+            </div>
+
+            <div class="asset-form-actions">
+
+                <a href="{{ url_for('asset_management.category_list') }}"
+                   class="asset-btn asset-btn-secondary">
+                    Cancel
+                </a>
+
+                <button type="submit"
+                        class="asset-btn asset-btn-primary">
+                    <i class="fas fa-save"></i>
+                    {{ 'Update Category' if category else 'Save Category' }}
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+{% endblock %}

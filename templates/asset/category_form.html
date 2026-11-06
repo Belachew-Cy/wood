@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit' if category else 'New' }} Asset Category | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">ASSET MANAGEMENT</span>
+      <h1>{{ category["name"] if category else 'New asset category' }}</h1>
+      <p>{% if category %}
+          {{ category["code"] }} · {{ category["status"] }}
+        {% else %}
+          A category names the kind of unit, and may sit under one parent so the
+          register reads as a small tree instead of a long list.
+        {% endif %}</p>
+    </div>
+    <a class="btn btn-outline" href="{{ url_for('asset.categories') }}">
+      ← Back to categories
+    </a>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category_message, message in messages %}
+        <div class="finance-alert {{ category_message }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="dash-panel">
+      <h2>{{ 'Category details' if category else 'Describe the category' }}</h2>
+
+      <form method="POST" class="dash-form stock-grid"
+            action="{{ url_for('asset.edit_category', category_id=category['id']) if category
+                     else url_for('asset.create_category') }}">
+        {{ csrf_field() }}
+
+        <div>
+          <label for="name">Category name *</label>
+          <input id="name" name="name" maxlength="120" required
+                 value="{{ category['name'] if category else '' }}"
+                 placeholder="e.g. Kitchen equipment" />
+        </div>
+
+        <div>
+          <label for="code">Category code *</label>
+          <input id="code" name="code" maxlength="50" required
+                 value="{{ category['code'] if category else '' }}"
+                 placeholder="e.g. KIT" />
+        </div>
+
+        <div>
+          <label for="parent_id">Parent category</label>
+          <select id="parent_id" name="parent_id">
+            <option value="">Top level</option>
+            {% for row in parents %}
+            <option value="{{ row['id'] }}"
+              {% if category and category['parent_id'] == row['id'] %}selected{% endif %}>
+              {{ row["name"] }} ({{ row["code"] }})
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="stock-notes">
+          <label for="description">Description</label>
+          <textarea id="description" name="description" rows="4" maxlength="500"
+                    placeholder="What belongs in this category and what does not.">{{ category['description'] if category else '' }}</textarea>
+        </div>
+
+        <div class="stock-form-actions">
+          <button class="btn" type="submit">Save category</button>
+          <a class="btn btn-outline" href="{{ url_for('asset.categories') }}">Cancel</a>
+        </div>
+      </form>
+
+      <p class="panel-note">Only an active category can take a new unit. Deactivate
+        a category to retire it without moving the units already filed under
+        it.</p>
+    </div>
+  </div>
+</section>
+{% endblock %}

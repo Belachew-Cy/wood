@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi with context %}
+
+{% block title %}Digital Marketing | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+{% set ns = namespace(live=0, spend=0.0) %}
+{% for item in digital_campaigns %}
+  {% if item["status"] == 'Live' %}{% set ns.live = ns.live + 1 %}{% endif %}
+  {% if item["status"] != 'Cancelled' %}
+    {% set ns.spend = ns.spend + (item["budget"] | float) %}
+  {% endif %}
+{% endfor %}
+
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">MARKETING MANAGEMENT</span>
+      <h1>Digital Marketing</h1>
+      <p>The pushes that run under a campaign — one line each, with what they
+        cost and where they sit.</p>
+    </div>
+    <div class="row-actions">
+      <a class="btn btn-outline" href="{{ url_for('marketing.campaigns') }}">
+        ← Campaigns
+      </a>
+      {% if 'marketing_campaigns' in granted_permissions %}
+      <a class="btn" href="{{ url_for('marketing.create_digital') }}">New push →</a>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="hr-stats">
+      {{ kpi('Pushes listed', digital_campaigns | length, 'matching this filter') }}
+      {{ kpi('Live now', ns.live, 'running today') }}
+      {{ kpi('Budget carried', "{:,.2f}".format(ns.spend), 'ETB, cancellations out') }}
+    </div>
+
+    <form method="GET" class="stock-search">
+      <label for="search">Search</label>
+      <input id="search" name="search" value="{{ search }}"
+             placeholder="Push name, platform or content" />
+      <label for="status">Status</label>
+      <select id="status" name="status">
+        <option value="">All statuses</option>
+        {% for value in digital_statuses %}
+        <option value="{{ value }}" {% if status == value %}selected{% endif %}>
+          {{ value }}</option>
+        {% endfor %}
+      </select>
+      <button class="btn" type="submit">Search</button>
+      <a class="btn btn-outline" href="{{ url_for('marketing.digital') }}">Reset</a>
+      {% if 'marketing_reports' in granted_permissions %}
+      <a class="btn btn-outline"
+         href="{{ url_for('marketing.export', kind='digital', status=status, search=search) }}">
+        Export CSV
+      </a>
+      {% endif %}
+    </form>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>{% if digital_campaigns %}{{ digital_campaigns | length }} push{{ '' if digital_campaigns | length == 1 else 'es' }}{% else %}Pushes{% endif %}</h2>
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Push</th><th>Campaign</th><th>Platform</th><th>Window</th>
+              <th>Budget</th><th>Status</th><th>Last modified</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in digital_campaigns %}
+            <tr>
+              <td>
+                {{ item["name"] }}
+                {% if item["content"] %}
+                <br><span class="feed-meta">{{ item["content"] | truncate(80) }}</span>
+                {% endif %}
+              </td>
+              <td>
+                {{ item["campaign_name"] or '—' }}
+                {% if item["campaign_status"] %}
+                <br><span class="feed-meta">
+                  campaign {{ item["campaign_status"] | lower }}</span>
+                {% endif %}
+              </td>
+              <td>{{ item["platform"] or '—' }}</td>
+              <td class="nowrap">
+                {{ item["start_date"] or '—' }}<br>
+                <span class="feed-meta">to {{ item["end_date"] or '—' }}</span>
+              </td>
+              <td class="nowrap">
+                {{ "{:,.2f}".format(item["budget"] | float) }}
+                <span class="feed-meta">{{ item["currency"] }}</span>
+              </td>
+              <td>
+                <span class="status-badge {{ 'active' if item["status"] in
+                      ('Live', 'Completed') else 'off' if item["status"] == 'Cancelled'
+                      else 'neutral' }}">{{ item["status"] }}</span>
+              </td>
+              <td class="nowrap">
+                {{ item["updated_by_name"] or item["created_by_name"] or '—' }}
+                <br><span class="feed-meta">{{ item["updated_at"] | audit_time }}</span>
+              </td>
+              <td class="row-actions">
+                {% if 'marketing_campaigns' in granted_permissions %}
+                <a class="btn"
+                   href="{{ url_for('marketing.edit_digital', digital_id=item['id']) }}">
+                  Edit
+                </a>
+                {% else %}
+                <span class="feed-meta">—</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="8">No digital pushes match this filter.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

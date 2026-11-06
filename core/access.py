@@ -1,20 +1,33 @@
 """Sessions, permissions, CSRF, login throttling and request hooks."""
 
+from core.config import COARSE_PERMISSION_COVERAGE
 from core.config import DASHBOARD_ENDPOINT
 from core.config import DASHBOARD_ROLES
+from core.config import DEPARTMENT_ACTIONS
+from core.config import DEPARTMENT_PERMISSION_BY_KEY
+from core.config import DEPARTMENT_PERMISSION_KEYS
+from core.config import DEPARTMENT_SCOPES
 from core.config import MANAGE_PREFIXES
 from core.config import MODULES
 from core.config import MODULE_DASHBOARDS
+from core.config import PERMISSION_BY_KEY
+from core.config import PERMISSION_HIRING_RIGHTS
+from core.config import PERMISSION_KEYS
 from core.config import ROLE_LABEL
 from core.config import ROLE_PERMISSIONS
+from core.config import SIDEBAR_GROUP_ICONS
 from core.config import SIDEBAR_NAV
 from core.config import SIDEBAR_PARENT
 from core.config import STAFF_GROUP_ROLES
 from core.config import SUPER_ADMIN_NAV
 from core.config import USER_ROLES
+from core.config import default_role_permissions
+from core.config import department_permission_key
+from core.config import permission_closure
 from core.db import ROLES_DDL
 from core.db import ROLE_PERMISSIONS_DDL
 from core.db import USER_ROLES_DDL
+from core.db import DEPARTMENT_ROLES_DDL
 from core.db import get_db
 from datetime import datetime
 from datetime import timedelta
@@ -45,8 +58,24 @@ def init_roles(db):
     db.execute(ROLES_DDL)
     db.execute(ROLE_PERMISSIONS_DDL)
     db.execute(USER_ROLES_DDL)
+    db.execute(DEPARTMENT_ROLES_DDL)
     db.execute("CREATE INDEX IF NOT EXISTS idx_user_roles_user"
                " ON user_roles(user_id)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_department_roles_unit"
+               " ON department_roles (department_id)")
+    # Roles gained an activation switch and a owning department after the first
+    # databases were built. A parked role keeps its configured rights but
+    # contributes none of them; the department groups the role on the console and
+    # never widens its reach by itself.
+    for column, definition in (
+            ("active", "INTEGER NOT NULL DEFAULT 1"),
+            ("department_id", "INTEGER NOT NULL DEFAULT 0"),
+            ("is_standard", "INTEGER NOT NULL DEFAULT 0")):
+        try:
+            db.execute("SELECT {} FROM roles LIMIT 1".format(column))
+        except sqlite3.Error:
+            db.execute("ALTER TABLE roles ADD COLUMN {} {}".format(
+                column, definition))
     for key in USER_ROLES:
         row = db.execute("SELECT key FROM roles WHERE key = ?", (key,)).fetchone()
         if row is None:
@@ -124,15 +153,477 @@ def user_extra_roles(db, user_id):
         return []
 
 
+def role_is_active(db, role_key):
+    """A parked role keeps its configured matrix but hands nothing out."""
+    try:
+        row = db.execute("SELECT active FROM roles WHERE key = ?",
+                         (role_key,)).fetchone()
+    except sqlite3.Error:
+        return True
+    return row is None or bool(row["active"])
+
+
+# A department binding may name the whole company instead of one unit, and may
+# apply to every rung instead of one. Two sentinels keep both answers storable
+# without a NULL in the primary key.
+COMPANY_WIDE_DEPARTMENT = 0
+ANY_POSITION_LEVEL = -1
+
+
+def account_department_id(db, user):
+    """The unit an account belongs to, direct assignment first.
+
+    Organisation assigns the account itself, so its own department_id is the
+    answer that matters. An account never assigned there is placed by the staff
+    record it is linked to - its position's unit, then the name typed on the HR
+    form - so a person still inherits their department's access.
+    """
+    if user is None:
+        return None
+    keys = set(user.keys())
+    try:
+        if "department_id" in keys and user["department_id"]:
+            return int(user["department_id"])
+        employee_id = user["employee_id"] if "employee_id" in keys else None
+        if not employee_id:
+            return None
+        row = db.execute("""
+            SELECT p.department_id
+            FROM employees AS e
+            LEFT JOIN organizational_positions AS p ON p.id = e.position_id
+            WHERE e.id = ?
+        """, (employee_id,)).fetchone()
+        if row is not None and row["department_id"]:
+            return int(row["department_id"])
+        row = db.execute("SELECT department FROM employees WHERE id = ?",
+                         (employee_id,)).fetchone()
+        if row is None or not row["department"]:
+            return None
+        match = db.execute(
+            "SELECT id FROM departments WHERE name = ? COLLATE NOCASE",
+            (row["department"],)).fetchone()
+        return int(match["id"]) if match is not None else None
+    except sqlite3.Error:
+        return None
+
+
+def department_branch_ids(db, department_id):
+    """One unit and every unit above it, walked once."""
+    ids, seen = [], set()
+    cursor = department_id
+    while cursor and cursor not in seen:
+        seen.add(cursor)
+        ids.append(cursor)
+        try:
+            row = db.execute("SELECT parent_id FROM departments WHERE id = ?",
+                             (cursor,)).fetchone()
+        except sqlite3.Error:
+            break
+        if row is None:
+            break
+        cursor = row["parent_id"]
+    return ids
+
+
+def department_role_keys(db, user):
+    """Roles bound to the account's unit, its parents, or the whole company.
+
+    A binding on a directorate reaches the departments inside it, which is what
+    makes one row enough at the top of a branch. A binding may name a rung, and
+    then only an account whose position sits on that rung carries it; the CEO
+    binding and each directorate's director role use that to stay on their own
+    seats. Administrators are answered by their role alone, and the administrator
+    role itself can never be bound. Cached for the request.
+    """
+    if user is None or user["role"] == "admin":
+        return []
+    cache = g.get("_department_role_cache")
+    if cache is None:
+        cache = {}
+        g._department_role_cache = cache
+    if user["id"] in cache:
+        return list(cache[user["id"]])
+
+    places = [COMPANY_WIDE_DEPARTMENT]
+    department_id = account_department_id(db, user)
+    if department_id:
+        places.extend(department_branch_ids(db, department_id))
+    marks = ", ".join("?" for _ in places)
+    try:
+        rows = db.execute(
+            "SELECT b.role_key, b.position_level FROM department_roles AS b"
+            " JOIN roles AS r ON r.key = b.role_key"
+            " WHERE b.department_id IN ({}) AND COALESCE(r.active, 1) = 1"
+            " ORDER BY b.department_id, b.role_key"
+            .format(marks), tuple(places)).fetchall()
+    except sqlite3.Error:
+        rows = ()
+
+    from services.workflow import account_position_level
+    level = account_position_level(user, db)
+    keys = []
+    for row in rows:
+        bound_level = row["position_level"]
+        if bound_level is None:
+            bound_level = ANY_POSITION_LEVEL
+        if bound_level != ANY_POSITION_LEVEL and bound_level != level:
+            continue
+        key = row["role_key"]
+        if key == "admin" or key in keys:
+            continue
+        keys.append(key)
+    cache[user["id"]] = tuple(keys)
+    return keys
+
+
+def account_role_keys(db, user):
+    """Every role key this account answers to: primary, additional, unit-bound.
+
+    The primary role decides the landing dashboard; the rest widen its reach.
+    Kept in one function so the permission matrix, the hiring baseline, the
+    letter register and report scoping all read the same list.
+    """
+    if user is None:
+        return []
+    keys = [user["role"]]
+    for key in user_extra_roles(db, user["id"]) + department_role_keys(db, user):
+        if key not in keys and role_is_active(db, key):
+            keys.append(key)
+    return keys
+
+
+def permission_modules(keys):
+    """The module ticks a set of permission keys opens."""
+    modules = set()
+    for key in keys:
+        modules |= set(PERMISSION_BY_KEY.get(key, {}).get("modules", ()))
+    return modules
+
+
+def stored_role_permissions(db, role_key):
+    """(configured, keys) from the role's own fine-grained matrix.
+
+    A role that has never been saved has no rows, and is answered by what its
+    module ticks have always implied. Saving the role dialog writes a row for
+    every catalogue permission, so a deliberately empty matrix is stored as a
+    matrix rather than mistaken for "never configured".
+    """
+    try:
+        rows = db.execute(
+            "SELECT permission, allowed FROM role_permission_grants"
+            " WHERE role_key = ?", (role_key,)).fetchall()
+    except sqlite3.Error:
+        return False, set()
+    if not rows:
+        return False, set()
+    return True, {row["permission"] for row in rows
+                  if row["allowed"] and row["permission"] in PERMISSION_BY_KEY}
+
+
+def department_matrix_stored(db, role_key):
+    """Whether this role has ever been given an explicit department matrix.
+
+    The check reads the denied rows too: an all-empty matrix is a deliberate
+    least-privilege answer, not a role nobody has configured yet.
+    """
+    try:
+        return db.execute(
+            "SELECT 1 FROM role_permission_grants WHERE role_key = ?"
+            " AND permission GLOB 'dept_*' LIMIT 1",
+            (role_key,)).fetchone() is not None
+    except sqlite3.Error:
+        return False
+
+
+# The words that make a hand written permission row stand for a department verb.
+# They are read from the key itself, so a new action key added to the catalogue
+# is counted without a second table. The baseline is only a migration bridge:
+# a role with an explicit department matrix is answered by its ticks alone.
+DEPARTMENT_ACTION_WORDS = {
+    "create": frozenset((
+        "create", "add", "new", "register", "submit", "request", "raise",
+        "issue", "receive", "post", "open", "generate", "publish", "apply",
+        "planning", "plan", "allocation", "allocate", "payment", "record",
+        "import", "employees", "leave", "attendance", "movements", "campaigns",
+        "leads", "research", "feedback", "tasks", "milestones", "team", "pr",
+        "po", "management", "processing")),
+    "edit": frozenset((
+        "edit", "update", "save", "set", "mark", "score", "status", "verify",
+        "review", "manage", "processing", "process", "tracking", "assign",
+        "close", "toggle", "restore", "activate", "schedule", "sync", "resolve",
+        "submit", "payment", "allocate", "planning", "plan", "allocation",
+        "register", "employees", "leave", "attendance", "salary", "grade",
+        "allowance", "deduction", "statutory", "campaigns", "leads", "research",
+        "feedback", "tasks", "milestones", "team", "items", "movements",
+        "stocktake", "pr", "po", "role", "permission", "access", "settings",
+        "config", "policy")),
+    "delete": frozenset((
+        "delete", "deactivate", "remove", "archive", "discard", "cancel",
+        "void", "employees", "users", "register", "items", "pr", "po")),
+    "approve": frozenset((
+        "approve", "approval", "authorize", "authorise", "sign", "decide",
+        "decision", "selection", "review", "leave")),
+    "reject": frozenset((
+        "reject", "return", "decline", "review", "leave")),
+    "manage": frozenset((
+        "management", "manage", "settings", "config", "configuration",
+        "policy", "organization", "roles", "role", "users", "accounts",
+        "account", "departments", "access", "permission", "grade",
+        "statutory")),
+}
+
+
+# Scopes that share a module need to read only the keys that belong to them.
+# Without this split an HR employee key would hand the attendance desk delete
+# rights, and a marketing plan key would hand Customer Service edit rights.
+def _department_scope_keys(scope_key, keys):
+    if scope_key == "hr":
+        return {key for key in keys
+                if not any(word in key
+                           for word in ("attendance", "leave", "overtime"))}
+    if scope_key == "attendance":
+        return {key for key in keys
+                if any(word in key
+                       for word in ("attendance", "leave", "overtime"))}
+    if scope_key == "customer":
+        return {key for key in keys
+                if any(word in key
+                       for word in ("feedback", "customers", "leads",
+                                    "reports"))}
+    if scope_key == "marketing":
+        return {key for key in keys if "feedback" not in key}
+    if scope_key == "operations":
+        return set()
+    return set(keys)
+
+
+def _letter_baseline(action_key, actions):
+    return {
+        "view": bool(actions),
+        "read": bool(actions),
+        "create": "letters_create" in actions,
+        "edit": bool(actions & {"letters_edit", "letters_send"}),
+        "delete": "letters_delete" in actions,
+        "approve": "letters_approve" in actions,
+        "reject": "letters_approve" in actions,
+        "export": "letters_download" in actions,
+        "print": "letters_print" in actions,
+        "manage": False,
+    }.get(action_key, False)
+
+
+def _recruitment_baseline(action_key, rights):
+    if not rights:
+        return False
+    return {
+        "view": True,
+        "read": True,
+        "create": bool(rights & {
+            "vacancy_request", "applicant_register", "applicant_hire",
+            "exam_author", "interview_book"}),
+        "edit": bool(rights & {
+            "vacancy_publish", "applicant_screen", "exam_author",
+            "exam_publish", "interview_book", "interview_score",
+            "interview_decide"}),
+        "approve": "interview_decide" in rights,
+        "reject": "interview_decide" in rights,
+        "export": "hiring_report" in rights,
+        "print": "hiring_report" in rights,
+        "delete": False,
+        "manage": False,
+    }.get(action_key, False)
+
+
+def department_action_baseline(db, role_key, granted_keys, modules=None,
+                               letter_actions=None, hiring_rights=None):
+    """The department verbs a role's existing permissions already imply.
+
+    This is the only migration bridge: a role saved before the department
+    matrix existed keeps exactly the reach its module ticks and action keys
+    already gave it. A role with an explicit matrix never reaches this
+    function, so least privilege applies from the first save onward. The preset
+    dialog passes its letter actions and hiring rights in, because a bundle
+    that has not been created yet has no rows to read them from.
+    """
+    modules = set(role_permission_set(role_key, db)
+                  if modules is None else modules)
+    keys = {key for key in granted_keys if key in PERMISSION_BY_KEY}
+    if letter_actions is None:
+        letter_actions = set()
+        if "letters" in modules:
+            from services.letters import LETTER_VIEW_BASE
+            from services.letters import stored_letter_role_permissions
+            has_rows, actions = stored_letter_role_permissions(db, role_key)
+            letter_actions = set(actions) if has_rows else set(LETTER_VIEW_BASE)
+    else:
+        letter_actions = set(letter_actions)
+    if hiring_rights is None:
+        hiring_rights = set()
+        if "hr" in modules:
+            from services.recruitment import HIRING_MODULE_RIGHTS
+            from services.recruitment import role_rights
+            hiring_rights = set(role_rights(db, role_key))
+            hiring_rights |= set(HIRING_MODULE_RIGHTS.get("hr", ()))
+    else:
+        hiring_rights = set(hiring_rights)
+
+    granted = set()
+    for scope in DEPARTMENT_SCOPES:
+        scope_key = scope["key"]
+        if not (set(scope["modules"]) & modules):
+            continue
+        scope_keys = _department_scope_keys(
+            scope_key,
+            {key for key in keys
+             if set(PERMISSION_BY_KEY.get(key, {}).get("modules") or ())
+             & set(scope["modules"])})
+        words = set()
+        for key in scope_keys:
+            words |= set(key.split("_"))
+        for action in DEPARTMENT_ACTIONS:
+            action_key = action["key"]
+            allow = action_key in ("view", "read", "export", "print")
+            if scope_key == "operations":
+                allow = action_key in ("view", "read", "export", "print")
+            elif scope_key == "audit":
+                allow = (action_key in ("view", "read", "export", "print")
+                         or (action_key in ("create", "edit")
+                             and role_key == "auditor"))
+            elif scope_key == "letters":
+                allow = _letter_baseline(action_key, letter_actions)
+            elif scope_key == "recruitment":
+                allow = _recruitment_baseline(action_key, hiring_rights)
+                if "hr_reports" in scope_keys and action_key in (
+                        "create", "edit", "export"):
+                    allow = True
+            elif scope_key in ("finance", "it"):
+                allow = (action_key in ("view", "read", "export", "print")
+                         or action_key in ("create", "edit", "delete", "manage"))
+            elif words & DEPARTMENT_ACTION_WORDS.get(action_key, frozenset()):
+                allow = True
+            if allow:
+                granted.add(department_permission_key(scope_key, action_key))
+        # A signing or returning desk can always open and change the record it
+        # signs; without that the queue would be visible but unusable.
+        if (department_permission_key(scope_key, "approve") in granted
+                or department_permission_key(scope_key, "reject") in granted):
+            for action_key in ("view", "read", "edit"):
+                granted.add(department_permission_key(scope_key, action_key))
+    return granted
+
+
+def role_granted_permissions(db, role_key):
+    """The fine-grained permissions a role carries, matrix first, modules after."""
+    configured, stored = stored_role_permissions(db, role_key)
+    modules = role_permission_set(role_key, db)
+    if configured:
+        granted = permission_closure(stored)
+        if not department_matrix_stored(db, role_key):
+            granted |= department_action_baseline(db, role_key, granted, modules)
+        return granted
+    granted = set(default_role_permissions(role_key))
+    granted |= default_recruitment_permissions(db, role_key)
+    granted |= department_action_baseline(db, role_key, granted, modules)
+    return permission_closure(granted)
+
+
+def default_recruitment_permissions(db, role_key):
+    """Recruitment rights a role's modules have always implied.
+
+    Hiring actions live in their own vocabulary, so the module ticks that open a
+    desk also decide which recruitment permissions start ticked. Roles without a
+    hiring module start with none.
+    """
+    from services.recruitment import HIRING_MODULE_RIGHTS
+    rights = set()
+    for module in role_permission_set(role_key, db):
+        rights |= HIRING_MODULE_RIGHTS.get(module, frozenset())
+    return {key for key, needed in PERMISSION_HIRING_RIGHTS.items()
+            if set(needed) <= rights}
+
+
+def effective_granted_permissions(user):
+    """Every fine-grained permission this account holds.
+
+    The primary role and any additional roles contribute their matrices, the
+    roles bound to the account's department contribute theirs, and the account's
+    own rows are applied last in both directions, so one permission can be
+    borrowed or withdrawn without touching a role. Admin holds the whole
+    catalogue by definition. Cached for the request like effective_permissions.
+    """
+    if user is None:
+        return set()
+    if user["role"] == "admin":
+        return set(PERMISSION_KEYS)
+    cache = g.get("_permission_key_cache")
+    if cache is None:
+        cache = {}
+        g._permission_key_cache = cache
+    if user["id"] in cache:
+        return set(cache[user["id"]])
+    db = get_db()
+    granted = set(role_granted_permissions(db, user["role"]))
+    for role_key in account_role_keys(db, user)[1:]:
+        granted |= role_granted_permissions(db, role_key)
+    try:
+        rows = db.execute(
+            "SELECT permission, allowed FROM user_permission_grants"
+            " WHERE user_id = ?", (user["id"],)).fetchall()
+    except sqlite3.Error:
+        rows = ()
+    denied = set()
+    for row in rows:
+        if row["permission"] not in PERMISSION_BY_KEY:
+            continue
+        if row["allowed"]:
+            # A borrowed coarse desk tick opens the same action rights its role
+            # form would; the account's explicit denials are applied after it.
+            if row["permission"] in COARSE_PERMISSION_COVERAGE:
+                granted |= permission_closure({row["permission"]})
+            else:
+                granted.add(row["permission"])
+        else:
+            denied.add(row["permission"])
+    granted -= denied
+    cache[user["id"]] = frozenset(granted)
+    return granted
+
+
+def has_permission(key, user=None, db=None):
+    """Whether the account holds one catalogue permission right now.
+
+    Both layers have to agree: the key must be in the effective matrix and every
+    module it names must be open. That is what makes an explicit module denial
+    revoke the actions inside it without a second rule, and what keeps an
+    approval right tied to the desk that holds it rather than to the queue alone.
+    """
+    if key not in PERMISSION_BY_KEY:
+        return False
+    account = current_user() if user is None else user
+    if account is None:
+        return False
+    if account["role"] == "admin":
+        return True
+    if key not in effective_granted_permissions(account):
+        return False
+    modules = set(PERMISSION_BY_KEY[key].get("modules") or ())
+    if modules and not modules <= effective_permissions(account):
+        return False
+    return True
+
+
+
 def role_choices(db=None):
-    """Keys and labels for every role, built-in and custom.
+    """Keys and labels for every active role, built-in and custom.
 
     The primary role is picked from the built-in staff roles; a custom role is a
     permission bundle assigned on top of one, so it widens what an account can
-    open without inventing a second landing page.
+    open without inventing a second landing page. A parked role is left out so
+    it cannot be assigned or bound until it is activated again.
     """
     db = db or get_db()
-    rows = role_catalogue(db)
+    rows = [row for row in role_catalogue(db)
+            if "active" not in row.keys() or row["active"]]
     if not rows:
         return [(key, ROLE_LABEL.get(key, key.title())) for key in USER_ROLES]
     return [(row["key"], row["name"]) for row in rows]
@@ -168,10 +659,11 @@ def effective_permissions(user):
     """Modules this account may open: every assigned role, then its own ticks.
 
     The primary role is the one that decides the landing dashboard. Additional
-    roles (including custom roles) widen the module list, which is how one person
-    can sit at, say, both the Budget and Finance desks without a second account.
-    The result is cached for the request, so the sidebar, guards and notification
-    fan-out all reuse one read instead of repeating the role joins per view.
+    roles (including custom roles) and the roles bound to the account's
+    department widen the module list, which is how one person can sit at, say,
+    both the Budget and Finance desks without a second account. The result is
+    cached for the request, so the sidebar, guards and notification fan-out all
+    reuse one read instead of repeating the role joins per view.
     """
     if user is None:
         return set()
@@ -185,7 +677,7 @@ def effective_permissions(user):
         return set(cache[user["id"]])
     db = get_db()
     granted = role_permission_set(user["role"], db)
-    for role_key in user_extra_roles(db, user["id"]):
+    for role_key in account_role_keys(db, user)[1:]:
         granted |= role_permission_set(role_key, db)
     for row in db.execute(
         "SELECT module, allowed FROM user_permissions WHERE user_id = ?", (user["id"],)
@@ -205,19 +697,66 @@ def effective_permissions(user):
     return granted
 
 
+def _nav_link(link):
+    """A link dict; the two-tuples older rails use are accepted unchanged."""
+    if isinstance(link, dict):
+        return link
+    return {"label": link[0], "target": link[1]}
+
+
+def _link_href(link):
+    params = link.get("params") or {}
+    href = url_for(link["target"], **params) if params else url_for(link["target"])
+    anchor = link.get("anchor")
+    return "#".join((href, anchor)) if anchor else href
+
+
+def _link_allowed(link, user, granted):
+    """The group module opens the rail; a link may narrow it by one right more."""
+    required = link.get("modules")
+    if required and not (set(required) & granted):
+        return False
+    keys = link.get("permission") or link.get("permissions")
+    if keys:
+        if isinstance(keys, str):
+            keys = (keys,)
+        if not any(has_permission(key, user) for key in keys):
+            return False
+    roles = link.get("roles")
+    if roles and user["role"] not in roles:
+        if not (set(department_role_keys(get_db(), user)) & set(roles)):
+            return False
+    permission = link.get("letter")
+    needs_categories = bool(link.get("letter_categories"))
+    if permission or needs_categories:
+        from services.letters import has_letter_permission
+        from services.letters import letter_allowed_types
+        try:
+            if permission and not has_letter_permission(permission, user):
+                return False
+            if needs_categories and not letter_allowed_types(user):
+                return False
+        except sqlite3.Error:
+            return False
+    return True
+
+
 def sidebar_groups(user, granted):
     """The left management sidebar for the current request.
 
     Only management paths get a sidebar, so the public pages keep their exact
-    markup, and each group is dropped unless the account holds its module. A
-    group with no module is open to every member of staff, except a staff
-    shortcut limited to the roles that may open it. A destination is listed once:
-    when a staff shortcut and a module group both point at the same screen, the
-    module group's entry replaces the shortcut.
+    markup, and each group is dropped unless the account holds its module. Two
+    groups answer to a per-account right instead of a module tick - the letters
+    desk and the hiring desk - and a group with no module is open to every member
+    of staff, except a staff shortcut limited to the roles that may open it.
+    A destination is listed once: the earliest group in the rail wins, which is
+    why the module groups sit above the staff shortcuts. A link may point at a
+    filtered view of a shared page (params/anchor), and the view with the most
+    matching parameters is the one marked current.
     """
     if user is None or not request.path.startswith(MANAGE_PREFIXES):
         return ()
-    active = SIDEBAR_PARENT.get(request.endpoint, request.endpoint)
+    endpoint = SIDEBAR_PARENT.get(request.endpoint, request.endpoint)
     if user["role"] == "admin":
         nav = SUPER_ADMIN_NAV
     else:
@@ -234,12 +773,22 @@ def sidebar_groups(user, granted):
 
     groups, seen = [], set()
     own_dashboard = DASHBOARD_ENDPOINT.get(user["role"]) in MODULE_DASHBOARDS
-    for label, module, links in reversed(nav):
+    for label, module, links in nav:
         if module == "letters":
             # Letter access is granted per account, not by a role tick, so the
-            # rail entry follows the account's own grant.
+            # rail entry follows the account's own grant. An audit seat on its own
+            # still reaches the read-only Letter Audit link inside the group.
             from services.letters import letter_module_visible
-            if not letter_module_visible(user):
+            if not letter_module_visible(user) and "audit" not in granted:
+                continue
+        elif module == "hiring":
+            # The hiring rail follows what the account is for in recruitment: the
+            # HR desk, an audit seat and a department that raises its own requests.
+            # A finance seat reads the money on its own desk instead, and a staff
+            # account that only browses posts gets no rail it cannot open.
+            from services.recruitment import recruitment_scope
+            reach = recruitment_scope(get_db(), user)
+            if reach is None or reach["level"] not in ("manage", "audit", "department"):
                 continue
         elif module is not None and module not in granted:
             continue
@@ -247,20 +796,49 @@ def sidebar_groups(user, granted):
         if allowed_roles is not None and user["role"] not in allowed_roles:
             continue
         rows = []
-        for text, target in links:
-            if target in seen:
+        for raw in links:
+            link = _nav_link(raw)
+            target = link["target"]
+            params = link.get("params") or {}
+            href = _link_href(link)
+            if href in seen:
                 continue
             # A module role already lands on its own dashboard; a second link to
             # the shared overview (the Budget group carries one) would be the
             # duplicate the account never needs.
             if target == "dashboard" and own_dashboard:
                 continue
-            rows.append({"label": text, "href": url_for(target),
-                         "active": target == active})
-            seen.add(target)
+            if not _link_allowed(link, user, granted):
+                continue
+            rows.append({
+                "label": link["label"],
+                "href": href,
+                "icon": link.get("icon", ""),
+                "active": False,
+                "_target": target,
+                "_params": params,
+                "_matches": target == endpoint and all(
+                    request.args.get(key) == value
+                    for key, value in params.items()),
+            })
+            seen.add(href)
         if rows:
-            groups.append({"label": label, "links": rows})
-    groups.reverse()
+            groups.append({
+                "label": label,
+                "icon": SIDEBAR_GROUP_ICONS.get(label, ""),
+                "links": rows,
+            })
+
+    # Several submenus can share one page; only the closest view is current.
+    best = -1
+    for group in groups:
+        for row in group["links"]:
+            if row["_matches"]:
+                best = max(best, len(row["_params"]))
+    for group in groups:
+        for row in group["links"]:
+            row["active"] = row["_matches"] and len(row["_params"]) == best
+            del row["_target"], row["_params"], row["_matches"]
     return tuple(groups)
 
 
@@ -274,7 +852,19 @@ def perm(*modules):
 
 def guard(roles=(), modules=()):
     from services.audit import log_activity, refused
-    wanted_roles, wanted_modules = set(roles), set(modules)
+    wanted_roles = set(roles)
+    wanted = set(modules)
+    # A decorator may name module ticks and permission keys together; a permission
+    # key answers on its own so one route family can be narrowed to one right.
+    wanted_keys = {entry for entry in wanted if entry in PERMISSION_BY_KEY}
+    wanted_modules = wanted - wanted_keys
+
+    def allowed(user):
+        if wanted_modules and (wanted_modules & effective_permissions(user)):
+            return True
+        if wanted_keys and any(has_permission(key, user) for key in wanted_keys):
+            return True
+        return not (wanted_modules or wanted_keys)
 
     def decorator(fn):
         @wraps(fn)
@@ -291,10 +881,13 @@ def guard(roles=(), modules=()):
                 flash("Please log in to continue.", "info")
                 return redirect(url_for("login", next=request.path))
             if wanted_roles and user["role"] not in wanted_roles:
-                refused(wanted_roles, wanted_modules, user, fn)
-                abort(403)
-            if wanted_modules and not (wanted_modules & effective_permissions(user)):
-                refused(wanted_roles, wanted_modules, user, fn)
+                # A department binding says the account also carries that role,
+                # so a role-gated route opens on the same terms as a module gate.
+                if not (set(department_role_keys(get_db(), user)) & wanted_roles):
+                    refused(wanted_roles, wanted, user, fn)
+                    abort(403)
+            if not allowed(user):
+                refused(wanted_roles, wanted, user, fn)
                 abort(403)
             return fn(*args, **kwargs)
         return wrapper
@@ -316,7 +909,6 @@ def csrf_token():
         token = secrets.token_urlsafe(32)
         session[CSRF_SESSION_KEY] = token
     return token
-
 
 def csrf_field():
     """The hidden input every POST form carries."""

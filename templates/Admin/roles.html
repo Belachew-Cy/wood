@@ -1,7 +1,186 @@
 {% extends "base.html" %}
 {% from "base.html" import dash_icon with context %}
+{% from "Admin/_permissions.html" import permission_manager with context %}
+{% from "Admin/_department_actions.html" import department_matrix with context %}
+{% from "Admin/_department_actions.html" import department_template with context %}
 
-{% block title %}Role Management | Dereje Belay Wood &amp; Kitchen{% endblock %}
+{% block title %}Role and Permission Management | Dereje Belay Wood &amp; Kitchen{% endblock %}
+
+{% block extra_css %}
+<style>
+  .rp-tabs {
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding: 0.3rem;
+    margin-bottom: 1rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--white);
+    scrollbar-width: thin;
+  }
+  .rp-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 0.9rem;
+    border-radius: calc(var(--radius) - 2px);
+    color: var(--muted);
+    font-size: 0.84rem;
+    font-weight: 600;
+    white-space: nowrap;
+    text-decoration: none;
+  }
+  .rp-tab:hover { background: var(--surface, #f6f7f5); color: inherit; }
+  .rp-tab.is-active { background: var(--ink, #1f2a24); color: var(--btn-dark-ink); }
+  [data-theme="dark"] .rp-tab.is-active { background: var(--walnut); color: var(--on-accent); }
+  .rp-tab span {
+    display: inline-flex;
+    min-width: 1.4rem;
+    justify-content: center;
+    padding: 0.05rem 0.35rem;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.08);
+    font-size: 0.72rem;
+  }
+  .rp-tab.is-active span { background: rgba(255, 255, 255, 0.2); }
+  .rp-section { scroll-margin-top: 5rem; }
+  .da-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; }
+  .rp-dept-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    max-width: 16rem;
+    padding: 0.1rem 0.5rem;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--surface, #f6f7f5);
+    color: var(--muted);
+    font-size: 0.7rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .rp-dept-chip.is-wide { border-style: dashed; }
+  .std-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 0.8rem;
+  }
+  .std-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    padding: 0.85rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--white);
+  }
+  .std-card-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+  .std-card-head h3 { margin: 0; font-size: 0.88rem; }
+  .std-card-head em {
+    color: var(--muted);
+    font-size: 0.72rem;
+    font-style: normal;
+  }
+  .std-role {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0.45rem 0.55rem;
+    border: 1px solid var(--line);
+    border-radius: calc(var(--radius) - 2px);
+    background: var(--surface, #f6f7f5);
+  }
+  .std-role.is-missing { border-style: dashed; opacity: 0.8; }
+  .std-role-line {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+  }
+  .std-role-line strong { font-size: 0.8rem; }
+  .std-role-note { color: var(--muted); font-size: 0.7rem; }
+  .std-role-open {
+    align-self: flex-start;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--ink, #1f2a24);
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  .rp-perm-tools {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.5rem;
+  }
+  .perm-item[hidden] { display: none !important; }
+  .perm-category[hidden] { display: none !important; }
+  .rp-subhead { margin: 1.1rem 0 0.5rem; font-size: 0.84rem; font-weight: 700; }
+  .rp-chips { display: inline-flex; gap: 0.3rem; flex-wrap: wrap; }
+  .rp-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.12rem 0.5rem;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--surface, #f6f7f5);
+    color: var(--muted);
+    font-size: 0.7rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .rp-chip-meta { color: var(--muted); font-size: 0.72rem; }
+  .rp-bind-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.5rem;
+  }
+  .rp-bind-bar select {
+    flex: 1 1 13rem;
+    width: auto;
+    min-width: 0;
+    max-width: 20rem;
+    padding: 0.45rem 0.6rem;
+    margin: 0;
+  }
+  .rp-binding {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    padding: 0.4rem 0.55rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface, #f6f7f5);
+    margin-bottom: 0.4rem;
+  }
+  .rp-binding.is-parked { opacity: 0.7; border-style: dashed; }
+  .rp-binding-withdraw { display: inline-flex; margin-left: auto; }
+  .rp-danger { color: var(--danger-ink); font-weight: 600; }
+  .rp-danger:hover { color: var(--danger); }
+  .rp-bind-table td { vertical-align: top; }
+  .rp-unit { display: block; }
+  .rp-unit-depth-1 { margin-left: 1rem; }
+  .rp-unit-depth-2 { margin-left: 2rem; }
+  .rp-unit-depth-3 { margin-left: 3rem; }
+  .rp-suggest { margin-top: 1rem; }
+</style>
+{% endblock %}
 
 {% macro ui(name) -%}
   {%- set paths = {
@@ -18,10 +197,66 @@
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ paths.get(name, paths['person']) | safe }}</svg>
 {%- endmacro %}
 
+{% macro module_chips(modules) -%}
+<span class="rp-chips">
+  {% for module in modules %}
+  <span class="rp-chip">{{ module_label.get(module, module) }}</span>
+  {% else %}
+  <span class="rp-chip">No modules</span>
+  {% endfor %}
+</span>
+{%- endmacro %}
+
+{% macro binding_row(binding, department_id, source) -%}
+<div class="rp-binding{{ '' if binding.role_active else ' is-parked' }}">
+  <span class="rp-chip">{{ binding.role_name }}</span>
+  <span class="rp-chip-meta">{{ binding.level_label }} · reaches
+    {{ binding.reaches if binding.role_active else 0 }}
+    account{{ '' if binding.reaches == 1 else 's' }}</span>
+  {{ module_chips(binding.modules) }}
+  {% if not binding.role_active %}
+  <span class="status-badge neutral">Role inactive</span>
+  {% endif %}
+  <form method="POST" class="rp-binding-withdraw"
+        action="{{ url_for('admin_department_access') }}"
+        onsubmit="return confirm({{ ('Withdraw ' ~ binding.role_name ~ ' from ' ~ source ~ '? Accounts keep their primary role.') | tojson }});">
+    {{ csrf_field() }}
+    <input type="hidden" name="action" value="unbind" />
+    <input type="hidden" name="department_id" value="{{ department_id }}" />
+    <input type="hidden" name="role_key" value="{{ binding.role_key }}" />
+    <input type="hidden" name="position_level" value="{{ binding.level }}" />
+    <button type="submit" class="dir-text-btn rp-danger">Withdraw</button>
+  </form>
+</div>
+{%- endmacro %}
+
+{% macro unit_row(node, depth=0) -%}
+<tr>
+  <td>
+    <span class="rp-unit rp-unit-depth-{{ depth if depth < 3 else 3 }}">
+      <strong>{{ node.name }}</strong>
+      <span class="cell-sub">{{ node.unit_type }}{{ ' · inactive' if not node.is_active }}</span>
+    </span>
+  </td>
+  <td><span class="cell-sub">{{ node.accounts }} placed</span></td>
+  <td>
+    {% for binding in node.bindings %}
+    {{ binding_row(binding, node.id, node.name) }}
+    {% else %}
+    <span class="rp-chip-meta">No role bound here.</span>
+    {% endfor %}
+  </td>
+</tr>
+{% for child in node.children %}
+{{ unit_row(child, depth + 1) }}
+{% endfor %}
+{%- endmacro %}
+
 {% block content %}
-{% set customised = roles | map(attribute='customised') | sum %}
-{% set extra_total = roles | map(attribute='extras') | map('length') | sum %}
 {% set pill_keys = ('admin', 'hr', 'finance', 'payroll', 'inventory', 'member') %}
+{% set system_keys = roles | selectattr('is_system') | map(attribute='role') | list %}
+{% set role_dialog_ids = {} %}
+{% for role in roles %}{% set _ = role_dialog_ids.update({role.role: loop.index}) %}{% endfor %}
 
 <section class="dir-page">
   <div class="container">
@@ -35,22 +270,31 @@
     <header class="dir-head">
       <div class="dir-head-copy">
         <span class="dir-eyebrow">Access Control</span>
-        <h1>Role Management</h1>
-        <p class="dir-sub">What each account may open. A role carries default modules,
-          additional roles widen that list, and the ticks stored here are the only
-          per-account deviations.</p>
+        <h1>Role and Permission Management</h1>
+        <p class="dir-sub">One place for what each account may do. Build roles and
+          choose the permissions they carry, then bind those roles to the units and
+          rungs that need them under Department bindings. A parked role
+          keeps its settings but hands nothing out until it is activated again;
+          built-in roles stay active because accounts land on them.</p>
         <p class="dir-summary">
           <span><span class="dir-swatch"></span><strong>{{ roles | length }}</strong>
             role{{ '' if roles | length == 1 else 's' }}</span>
-          <span><span class="dir-swatch success"></span><strong>{{ accounts | length }}</strong>
+          <span><span class="dir-swatch success"></span>
+            <strong>{{ roles | length - inactive_total }}</strong> active</span>
+          <span><span class="dir-swatch warning"></span>
+            <strong>{{ inactive_total }}</strong> inactive</span>
+          <span><span class="dir-swatch muted"></span>
+            <strong>{{ accounts | length }}</strong>
             account{{ '' if accounts | length == 1 else 's' }}</span>
-          <span><span class="dir-swatch muted"></span><strong>{{ extra_total }}</strong>
-            additional role{{ '' if extra_total == 1 else 's' }}</span>
-          <span><span class="dir-swatch warning"></span><strong>{{ customised }}</strong>
-            customised account{{ '' if customised == 1 else 's' }}</span>
+          <span><span class="dir-swatch"></span><strong>{{ departments | length }}</strong>
+            department{{ '' if departments | length == 1 else 's' }}</span>
+          <span><span class="dir-swatch"></span><strong>{{ department.binding_total }}</strong>
+            department binding{{ '' if department.binding_total == 1 else 's' }}</span>
         </p>
       </div>
       <div class="dir-head-actions">
+        <a class="dir-quiet-link" href="{{ url_for('organization') }}">Organization chart</a>
+        <a class="dir-quiet-link" href="{{ url_for('admin_departments') }}">Department management</a>
         <a class="dir-quiet-link" href="{{ url_for('admin_users') }}">{{ ui('users') }} User management</a>
         <a class="dir-quiet-link" href="{{ url_for('admin_settings') }}">{{ ui('sliders') }} Settings</a>
         <button type="button" class="btn btn-sm dir-add" data-open-dialog="newRoleDialog">
@@ -59,9 +303,20 @@
       </div>
     </header>
 
+    <nav class="rp-tabs" aria-label="Access control sections">
+      <a class="rp-tab is-active" href="#roles">Roles &amp; permissions
+        <span>{{ roles | length }}</span></a>
+      <a class="rp-tab" href="#standard-roles">Standard roles
+        <span>{{ standard_groups | map(attribute='roles') | map('length') | sum }}</span></a>
+      <a class="rp-tab" href="#bindings">Department bindings
+        <span>{{ department.binding_total }}</span></a>
+      <a class="rp-tab" href="#accounts">Account matrix
+        <span>{{ accounts | length }}</span></a>
+    </nav>
+
     <div class="dir-stack">
 
-      <div class="dir-card">
+      <div class="dir-card rp-section" id="roles">
         <div class="dir-toolbar">
           <div class="dir-search">
             {{ dash_icon('search') }}
@@ -80,7 +335,24 @@
               <select id="roleTypeFilter">
                 <option value="">All roles</option>
                 <option value="built-in">Built-in</option>
+                <option value="standard">Standard</option>
                 <option value="custom">Custom</option>
+              </select>
+
+              <label for="roleDepartmentFilter">Department</label>
+              <select id="roleDepartmentFilter">
+                <option value="">All departments</option>
+                <option value="0">Company-wide</option>
+                {% for dept in departments %}
+                <option value="{{ dept.id }}">{{ dept.name }}</option>
+                {% endfor %}
+              </select>
+
+              <label for="roleStatusFilter">Status</label>
+              <select id="roleStatusFilter">
+                <option value="">Active and inactive</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
               </select>
 
               <div class="dir-filter-foot">
@@ -95,7 +367,8 @@
           <thead>
             <tr>
               <th scope="col">Role</th>
-              <th scope="col">Default modules</th>
+              <th scope="col">Department</th>
+              <th scope="col">Permission groups</th>
               <th scope="col">Accounts</th>
               <th scope="col" class="dir-actions-cell"><span class="sr-only">Actions</span></th>
             </tr>
@@ -103,8 +376,12 @@
           <tbody id="roleTableBody">
             {% for r in roles %}
             {% set pill = r.role if r.role in pill_keys else 'other' %}
-            <tr data-role-row data-key="{{ r.role }}" data-type="{{ 'built-in' if r.is_system else 'custom' }}"
-                data-search="{{ r.label }} {{ r.description }} {{ r.role }} {{ 'built-in' if r.is_system else 'custom' }} {% for m in r.defaults %}{{ module_label.get(m, m) }} {% endfor %}{% for account in r.members %}{{ account.user.full_name }} {% endfor %}{% for person in r.extras %}{{ person.full_name }} {% endfor %}">
+            {% set rtype = 'built-in' if r.is_system
+                           else 'standard' if r.is_standard else 'custom' %}
+            <tr data-role-row data-key="{{ r.role }}" data-type="{{ rtype }}"
+                data-department="{{ r.department_id }}"
+                data-status="{{ 'active' if r.active else 'inactive' }}"
+                data-search="{{ r.label }} {{ r.description }} {{ r.role }} {{ rtype }} {{ r.department_name }} {{ 'active' if r.active else 'inactive' }} {% for m in r.defaults %}{{ module_label.get(m, m) }} {% endfor %}{% for account in r.members %}{{ account.user.full_name }} {% endfor %}{% for person in r.extras %}{{ person.full_name }} {% endfor %}">
               <td>
                 <div class="dir-role-cell">
                   <span class="dir-role-line">
@@ -112,8 +389,10 @@
                     {% if r.role == 'admin' %}
                     <span class="dir-flag self">Locked</span>
                     {% else %}
-                    <span class="dir-flag {{ 'self' if r.is_system }}">{{ 'Built-in' if r.is_system else 'Custom' }}</span>
+                    <span class="dir-flag {{ 'self' if r.is_system }}">{{ 'Built-in' if r.is_system else 'Standard' if r.is_standard else 'Custom' }}</span>
                     {% endif %}
+                    <span class="status-badge {{ 'active' if r.active else 'neutral' }}">
+                      <span class="status-dot"></span>{{ 'Active' if r.active else 'Inactive' }}</span>
                   </span>
                   {% if r.description %}
                   <span class="dir-role-note">{{ r.description }}</span>
@@ -121,14 +400,19 @@
                   <span class="dir-role-meta">
                     {{ r.defaults | length }} module{{ '' if r.defaults | length == 1 else 's' }} ·
                     {{ r.members | length }} primary ·
-                    {{ r.extras | length }} additional
+                    {{ r.extras | length }} additional{% if r.bindings %} ·
+                    {{ r.bindings }} unit binding{{ '' if r.bindings == 1 else 's' }}{% endif %}
                   </span>
                 </div>
               </td>
               <td>
+                <span class="rp-dept-chip {{ 'is-wide' if not r.department_id }}">{{ r.department_name }}</span>
+              </td>
+              <td>
                 <div class="role-chip-set">
-                  {% for m in r.defaults %}
-                  <span class="chip">{{ module_label.get(m, m) }}</span>
+                  {% for group in r.groups %}
+                  <span class="chip">{{ group.label }}
+                    <em class="chip-count">{{ group.open }}/{{ group.total }}</em></span>
                   {% else %}
                   <span class="chip chip-off">None &mdash; landing page only</span>
                   {% endfor %}
@@ -157,6 +441,15 @@
                     {% if not r.is_system %}
                     <div class="dir-menu-sep"></div>
                     <form method="POST" class="dir-menu-form"
+                          action="{{ url_for('admin_role_activation', role_key=r.role) }}">
+                      {{ csrf_field() }}
+                      <input type="hidden" name="active" value="{{ '0' if r.active else '1' }}" />
+                      <button type="submit" class="dir-menu-item">
+                        {{ ui('shield') }} {{ 'Deactivate role' if r.active else 'Activate role' }}
+                      </button>
+                    </form>
+                    {% if not r.is_standard %}
+                    <form method="POST" class="dir-menu-form"
                           action="{{ url_for('admin_role_delete', role_key=r.role) }}"
                           onsubmit="return confirm('Delete this custom role? This cannot be undone.');">
                       {{ csrf_field() }}
@@ -165,13 +458,14 @@
                       </button>
                     </form>
                     {% endif %}
+                    {% endif %}
                   </div>
                 </details>
               </td>
             </tr>
             {% endfor %}
             <tr id="roleEmptyRow" hidden>
-              <td colspan="4">
+              <td colspan="5">
                 <div class="dir-empty">
                   <strong>No roles match this filter</strong>
                   <span>Try a different search or clear the filter.</span>
@@ -186,7 +480,82 @@
         </div>
       </div>
 
-      <div class="dir-card" id="access-matrix">
+      <div class="dir-card rp-section" id="standard-roles">
+        <div class="dir-card-head">
+          <div>
+            <span class="dir-eyebrow">Catalogue</span>
+            <h2>Standard roles by department</h2>
+            <p>Every unit of the company charter starts with the roles its desk
+              needs. A standard role is created with its department and starting
+              permissions, and can then be tailored, deactivated or bound to its
+              unit like any other role. Creating them never assigns an account.
+              A role marked below has never stored some of the rights its charter
+              names; restoring adds those rows and removes nothing.</p>
+          </div>
+          <div class="da-actions">
+            <form method="POST" action="{{ url_for('admin_department_access') }}">
+              {{ csrf_field() }}
+              <input type="hidden" name="action" value="create_standard_roles" />
+              <button type="submit" class="btn btn-sm btn-outline">
+                Create missing standard roles
+              </button>
+            </form>
+            {% if standard_drift %}
+            <form method="POST" action="{{ url_for('admin_department_access') }}">
+              {{ csrf_field() }}
+              <input type="hidden" name="action" value="sync_standard_roles" />
+              <button type="submit" class="btn btn-sm btn-outline"
+                      title="Adds only the rights the charters name and the database never stored.">
+                Restore {{ standard_drift }} missing charter
+                right{{ '' if standard_drift == 1 else 's' }}
+              </button>
+            </form>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="std-grid">
+          {% for group in standard_groups %}
+          <div class="std-card">
+            <div class="std-card-head">
+              <h3>{{ group.unit }}</h3>
+              <em>{{ group.roles | length }}
+                role{{ '' if group.roles | length == 1 else 's' }}</em>
+            </div>
+            {% for item in group.roles %}
+            <div class="std-role{{ '' if item.present else ' is-missing' }}">
+              <div class="std-role-line">
+                <strong>{{ item.name }}</strong>
+                <span class="rp-dept-chip">{{ item.rank }}</span>
+                {% if not item.present %}
+                <span class="status-badge neutral">Not created</span>
+                {% elif not item.active %}
+                <span class="status-badge neutral">Inactive</span>
+                {% else %}
+                <span class="status-badge active"><span class="status-dot"></span>Active</span>
+                {% endif %}
+                {% if item.present and item.drift %}
+                <span class="status-badge neutral"
+                      title="The charter names rights this role has never stored.">{{ item.drift }} missing</span>
+                {% endif %}
+              </div>
+              <span class="std-role-note">{{ item.modules | length }}
+                module{{ '' if item.modules | length == 1 else 's' }} ·
+                {% for m in item.modules %}{{ module_label.get(m, m) }}{{ ', ' if not loop.last }}{% endfor %}</span>
+              {% if item.present and role_dialog_ids.get(item.key) %}
+              <button type="button" class="std-role-open"
+                      data-open-dialog="roleDialog-{{ role_dialog_ids.get(item.key) }}">
+                Edit permissions
+              </button>
+              {% endif %}
+            </div>
+            {% endfor %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="dir-card rp-section" id="accounts">
         <div class="dir-card-head">
           <div>
             <span class="dir-eyebrow">Matrix</span>
@@ -227,7 +596,7 @@
                 <td>
                   {% if u.role == 'admin' %}
                   <span class="cell-note">All modules</span>
-                  {% else %}
+                  {% elif 'admin_access' in granted_permissions %}
                   <a class="btn btn-outline-dark btn-sm" href="{{ url_for('admin_role_account', user_id=u.id) }}">Edit</a>
                   {% endif %}
                 </td>
@@ -238,50 +607,98 @@
         </div>
       </div>
 
-      <div class="dir-card">
+      <div class="dir-card rp-section" id="bindings">
         <div class="dir-card-head">
           <div>
-            <span class="dir-eyebrow">Overrides</span>
-            <h2>Stored deviations</h2>
-            <p>Every row below is one module ticked against an account's combined role
-              defaults. An account with no rows follows its roles exactly.</p>
+            <span class="dir-eyebrow">Bindings</span>
+            <h2>Roles bound to the chart</h2>
+            <p>A binding hands a role to the seats of a unit at one rung, on top of
+              each person's primary role, and it reaches every unit below the one it
+              is stored on. Bindings are resolved on every request, so granting or
+              withdrawing one applies from the next page and changes no account row.
+              {{ department.bound_accounts }} of {{ department.accounts }} placed
+              account{{ '' if department.accounts == 1 else 's' }}
+              carry{{ '' if department.accounts == 1 else ' a' }} a bound role.</p>
           </div>
         </div>
 
-        <table class="dir-table overrides-table">
+        <form method="POST" action="{{ url_for('admin_department_access') }}"
+              class="dm-plain-form is-spaced">
+          {{ csrf_field() }}
+          <input type="hidden" name="action" value="bind" />
+          <div class="rp-bind-bar">
+            <label class="sr-only" for="bind-role">Role</label>
+            <select id="bind-role" name="role_key" required>
+              <option value="">Choose a role…</option>
+              {% for group in department.role_groups %}
+              <optgroup label="{{ group.label }}">
+                {% for role in group.options %}
+                <option value="{{ role.key }}">{{ role.name }}</option>
+                {% endfor %}
+              </optgroup>
+              {% endfor %}
+            </select>
+            <label class="sr-only" for="bind-department">Unit</label>
+            <select id="bind-department" name="department_id" required>
+              <option value="0">Company-wide (every unit)</option>
+              {% for dept in departments %}
+              <option value="{{ dept.id }}">{{ dept.name }} — {{ dept.unit_type }}</option>
+              {% endfor %}
+            </select>
+            <label class="sr-only" for="bind-level">Rung</label>
+            <select id="bind-level" name="position_level">
+              <option value="-1">Every rung</option>
+              {% for level, label in department.level_labels.items() %}
+              <option value="{{ level }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-sm">Grant role</button>
+          </div>
+          <p class="dir-form-note">A binding on a unit also reaches its sub-units, so
+            a directorate seat is granted once rather than repeated below it. The
+            Administrator role is never bound; it already carries everything.</p>
+        </form>
+
+        <h3 class="rp-subhead">Company-wide</h3>
+        {% for binding in department.company_bindings %}
+        {{ binding_row(binding, 0, 'Every unit') }}
+        {% else %}
+        <p class="dir-form-note">No role is bound company-wide.</p>
+        {% endfor %}
+
+        <h3 class="rp-subhead">By unit</h3>
+        <table class="dir-table rp-bind-table">
           <thead>
             <tr>
-              <th scope="col">Account</th>
-              <th scope="col">Primary role</th>
-              <th scope="col">Module</th>
-              <th scope="col">Effect</th>
-              <th scope="col">Updated</th>
+              <th scope="col">Unit</th>
+              <th scope="col">Accounts</th>
+              <th scope="col">Roles bound here</th>
             </tr>
           </thead>
           <tbody>
-            {% for row in overrides %}
-            {% set pill = row.role if row.role in pill_keys else 'other' %}
-            <tr>
-              <td>{{ row.full_name }}</td>
-              <td><span class="dir-pill role-{{ pill }}">{{ role_labels.get(row.role, row.role) }}</span></td>
-              <td>{{ module_label.get(row.module, row.module) }}</td>
-              <td><span class="dir-pill status-{{ 'active' if row.allowed else 'disabled' }}">
-                <span class="status-dot"></span>{{ 'Granted' if row.allowed else 'Revoked' }}</span></td>
-              <td class="dir-cell-muted">{{ row.updated_at | audit_time }}</td>
-            </tr>
-            {% else %}
-            <tr>
-              <td colspan="5">
-                <div class="dir-empty">
-                  <strong>Every account follows its role defaults</strong>
-                  <span>No per-account override is stored right now.</span>
-                </div>
-              </td>
-            </tr>
+            {% for node in department.tree %}
+            {{ unit_row(node) }}
             {% endfor %}
           </tbody>
         </table>
+
+        {% if department.suggestions %}
+        <div class="da-actions rp-suggest">
+          <form method="POST" action="{{ url_for('admin_department_access') }}">
+            {{ csrf_field() }}
+            <input type="hidden" name="action" value="apply_suggested" />
+            <button type="submit" class="btn btn-sm btn-outline"
+                    title="Stores the charter's suggested bindings that are not saved yet.">
+              Apply {{ department.suggestions | length }} suggested
+              binding{{ '' if department.suggestions | length == 1 else 's' }}
+            </button>
+          </form>
+          <span class="dir-form-note">Suggestions the charter names and the register
+            has not stored yet.</span>
+        </div>
+        {% endif %}
       </div>
+
     </div>
   </div>
 </section>
@@ -294,11 +711,15 @@
     <div class="dir-dialog-title">
       <h2 id="roleTitle-{{ loop.index }}">{{ r.label }}</h2>
       <p>
-        {{ 'Built-in role' if r.is_system else 'Custom role' }}
+        {{ 'Built-in role' if r.is_system else 'Standard role' if r.is_standard else 'Custom role' }}
+        · {{ r.department_name }}
+        · {{ r.permission_open }} of {{ r.permission_total }} permissions
         {%- if r.role == 'admin' %} · every module, always
-        {%- elif r.role == 'member' %} · lands on the member area
+        {%- elif r.landing == 'member' %} · lands on the member area
         {%- else %} · lands on its <a href="{{ url_for(r.landing) }}">dashboard</a>
         {%- endif %}
+        · <span class="status-badge {{ 'active' if r.active else 'neutral' }}">
+          <span class="status-dot"></span>{{ 'Active' if r.active else 'Inactive' }}</span>
       </p>
     </div>
     <button type="button" class="dir-dialog-close" data-close-dialog aria-label="Close">&times;</button>
@@ -309,11 +730,33 @@
     {{ csrf_field() }}
     <div class="dir-dialog-body">
       <div class="account-grid">
-        {% if not r.is_system %}
+        {% if not r.is_system and not r.is_standard %}
         <div class="full">
           <label for="roleName-{{ loop.index }}">Role name</label>
           <input id="roleName-{{ loop.index }}" name="name" value="{{ r.label }}"
                  maxlength="60" required />
+        </div>
+        <div class="full">
+          <label for="roleDepartment-{{ loop.index }}">Department</label>
+          <select id="roleDepartment-{{ loop.index }}" name="department_id">
+            <option value="0" {% if not r.department_id %}selected{% endif %}>
+              Company-wide (every unit)</option>
+            {% for dept in departments %}
+            <option value="{{ dept.id }}" {% if dept.id == r.department_id %}selected{% endif %}>
+              {{ dept.name }} — {{ dept.unit_type }}</option>
+            {% endfor %}
+          </select>
+          <span class="cell-note">The role is filed under this unit. Its
+            permissions are the ticks below.</span>
+        </div>
+        {% else %}
+        <div class="full">
+          <label>Department</label>
+          <p class="dir-form-note" style="margin:0">{{ r.department_name }} ·
+            {{ 'standard role from the company charter. Its name and department
+               are fixed; the permissions below stay editable.'
+               if r.is_standard else
+               'built-in role. Its name and department are fixed.' }}</p>
         </div>
         {% endif %}
         <div class="full">
@@ -324,22 +767,51 @@
         </div>
       </div>
 
-      <fieldset class="perm-grid">
-        <legend>Modules this role grants</legend>
-        {% for m in modules %}
-        <label class="perm-item">
-          <input type="checkbox" name="modules" value="{{ m }}"
-                 {% if m in r.defaults %}checked{% endif %} />
-          <span>{{ module_label.get(m, m) }}</span>
-        </label>
-        {% endfor %}
-      </fieldset>
+      <div class="role-dialog-section perm-section">
+        <h3>Permissions
+          <small class="cell-note">{{ r.permission_open }} assigned of
+            {{ r.permission_total }}</small></h3>
+        <p class="dir-form-note">
+          Ticking a permission opens the module behind it; unticking deactivates
+          it for this role. A role is saved as what its people may do rather than
+          as a list of modules. Recruitment rows
+          are the hiring desk rights; open
+          {% if 'admin_access' in granted_permissions %}
+          <a href="{{ url_for('admin_hiring_role_permissions', role_key=r.role) }}">the
+          desk matrix</a> to set one right at a time.
+          {% else %}
+          The desk matrix keeps one hiring right apart.
+          {% endif %}
+          Letter rows grant actions inside the register; which letter categories an
+          account may file is still set on that account&rsquo;s letter permissions screen.
+        </p>
+        {{ permission_manager(r.catalog, 'role' ~ loop.index) }}
+      </div>
+
+      <div class="role-dialog-section perm-section">
+        <h3>Department actions
+          <small class="cell-note">{{ r.dept_open }} of {{ r.dept_total }}
+            open</small></h3>
+        <p class="dir-form-note">The ten standard actions per department:
+          create, read, view, edit, delete, approve, reject, export, print and
+          manage. Each tick is checked on the server for every request it
+          covers, so a typed URL cannot get past it. A role never granted an
+          action matrix follows the rights its modules already imply; saving
+          this grid pins the selection.</p>
+        {{ department_matrix(r.dept_matrix, 'roleDept' ~ loop.index) }}
+      </div>
 
       <p class="dir-form-note">
-        {{ 'Built-in roles keep their name; only the description and module list change.'
+        {{ 'Built-in roles keep their name; only the description and the permissions
+           below change.'
            if r.is_system else
-           'Custom roles do not change an account&rsquo;s home dashboard. They add modules,
-            so one person can sit at more than one desk without a second sign-in.' }}
+           'Standard roles keep the name and department the charter gives them;
+            only the description and the permissions below change. Deactivating one
+            keeps every tick but stops it granting access.'
+           if r.is_standard else
+           'Custom roles do not change an account&rsquo;s home dashboard. They add
+            permissions, so one person can sit at more than one desk without a second
+            sign-in.' }}
       </p>
 
       <div class="role-dialog-section">
@@ -348,7 +820,11 @@
           {% for account in r.members %}
           {% set u = account.user %}
           <li>
+            {% if 'admin_access' in granted_permissions %}
             <a href="{{ url_for('admin_role_account', user_id=u.id) }}">{{ u.full_name }}</a>
+            {% else %}
+            <strong>{{ u.full_name }}</strong>
+            {% endif %}
             <span class="dir-pill status-{{ 'active' if u.status == 'Active' else 'disabled' }}">
               <span class="status-dot"></span>{{ u.status }}</span>
             <span class="cell-note">{{ 'Every module' if u.role == 'admin' else 'Primary role' }}</span>
@@ -360,7 +836,11 @@
           <li>
             <span class="cell-note">Also carried as an additional role by</span>
             {% for person in r.extras %}
-            <a href="{{ url_for('admin_role_account', user_id=person.id) }}">{{ person.full_name }}</a>{{ ', ' if not loop.last }}
+            {% if 'admin_access' in granted_permissions %}
+            <a href="{{ url_for('admin_role_account', user_id=person.id) }}">{{ person.full_name }}</a>
+            {% else %}
+            {{ person.full_name }}
+            {% endif %}{{ ', ' if not loop.last }}
             {% endfor %}
           </li>
           {% endif %}
@@ -373,14 +853,37 @@
       <button type="submit" class="btn btn-sm">Save role</button>
     </div>
   </form>
+  {% if not r.is_system %}
+  <form method="POST" action="{{ url_for('admin_role_activation', role_key=r.role) }}">
+    {{ csrf_field() }}
+    <input type="hidden" name="active" value="{{ '0' if r.active else '1' }}" />
+    <div class="dir-dialog-actions">
+      <span class="dir-form-note" style="margin:0;flex:1">
+        {{ 'Deactivating keeps this role, its permissions and its bindings,
+           but stops it granting anything.' if r.active else
+           'This role is parked. Activate it to let its saved permissions and
+           bindings apply again.' }}
+      </span>
+      <button type="submit" class="btn btn-outline btn-sm">
+        {{ 'Deactivate role' if r.active else 'Activate role' }}
+      </button>
+    </div>
+  </form>
+  {% endif %}
   {% else %}
   <div class="dir-dialog-body">
-    <p class="dir-form-note">The Administrator role always holds every module and cannot be
-      reduced or deleted. Department and position assignments live in
+    <p class="dir-form-note">The Administrator role always holds every permission and
+      cannot be reduced or deleted. Department and position assignments live in
       Organization &amp; Hierarchy.</p>
-    <ul class="chip-row">
-      {% for m in modules %}<li class="chip">{{ module_label.get(m, m) }}</li>{% endfor %}
-    </ul>
+    {{ permission_manager(r.catalog, 'adminRole') }}
+
+    <div class="role-dialog-section perm-section">
+      <h3>Department actions
+        <small class="cell-note">{{ r.dept_open }} of {{ r.dept_total }} open</small></h3>
+      <p class="dir-form-note">An Administrator holds every department action by
+        definition, so every cell is ticked and locked.</p>
+      {{ department_matrix(r.dept_matrix, 'adminDept') }}
+    </div>
 
     <div class="role-dialog-section">
       <h3>Accounts holding this role</h3>
@@ -421,21 +924,56 @@
                  placeholder="e.g. Stores supervisor" />
         </div>
         <div class="full">
+          <label for="new-role-department">Department *</label>
+          <select id="new-role-department" name="department_id" required>
+            <option value="0">Company-wide (every unit)</option>
+            {% for dept in departments %}
+            <option value="{{ dept.id }}">{{ dept.name }} — {{ dept.unit_type }}</option>
+            {% endfor %}
+          </select>
+          <span class="cell-note">The role is filed under this unit. Every
+            permission registered by every department is listed below; the unit
+            only decides where the role is filed, never what it can be given.</span>
+        </div>
+        <div class="full">
+          <label for="new-role-preset">Start from a standard role</label>
+          <select id="new-role-preset">
+            <option value="">Choose a preset…</option>
+          </select>
+          <span class="cell-note" id="newRolePresetNote">Pick a department to
+            start from one of its standard roles.</span>
+        </div>
+        <div class="full">
           <label for="new-role-description">Description</label>
           <input id="new-role-description" name="description" maxlength="300"
                  placeholder="What this role is for" />
         </div>
       </div>
 
-      <fieldset class="perm-grid">
-        <legend>Modules this role grants</legend>
-        {% for m in modules %}
-        <label class="perm-item">
-          <input type="checkbox" name="modules" value="{{ m }}" />
-          <span>{{ module_label.get(m, m) }}</span>
-        </label>
-        {% endfor %}
-      </fieldset>
+      <div class="role-dialog-section perm-section">
+        <h3>Permissions</h3>
+        <p class="dir-form-note">Every permission registered across the system is
+          listed here, grouped by the department whose desk it opens. Tick the
+          rights this role carries; unticking one deactivates it for the role. The
+          recruitment rows are the hiring desk rights, and the letter rows grant
+          actions inside the register. Every group below, Finance and Audit
+          included, stays listed whatever department the role is filed under.</p>
+        <div class="rp-perm-tools">
+          <button type="button" class="dir-text-btn" id="newRoleClearTicks">
+            Clear all ticks
+          </button>
+        </div>
+        {{ permission_manager(new_catalog, 'newRole') }}
+      </div>
+
+      <div class="role-dialog-section perm-section">
+        <h3>Department actions</h3>
+        <p class="dir-form-note">Tick what this role may do in each department.
+          The action keys are checked on the server, so they also stop a URL
+          typed straight into the address bar. Choosing a standard preset above
+          fills its starting actions as well.</p>
+        {{ department_matrix(new_dept_matrix, 'newDept') }}
+      </div>
 
       <p class="dir-form-note">Custom roles do not change an account&rsquo;s home dashboard.
         They add modules, so one person can sit at more than one desk without a second
@@ -447,6 +985,8 @@
     </div>
   </form>
 </dialog>
+
+{{ department_template(new_dept_matrix) }}
 {% endblock %}
 
 {% block scripts %}
@@ -458,6 +998,8 @@
     var rows = Array.prototype.slice.call(tbody.querySelectorAll("[data-role-row]"));
     var search = document.getElementById("roleSearch");
     var typeFilter = document.getElementById("roleTypeFilter");
+    var deptFilter = document.getElementById("roleDepartmentFilter");
+    var statusFilter = document.getElementById("roleStatusFilter");
     var filterDetails = document.getElementById("roleFilter");
     var filterBadge = document.querySelector("[data-filter-badge]");
     var emptyRow = document.getElementById("roleEmptyRow");
@@ -467,11 +1009,14 @@
       var q = search.value.trim().toLowerCase();
       if (q && row.dataset.search.toLowerCase().indexOf(q) === -1) return false;
       if (typeFilter.value && row.dataset.type !== typeFilter.value) return false;
+      if (deptFilter.value && row.dataset.department !== deptFilter.value) return false;
+      if (statusFilter.value && row.dataset.status !== statusFilter.value) return false;
       return true;
     }
 
     function syncFilters() {
-      var n = typeFilter.value ? 1 : 0;
+      var n = (typeFilter.value ? 1 : 0) + (deptFilter.value ? 1 : 0) +
+              (statusFilter.value ? 1 : 0);
       if (filterBadge) {
         filterBadge.hidden = n === 0;
         filterBadge.textContent = n;
@@ -495,12 +1040,16 @@
 
     search.addEventListener("input", render);
     typeFilter.addEventListener("change", render);
+    deptFilter.addEventListener("change", render);
+    statusFilter.addEventListener("change", render);
 
     var clearFilters = document.querySelector("[data-clear-filters]");
     if (clearFilters) {
       clearFilters.addEventListener("click", function () {
         search.value = "";
         typeFilter.value = "";
+        deptFilter.value = "";
+        statusFilter.value = "";
         render();
       });
     }
@@ -564,7 +1113,117 @@
       });
     });
 
+    var tabs = Array.prototype.slice.call(document.querySelectorAll(".rp-tab"));
+    function markTab() {
+      var hash = window.location.hash || "#roles";
+      tabs.forEach(function (tab) {
+        tab.classList.toggle("is-active", tab.getAttribute("href") === hash);
+      });
+    }
+    tabs.forEach(function (tab) {
+      tab.addEventListener("click", function () {
+        tabs.forEach(function (other) { other.classList.remove("is-active"); });
+        tab.classList.add("is-active");
+      });
+    });
+    window.addEventListener("hashchange", markTab);
+    markTab();
+
     render();
   })();
 </script>
+<script type="application/json" id="rolePresetData">{{ role_presets | tojson }}</script>
+<script>
+  (function () {
+    var dialog = document.getElementById("newRoleDialog");
+    if (!dialog) return;
+    var dept = document.getElementById("new-role-department");
+    var preset = document.getElementById("new-role-preset");
+    var presetNote = document.getElementById("newRolePresetNote");
+    var clearBtn = document.getElementById("newRoleClearTicks");
+    var nameInput = document.getElementById("new-role-name");
+    var descInput = document.getElementById("new-role-description");
+    var catalog = dialog.querySelector("[data-perm-catalog]");
+    if (!dept || !preset || !catalog) return;
+
+    var presets = JSON.parse(
+      document.getElementById("rolePresetData").textContent || "[]");
+
+    function boxes() {
+      return Array.prototype.slice.call(
+        catalog.querySelectorAll('.perm-cat-grid input[type="checkbox"]'));
+    }
+
+    function tickBoxes(wanted) {
+      boxes().forEach(function (box) {
+        if (box.disabled) return;
+        var keep = box.parentElement.querySelector("[data-perm-keep]");
+        if (keep) keep.remove();
+        if (box.dataset.partial) delete box.dataset.partial;
+        box.checked = wanted.indexOf(box.value) !== -1;
+        box.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+    }
+
+    function tickDepartmentActions(wanted) {
+      var matrix = dialog.querySelector("[data-dept-matrix]");
+      if (!matrix) return;
+      matrix.querySelectorAll('input[name="department_action"]').forEach(function (box) {
+        if (box.disabled) return;
+        box.checked = wanted.indexOf(box.value) !== -1;
+      });
+      matrix.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+
+    function fillPresets() {
+      var key = dept.value;
+      var list = presets.filter(function (item) {
+        return item.department_id !== null &&
+               String(item.department_id) === String(key);
+      });
+      preset.innerHTML = '<option value="">Choose a preset…</option>';
+      list.forEach(function (item) {
+        var option = document.createElement("option");
+        option.value = item.key;
+        option.textContent = item.name + " · " + item.unit;
+        preset.appendChild(option);
+      });
+      preset.disabled = list.length === 0;
+      if (presetNote) {
+        presetNote.textContent = list.length
+          ? list.length + " standard role" + (list.length === 1 ? "" : "s") +
+            " for this unit. Choosing one fills its starting permissions."
+          : (key === "0"
+             ? "Company-wide has no preset beyond the CEO bundle. Pick a department for its standard roles, or tick permissions directly."
+             : "This unit has no standard role yet. Tick the permissions directly.");
+      }
+    }
+
+    dept.addEventListener("change", fillPresets);
+
+    preset.addEventListener("change", function () {
+      var chosen = presets.filter(function (item) {
+        return item.key === preset.value;
+      })[0];
+      if (!chosen) return;
+      if (nameInput && !nameInput.value.trim()) nameInput.value = chosen.name;
+      if (descInput && !descInput.value.trim()) {
+        descInput.value = chosen.description || "";
+      }
+      tickBoxes(chosen.permissions.concat(chosen.letters));
+      tickDepartmentActions(chosen.department_actions || []);
+    });
+
+    if (clearBtn) {
+      clearBtn.addEventListener("click", function () {
+        tickBoxes([]);
+        tickDepartmentActions([]);
+      });
+    }
+
+    fillPresets();
+  })();
+</script>
+{% include "Admin/_permission_script.html" %}
+{% include "Admin/_department_script.html" %}
 {% endblock %}

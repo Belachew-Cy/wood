@@ -1,0 +1,401 @@
+
+/* =====================================================
+   DEREJE WOOD & CAM MANAGEMENT SYSTEM
+   PROJECT MANAGEMENT MODULE
+   Responsive styling for desktop, tablet and mobile
+   ===================================================== */
+
+/* ---------- Global Variables ---------- */
+
+:root {
+    --pm-primary: #2457a6;
+    --pm-primary-dark: #183e78;
+    --pm-success: #198754;
+    --pm-warning: #f0ad4e;
+    --pm-danger: #dc3545;
+
+    --pm-background: #f5f7fb;
+    --pm-card: #ffffff;
+    --pm-text: #263445;
+    --pm-muted: #718096;
+    --pm-border: #e5eaf1;
+
+    --pm-radius: 14px;
+    --pm-shadow: 0 5px 20px rgba(20, 40, 70, 0.06);
+    --pm-transition: all 0.25s ease;
+}
+
+/* ---------- Main Container ---------- */
+
+.pm-container {
+    width: 100%;
+    min-height: 100vh;
+    padding: 24px;
+    background: var(--pm-background);
+    color: var(--pm-text);
+}
+
+/* ---------- Page Header ---------- */
+
+.pm-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 25px;
+}
+
+.pm-header h2 {
+    font-size: 25px;
+    font-weight: 750;
+    margin-bottom: 5px;
+}
+
+.pm-header p {
+    color: var(--pm-muted);
+    margin: 0;
+}
+
+/* ---------- Cards ---------- */
+
+.pm-card {
+    background: var(--pm-card);
+    border: 1px solid var(--pm-border);
+    border-radius: var(--pm-radius);
+    box-shadow: var(--pm-shadow);
+    padding: 20px;
+    transition: var(--pm-transition);
+}
+
+.pm-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 28px rgba(20, 40, 70, 0.10);
+}
+
+.pm-card-title {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 12px;
+}
+
+.pm-card-value {
+    font-size: 28px;
+    font-weight: 800;
+    margin-bottom: 5px;
+}
+
+.pm-card-description {
+    color: var(--pm-muted);
+    font-size: 13px;
+}
+
+/* ---------- Card Icons ---------- */
+
+.pm-card-icon {
+    width: 46px;
+    height: 46px;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 12px;
+    font-size: 21px;
+    background: rgba(36, 87, 166, 0.10);
+    color: var(--pm-primary);
+}
+
+/* ---------- Buttons ---------- */
+
+.pm-btn {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 17px;
+    border: none;
+    border-radius: 9px;
+    font-weight: 650;
+    text-decoration: none;
+    cursor: pointer;
+    transition: var(--pm-transition);
+}
+
+.pm-btn-primary {
+    background: var(--pm-primary);
+    color: #fff;
+}
+
+.pm-btn-primary:hover {
+    background: var(--pm-primary-dark);
+    color: #fff;
+    transform: translateY(-2px);
+}
+
+.pm-btn-success {
+    background: var(--pm-success);
+    color: #fff;
+}
+
+.pm-btn-danger {
+    background: var(--pm-danger);
+    color: #fff;
+}
+
+/* ---------- Tables ---------- */
+
+.pm-table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    border-radius: var(--pm-radius);
+}
+
+.pm-table {
+    width: 100%;
+    min-width: 750px;
+    border-collapse: collapse;
+    background: var(--pm-card);
+}
+
+.pm-table th {
+    background: #f0f3f8;
+    color: #43536a;
+    font-size: 12px;
+    font-weight: 750;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    padding: 14px;
+    white-space: nowrap;
+}
+
+.pm-table td {
+    padding: 14px;
+    border-bottom: 1px solid var(--pm-border);
+    vertical-align: middle;
+}
+
+.pm-table tbody tr {
+    transition: var(--pm-transition);
+}
+
+.pm-table tbody tr:hover {
+    background: #f7f9fc;
+}
+
+/* ---------- Status Badges ---------- */
+
+.pm-status {
+    display: inline-block;
+    padding: 6px 11px;
+    border-radius: 30px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.pm-status-active {
+    background: #e5f0ff;
+    color: #2457a6;
+}
+
+.pm-status-completed {
+    background: #e5f7ed;
+    color: #198754;
+}
+
+.pm-status-pending {
+    background: #fff4dc;
+    color: #956000;
+}
+
+.pm-status-overdue {
+    background: #fde8e8;
+    color: #c62828;
+}
+
+.pm-status-on-hold {
+    background: #edf0f4;
+    color: #596579;
+}
+
+/* ---------- Progress Bars ---------- */
+
+.pm-progress {
+    width: 100%;
+    height: 9px;
+    background: #e8edf4;
+    border-radius: 20px;
+    overflow: hidden;
+}
+
+.pm-progress-bar {
+    height: 100%;
+    border-radius: 20px;
+    background: var(--pm-primary);
+    transition: width 0.4s ease;
+}
+
+/* ---------- Forms ---------- */
+
+.pm-form-card {
+    background: var(--pm-card);
+    padding: 25px;
+    border: 1px solid var(--pm-border);
+    border-radius: var(--pm-radius);
+    box-shadow: var(--pm-shadow);
+}
+
+.pm-form-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 7px;
+}
+
+.pm-form-control {
+    width: 100%;
+    min-height: 43px;
+    padding: 10px 12px;
+    border: 1px solid var(--pm-border);
+    border-radius: 8px;
+    background: var(--pm-card);
+    color: var(--pm-text);
+    outline: none;
+    transition: var(--pm-transition);
+}
+
+.pm-form-control:focus {
+    border-color: var(--pm-primary);
+    box-shadow: 0 0 0 3px rgba(36, 87, 166, 0.12);
+}
+
+/* ---------- Filters ---------- */
+
+.pm-filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.pm-filter-bar input,
+.pm-filter-bar select {
+    min-width: 170px;
+    max-width: 100%;
+}
+
+/* ---------- Empty States ---------- */
+
+.pm-empty-state {
+    padding: 45px 20px;
+    text-align: center;
+    color: var(--pm-muted);
+}
+
+.pm-empty-state i {
+    font-size: 42px;
+    margin-bottom: 12px;
+}
+
+/* ---------- Dark Mode ---------- */
+
+[data-theme="dark"] {
+    --pm-background: #121a27;
+    --pm-card: #1c2838;
+    --pm-text: #e8edf5;
+    --pm-muted: #a4b0c0;
+    --pm-border: #344256;
+    --pm-shadow: 0 5px 20px rgba(0, 0, 0, 0.20);
+}
+
+[data-theme="dark"] .pm-table th {
+    background: #26364b;
+    color: #e8edf5;
+}
+
+[data-theme="dark"] .pm-table tbody tr:hover {
+    background: #253449;
+}
+
+[data-theme="dark"] .pm-progress {
+    background: #344256;
+}
+
+/* ---------- Tablet ---------- */
+
+@media (max-width: 992px) {
+    .pm-container {
+        padding: 18px;
+    }
+
+    .pm-header h2 {
+        font-size: 22px;
+    }
+
+    .pm-card-value {
+        font-size: 24px;
+    }
+}
+
+/* ---------- Mobile ---------- */
+
+@media (max-width: 576px) {
+    .pm-container {
+        padding: 12px;
+    }
+
+    .pm-header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .pm-header h2 {
+        font-size: 20px;
+    }
+
+    .pm-card {
+        padding: 15px;
+    }
+
+    .pm-card-value {
+        font-size: 22px;
+    }
+
+    .pm-form-card {
+        padding: 16px;
+    }
+
+    .pm-btn {
+        width: 100%;
+    }
+
+    .pm-filter-bar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .pm-filter-bar input,
+    .pm-filter-bar select {
+        width: 100%;
+        min-width: 0;
+    }
+}
+
+/* ---------- Print ---------- */
+
+@media print {
+    .pm-no-print,
+    .sidebar,
+    .navbar {
+        display: none !important;
+    }
+
+    .pm-container {
+        padding: 0;
+        background: #fff;
+    }
+
+    .pm-card {
+        box-shadow: none;
+        break-inside: avoid;
+    }
+}

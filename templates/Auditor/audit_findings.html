@@ -1,0 +1,371 @@
+
+{% extends "base.html" %}
+
+{% block title %}Audit Findings | Audit Management{% endblock %}
+
+{% block content %}
+
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Audit Management</span>
+            <h1>Audit Findings</h1>
+            <p>
+                Document audit exceptions, evaluate their impact,
+                and monitor corrective recommendations.
+            </p>
+        </div>
+
+        <div class="stock-actions">
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.dashboard') }}">
+                Dashboard
+            </a>
+
+            <a class="btn btn-sm"
+               href="#finding-form">
+                + Record Finding
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="container finance-page">
+
+    <!-- FINDING SUMMARY -->
+
+    <div class="hr-stats">
+
+        <div class="dash-panel">
+            <span class="eyebrow">Total Findings</span>
+            <h2>{{ stats.total | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Critical Findings</span>
+            <h2>{{ stats.critical | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Open Findings</span>
+            <h2>{{ stats.open | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Resolved Findings</span>
+            <h2>{{ stats.resolved | default(0) }}</h2>
+        </div>
+
+    </div>
+
+
+    <!-- CREATE FINDING -->
+
+    <div class="dash-panel" id="finding-form">
+
+        <h2>Record New Audit Finding</h2>
+
+        <p>
+            Record the condition identified during an audit and
+            provide a clear recommendation.
+        </p>
+
+        <form method="POST"
+              action="{{ url_for('audit.create_audit_finding') }}">
+
+            {% if csrf_token is defined %}
+                {{ csrf_token() }}
+            {% endif %}
+
+            <div class="form-grid">
+
+                <div class="form-group">
+                    <label for="title">Finding Title *</label>
+                    <input
+                        type="text"
+                        id="title"
+                        name="title"
+                        placeholder="Enter finding title"
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="plan_id">Related Audit Plan</label>
+                    <select id="plan_id" name="plan_id">
+                        <option value="">Select Audit Plan</option>
+
+                        {% for plan in plans | default([]) %}
+                        <option value="{{ plan.id }}">
+                            {{ plan.plan_number | default('') }}
+                            — {{ plan.title | default('Untitled Audit') }}
+                        </option>
+                        {% endfor %}
+
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="department">Department *</label>
+                    <select id="department" name="department" required>
+                        <option value="">Select Department</option>
+
+                        {% for department in departments | default([]) %}
+                        <option value="{{ department }}">
+                            {{ department }}
+                        </option>
+                        {% endfor %}
+
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="severity">Severity *</label>
+                    <select id="severity" name="severity" required>
+                        <option value="">Select Severity</option>
+                        <option value="Low">Low</option>
+                        <option value="Medium">Medium</option>
+                        <option value="High">High</option>
+                        <option value="Critical">Critical</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="finding_category">Finding Category</label>
+                    <select id="finding_category" name="finding_category">
+                        <option value="Financial">Financial</option>
+                        <option value="Operational">Operational</option>
+                        <option value="Compliance">Compliance</option>
+                        <option value="Information Security">Information Security</option>
+                        <option value="Procurement">Procurement</option>
+                        <option value="Human Resources">Human Resources</option>
+                        <option value="Asset Management">Asset Management</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="identified_date">Identified Date *</label>
+                    <input
+                        type="date"
+                        id="identified_date"
+                        name="identified_date"
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="responsible_department">Responsible Department</label>
+                    <input
+                        type="text"
+                        id="responsible_department"
+                        name="responsible_department"
+                        placeholder="Responsible department"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="target_date">Target Resolution Date</label>
+                    <input
+                        type="date"
+                        id="target_date"
+                        name="target_date"
+                    >
+                </div>
+
+            </div>
+
+            <div class="form-group">
+                <label for="condition">Condition / Observation *</label>
+                <textarea
+                    id="condition"
+                    name="condition"
+                    rows="4"
+                    placeholder="Describe what the auditor observed"
+                    required
+                ></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="criteria">Audit Criteria</label>
+                <textarea
+                    id="criteria"
+                    name="criteria"
+                    rows="3"
+                    placeholder="Describe the policy, procedure or requirement that should have been followed"
+                ></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="cause">Root Cause</label>
+                <textarea
+                    id="cause"
+                    name="cause"
+                    rows="3"
+                    placeholder="Explain the underlying reason for the finding"
+                ></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="impact">Potential Impact</label>
+                <textarea
+                    id="impact"
+                    name="impact"
+                    rows="3"
+                    placeholder="Describe the potential organizational impact"
+                ></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="recommendation">Audit Recommendation *</label>
+                <textarea
+                    id="recommendation"
+                    name="recommendation"
+                    rows="4"
+                    placeholder="Provide practical corrective recommendations"
+                    required
+                ></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="management_response">Management Response</label>
+                <textarea
+                    id="management_response"
+                    name="management_response"
+                    rows="4"
+                    placeholder="Record management's response or action plan"
+                ></textarea>
+            </div>
+
+            <div class="stock-actions">
+                <button type="submit" class="btn btn-sm">
+                    Save Audit Finding
+                </button>
+
+                <button type="reset" class="btn btn-outline btn-sm">
+                    Clear Form
+                </button>
+            </div>
+
+        </form>
+
+    </div>
+
+
+    <!-- FINDINGS REGISTER -->
+
+    <div class="dash-panel hr-table-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Audit Findings Register</h2>
+                <p>
+                    Monitor findings and their resolution progress.
+                </p>
+            </div>
+
+            <span class="status-badge neutral">
+                {{ findings | length }} Records
+            </span>
+        </div>
+
+        <div class="table-scroll">
+
+            <table class="report-table">
+
+                <thead>
+                    <tr>
+                        <th>Finding Reference</th>
+                        <th>Finding Title</th>
+                        <th>Department</th>
+                        <th>Severity</th>
+                        <th>Identified Date</th>
+                        <th>Target Date</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for finding in findings | default([]) %}
+
+                    <tr>
+
+                        <td>
+                            {{ finding.finding_number
+                               | default(finding.reference
+                               | default('—')) }}
+                        </td>
+
+                        <td>
+                            <strong>
+                                {{ finding.title | default('Untitled Finding') }}
+                            </strong>
+                        </td>
+
+                        <td>
+                            {{ finding.department | default('—') }}
+                        </td>
+
+                        <td>
+                            {% set severity = finding.severity | default('Medium') %}
+
+                            <span class="status-badge
+                                {{ 'off' if severity in ['High', 'Critical']
+                                else 'neutral' }}">
+                                {{ severity }}
+                            </span>
+                        </td>
+
+                        <td>
+                            {{ finding.identified_date | default('—') }}
+                        </td>
+
+                        <td>
+                            {{ finding.target_date | default('—') }}
+                        </td>
+
+                        <td>
+                            {% set status = finding.status | default('Open') %}
+
+                            <span class="status-badge
+                                {{ 'active' if status == 'Resolved'
+                                else 'neutral' }}">
+                                {{ status }}
+                            </span>
+                        </td>
+
+                        <td>
+                            <a class="btn btn-outline btn-sm"
+                               href="{{ url_for(
+                                   'audit.finding_detail',
+                                   finding_id=finding.id
+                               ) }}">
+                                View
+                            </a>
+                        </td>
+
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="8" class="report-empty">
+                            No audit findings have been recorded.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</section>
+
+{% endblock %}

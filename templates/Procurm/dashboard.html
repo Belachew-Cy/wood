@@ -1,18 +1,23 @@
 {% extends "base.html" %}
 {% from "base.html" import kpi, bars, feed with context %}
 
-{% block title %}Procurement | Dereje Wood &amp; Kitchen{% endblock %}
+{% block title %}Procurement Management | Dereje Wood &amp; Kitchen{% endblock %}
 
 {% block content %}
 <section class="dash-head">
   <div class="container">
     <div>
       <span class="eyebrow">Procurement</span>
-      <h1>Procurement Dashboard</h1>
-      <p>Suppliers, purchase requests and purchase orders for the workshop.</p>
+      <h1>Procurement Management</h1>
+      <p>Requisitions and purchase orders for the workshop, side by side.</p>
     </div>
-    <nav class="stock-actions" aria-label="Procurement actions">
+    <nav class="stock-actions" aria-label="Procurement Management actions">
+      {% if user.role not in ('member', 'auditor') %}
       <a class="btn btn-outline btn-sm" href="{{ url_for('procurement.requisitions') }}">Requisitions</a>
+      {% endif %}
+      {% if 'procurement' in permissions %}
+      <a class="btn btn-outline btn-sm" href="{{ url_for('reports_centre') }}#reports-procurement-management">Procurement reports</a>
+      {% endif %}
       {% if 'inventory' in permissions %}
       <a class="btn btn-outline btn-sm" href="{{ url_for('inventory.dashboard') }}">Stock levels</a>
       {% endif %}
@@ -51,8 +56,9 @@
     {{ feed('Waiting on a decision', activity, 'Pending purchase requests') }}
   </div>
 
-  {% if can_manage %}
+  {% if (can_suppliers or can_orders or can_requisition) and not history %}
   <div class="procurement-forms" id="procurement-forms">
+    {% if can_suppliers %}
     <div class="finance-panel">
       <h2>Add a supplier</h2>
       <form method="post" action="{{ url_for('procurement.add_supplier') }}" class="finance-form">
@@ -69,7 +75,9 @@
         </div>
       </form>
     </div>
+    {% endif %}
 
+    {% if can_requisition %}
     <div class="finance-panel">
       <h2>Purchase requisitions</h2>
       <p class="panel-note">Requisitions are prepared by the department that needs the
@@ -83,7 +91,9 @@
           Prepare a requisition</a>
       </div>
     </div>
+    {% endif %}
 
+    {% if can_orders %}
     <div class="finance-panel">
       <h2>Create a purchase order</h2>
       <form method="post" action="{{ url_for('procurement.add_order') }}" class="finance-form">
@@ -133,11 +143,18 @@
         </div>
       </form>
     </div>
+    {% endif %}
   </div>
   {% endif %}
 
-  <div class="dash-panel hr-table-panel">
+  <div class="dash-panel hr-table-panel" id="purchase-requests">
     <h2>Purchase requests</h2>
+    {% if history %}
+    <p class="panel-note">
+      Closed records only — approved or rejected requisitions.
+      <a href="{{ url_for('procurement.dashboard') }}#purchase-requests">Back to live requests</a>
+    </p>
+    {% endif %}
     <div class="hr-table-wrap table-scroll">
       <table>
         <thead>
@@ -151,7 +168,7 @@
             <th>Raised by</th>
             <th>Raised on</th>
             <th>Status</th>
-            {% if can_manage %}<th>Chain</th>{% endif %}
+            {% if can_requests %}<th>Decision</th>{% endif %}
           </tr>
         </thead>
         <tbody>
@@ -170,7 +187,7 @@
                 {{ row.status }}
               </span>
             </td>
-            {% if can_manage %}
+            {% if can_requests %}
             <td>
               {% if row.approval_id %}
               <a class="finance-btn secondary"
@@ -194,7 +211,7 @@
           </tr>
           {% else %}
           <tr>
-            <td colspan="{{ 10 if can_manage else 9 }}" class="employee-empty">
+            <td colspan="{{ 10 if can_requests else 9 }}" class="employee-empty">
               No purchase requests have been raised yet.
             </td>
           </tr>
@@ -204,8 +221,21 @@
     </div>
   </div>
 
-  <div class="dash-panel hr-table-panel">
+  <div class="dash-panel hr-table-panel" id="purchase-orders">
     <h2>Purchase orders</h2>
+    {% if history %}
+    <p class="panel-note">
+      Closed records only — received or cancelled orders.
+      <a href="{{ url_for('procurement.dashboard') }}#purchase-orders">Back to live orders</a>
+    </p>
+    {% endif %}
+    {% if order_status %}
+    <p class="panel-note">
+      Showing <strong>{{ 'open' if order_status == 'open' else order_status }}</strong>
+      orders only.
+      <a href="{{ url_for('procurement.dashboard') }}#purchase-orders">Show every order</a>
+    </p>
+    {% endif %}
     <div class="hr-table-wrap table-scroll">
       <table>
         <thead>
@@ -220,7 +250,7 @@
             <th>Placed by</th>
             <th>Last modified</th>
             <th>Status</th>
-            {% if can_manage %}<th>Update</th>{% endif %}
+            {% if can_orders %}<th>Update</th>{% endif %}
           </tr>
         </thead>
         <tbody>
@@ -247,7 +277,7 @@
                 {{ row.status }}
               </span>
             </td>
-            {% if can_manage %}
+            {% if can_orders %}
             <td>
               {% if row.status != 'Cancelled' %}
               <form method="post" class="status-form"
@@ -268,7 +298,7 @@
           </tr>
           {% else %}
           <tr>
-            <td colspan="{{ 11 if can_manage else 10 }}" class="employee-empty">
+            <td colspan="{{ 11 if can_orders else 10 }}" class="employee-empty">
               No purchase orders have been placed yet.
             </td>
           </tr>

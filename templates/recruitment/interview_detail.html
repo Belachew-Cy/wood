@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+
+{% block title %}Interview | {{ interview.candidate_name }}{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Interview panel</span>
+      <h1>{{ interview.candidate_name }}</h1>
+      <p>{{ interview.job_title }} · {{ interview.vacancy_department }} ·
+        {{ (interview.scheduled_at or 'no time set')[:16] }}
+        {%- if interview.location %} · {{ interview.location }}{% endif %}</p>
+    </div>
+    <nav class="stock-actions" aria-label="Interview actions">
+      <a class="btn btn-outline btn-sm" href="{{ url_for('recruitment.hr_interviews') }}">
+        Back to panels
+      </a>
+      <a class="btn btn-outline btn-sm"
+         href="{{ url_for('recruitment.applicant_detail', application_id=interview.application_id) }}">
+        The candidate
+      </a>
+      <a class="btn btn-outline btn-sm"
+         href="{{ url_for('recruitment.vacancy_detail', vacancy_id=interview.vacancy_id) }}">
+        The post
+      </a>
+    </nav>
+  </div>
+</section>
+
+<section class="container finance-page">
+  <div class="dash-grid">
+    <div class="dash-panel">
+      <h2>This interview</h2>
+      <dl class="detail-list">
+        <dt>Candidate</dt>
+        <dd>
+          <a href="{{ url_for('recruitment.applicant_detail', application_id=interview.application_id) }}">
+            {{ interview.candidate_name }}</a>
+          <span class="cell-note">
+            {{ interview.candidate_reference or '#' ~ interview.application_id }} ·
+            {{ interview.candidate_email }}
+            {%- if interview.candidate_phone %} · {{ interview.candidate_phone }}{% endif %}
+          </span>
+        </dd>
+        <dt>Application stage</dt>
+        <dd>
+          <span class="status-badge {{ 'active' if interview.application_status in ('Selected', 'Hired')
+                                        else 'off' if interview.application_status == 'Rejected'
+                                        else 'neutral' }}">
+            {{ interview.application_status }}
+          </span>
+        </dd>
+        <dt>Scheduled</dt>
+        <dd>{{ (interview.scheduled_at or '')[:16] or 'No time set' }}</dd>
+        <dt>Location</dt><dd>{{ interview.location or '—' }}</dd>
+        <dt>Booked by</dt>
+        <dd>{{ interview.created_by_name or 'the HR desk' }}
+          <span class="cell-note">{{ interview.created_at | audit_time }}</span></dd>
+        <dt>Status</dt>
+        <dd>
+          <span class="status-badge {{ 'active' if interview.status == 'Held'
+                                        else 'off' if interview.status == 'Cancelled'
+                                        else 'neutral' }}">{{ interview.status }}</span>
+        </dd>
+        <dt>Outcome</dt>
+        <dd>
+          <span class="status-badge {{ 'active' if interview.outcome == 'Passed'
+                                        else 'off' if interview.outcome in ('Failed', 'Withdrew')
+                                        else 'neutral' }}">{{ interview.outcome }}</span>
+        </dd>
+        <dt>Scored</dt>
+        <dd>{{ interview.scored_count }} of {{ interview.panel_size }} seats have answered
+          {% if interview.scored_count %}
+          · average {{ '%g' | format(interview.average_score | float) }} of
+          {{ interview_score_max | round(1) }}
+          {% endif %}
+        </dd>
+        {% if interview.note %}
+        <dt>Desk note</dt><dd class="wrap-cell">{{ interview.note }}</dd>
+        {% endif %}
+      </dl>
+      <p class="panel-note">The panel advises with its scores; the outcome is recorded by
+        the desk, which may answer against a unanimous panel and say why.</p>
+    </div>
+
+    <div class="dash-panel">
+      <h2>Your seat</h2>
+      {% if interview.status == 'Cancelled' %}
+      <p class="panel-note">This interview was cancelled, so no score is taken.</p>
+      {% elif on_panel %}
+      {% if my_score %}
+      <dl class="detail-list">
+        <dt>Your score</dt>
+        <dd>{{ '%g' | format(my_score.score | float) }} of
+          {{ interview_score_max | round(1) }}</dd>
+        <dt>Your recommendation</dt><dd>{{ my_score.recommendation }}</dd>
+        {% if my_score.comment %}
+        <dt>Your comment</dt><dd class="wrap-cell">{{ my_score.comment }}</dd>
+        {% endif %}
+        <dt>Recorded</dt><dd>{{ my_score.recorded_at | audit_time }}</dd>
+      </dl>
+      <p class="cell-note">You may revise your answer while the interview stays open.</p>
+      {% endif %}
+      <form method="POST" action="{{ url_for('recruitment.score_interview', interview_id=interview.id) }}"
+            class="dash-form account-grid">
+        {{ csrf_field() }}
+        <div>
+          <label for="score">Score out of {{ interview_score_max | round(1) }} *</label>
+          <input id="score" name="score" type="number" step="0.5" min="0"
+                 max="{{ interview_score_max }}" required
+                 value="{{ my_score.score if my_score else '' }}" />
+        </div>
+        <div>
+          <label for="recommendation">Recommendation *</label>
+          <select id="recommendation" name="recommendation" required>
+            {% for choice in interview_recommendations %}
+            <option value="{{ choice }}"
+              {% if my_score and my_score.recommendation == choice %}selected{% endif %}>
+              {{ choice }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="full">
+          <label for="comment">What led to that answer</label>
+          <textarea id="comment" name="comment" rows="4" maxlength="1000">{{
+            my_score.comment if my_score else '' }}</textarea>
+        </div>
+        <div class="full">
+          <button class="btn finance-btn primary" type="submit">
+            {{ 'Update my score' if my_score else 'Record my score' }}
+          </button>
+          <span class="cell-note">The score is keyed to your own account, never to the
+            form.</span>
+        </div>
+      </form>
+      {% else %}
+      <p class="panel-note">You are not on this panel, so you read the answers but cannot
+        cast one. Only an invited seat scores.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="dash-panel hr-table-panel">
+    <h2>The panel</h2>
+    <div class="hr-table-wrap table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Seat</th>
+            <th>Score</th>
+            <th>Recommendation</th>
+            <th>Comment</th>
+            <th>Recorded</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for seat in panel %}
+          <tr>
+            <td class="wrap-cell">
+              <strong>{{ seat.panel_user_name or 'Account #' ~ seat.panel_user_id }}</strong>
+              {% if seat.panel_user_id == scope.user_id %}
+              <span class="status-badge neutral">You</span>
+              {% endif %}
+            </td>
+            <td class="nowrap">
+              {{ '%g' | format(seat.score | float) if seat.score is not none else '—' }}
+              {% if seat.score is not none %}
+              <span class="cell-note">of {{ interview_score_max | round(1) }}</span>
+              {% endif %}
+            </td>
+            <td>{{ seat.recommendation or 'Not answered' }}</td>
+            <td class="wrap-cell">
+              {% for score in scores %}
+                {% if score.panel_user_id == seat.panel_user_id %}
+                {{ score.comment or '—' }}
+                {% endif %}
+              {% endfor %}
+            </td>
+            <td class="nowrap">
+              {% for score in scores %}
+                {% if score.panel_user_id == seat.panel_user_id %}
+                {{ score.recorded_at | audit_time }}
+                {% endif %}
+              {% endfor %}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="5" class="employee-empty">
+              No seat has been invited to this interview yet.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if scope.can('interview_book', interview) and not scores %}
+    <h2>Rebuild the panel</h2>
+    <form method="POST" action="{{ url_for('recruitment.set_panel', interview_id=interview.id) }}"
+          class="dash-form">
+      {{ csrf_field() }}
+      <label>Seats invited to score *</label>
+      <div class="perm-grid">
+        {% for seat in seats %}
+        <label class="perm-item">
+          <input type="checkbox" name="panel_user_id" value="{{ seat.id }}"
+                 {% if seat.panel_user_id is defined and seat.panel_user_id %}checked{% endif %} />
+          <span>{{ seat.full_name }}</span>
+          <em class="perm-default">{{ seat.department or seat.position or seat.role }}</em>
+        </label>
+        {% endfor %}
+      </div>
+      <p class="cell-note">Resetting replaces every invitation. It is refused once the
+        first score is recorded.</p>
+      <button class="btn finance-btn secondary" type="submit">Set the panel</button>
+    </form>
+    {% endif %}
+  </div>
+
+  {% if scope.can('interview_decide', interview) %}
+  <div class="dash-panel">
+    <h2>Close the interview</h2>
+    <form method="POST" action="{{ url_for('recruitment.decide_interview', interview_id=interview.id) }}"
+          class="dash-form account-grid">
+      {{ csrf_field() }}
+      <div>
+        <label for="status">Interview status</label>
+        <select id="status" name="status">
+          {% for value in ('Scheduled', 'Held', 'Cancelled') %}
+          <option value="{{ value }}" {% if interview.status == value %}selected{% endif %}>
+            {{ value }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="outcome">The desk&rsquo;s answer</label>
+        <select id="outcome" name="outcome">
+          {% for value in interview_outcomes %}
+          <option value="{{ value }}" {% if interview.outcome == value %}selected{% endif %}>
+            {{ value }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="full">
+        <label for="decision_note">Why the desk answered this way</label>
+        <textarea id="decision_note" name="note" rows="3" maxlength="1000"></textarea>
+      </div>
+      <div class="full">
+        <button class="btn finance-btn primary" type="submit">Record the outcome</button>
+        <span class="cell-note">Moving the candidate through the pipeline is done on their
+          own page; this closes the interview.</span>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}Hiring rights | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">ADMINISTRATION</span>
+      <h1>Hiring rights{% if kind == 'role' %} for a role{% endif %}</h1>
+      <p>{{ target_name }} · {{ subtitle }}</p>
+    </div>
+    <nav class="stock-actions">
+      <a class="btn btn-outline" href="{{ back }}">Back</a>
+    </nav>
+  </div>
+</section>
+
+<section class="container finance-page">
+  <div class="dash-panel">
+    <h2>What this {{ kind }} may do in hiring</h2>
+
+    {% if blocked %}
+    <p class="employee-alert info">
+      An administrator holds every hiring right without a grant, so this screen changes
+      nothing for this account. Save the rights on a role or on a staff account instead.
+    </p>
+    {% endif %}
+
+    <p class="panel-note">
+      {% if kind == 'role' %}
+      A role with nothing saved here keeps the defaults its module has always carried.
+      Ticking and saving replaces those defaults with exactly the ticks below, for every
+      account that carries the role.
+      {% else %}
+      The ticks shown are what this account holds now, from its roles, its modules and -
+      for a Manager or above - its position. Saving freezes that picture as the
+      account&rsquo;s own grant; an account with its own grant no longer follows a role
+      that later changes.
+      {% endif %}
+    </p>
+
+    {% if using_defaults %}
+    <p class="panel-note">
+      Nothing has been saved here yet, so what is shown is the inherited picture.
+    </p>
+    {% endif %}
+
+    <form method="POST" class="dash-form account-grid">
+      {{ csrf_field() }}
+      <div class="full hiring-right-grid">
+        {% for key, label in permissions %}
+        <label class="hiring-right-row" for="{{ key }}">
+          <input id="{{ key }}" type="checkbox" name="rights" value="{{ key }}"
+                 {% if key in granted %}checked{% endif %}
+                 {% if blocked %}disabled{% endif %} />
+          <span><strong>{{ label }}</strong><em>{{ key }}</em></span>
+        </label>
+        {% endfor %}
+      </div>
+
+      <p class="cell-note full">
+        Reading a desk is separate from moving a candidate: an account may be given
+        <em>Read vacancies</em> and <em>Read candidates</em> alone, and the hiring
+        screens open for reading with no button that writes. The rights that name a
+        person a desk may move - screening, registering, hiring, publishing a paper,
+        booking or deciding a panel - are obeyed only inside the departments this
+        account can reach, so a manager shortlists for their own posts and nowhere else.
+      </p>
+
+      <div class="full">
+        <button class="btn finance-btn primary" type="submit">Save the rights</button>
+        {% if not blocked %}
+        <button class="btn finance-btn secondary" type="submit" name="action"
+                value="reset"
+                onclick="return confirm('Return this {{ kind }} to the rights its roles and modules give by itself?')">
+          {% if kind == 'role' %}Clear to defaults{% else %}Clear to inherited{% endif %}
+        </button>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</section>
+{% endblock %}

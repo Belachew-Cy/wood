@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi with context %}
+
+{% block title %}Market Research | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+{% set ns = namespace(studies=0) %}
+{% for item in research_items %}
+  {% if item["research_type"] %}{% set ns.studies = ns.studies + 1 %}{% endif %}
+{% endfor %}
+
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">MARKETING MANAGEMENT</span>
+      <h1>Market Research</h1>
+      <p>What the desk found out, dated, and who recorded it.</p>
+    </div>
+    <div class="row-actions">
+      <a class="btn btn-outline" href="{{ url_for('marketing.dashboard') }}">
+        ← Marketing desk
+      </a>
+      {% if 'marketing_research' in granted_permissions %}
+      <a class="btn" href="{{ url_for('marketing.create_research') }}">
+        Record research →
+      </a>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="hr-stats">
+      {{ kpi('Records', research_items | length, 'matching this search') }}
+      {{ kpi('With a study type', ns.studies, 'named on the register') }}
+      {{ kpi('Newest', research_items[0]["research_date"] if research_items
+             else '—', 'latest research date') }}
+    </div>
+
+    <form method="GET" class="stock-search">
+      <label for="search">Search</label>
+      <input id="search" name="search" value="{{ search }}"
+             placeholder="Title, segment or findings" />
+      <button class="btn" type="submit">Search</button>
+      <a class="btn btn-outline" href="{{ url_for('marketing.research') }}">Reset</a>
+      {% if 'marketing_reports' in granted_permissions %}
+      <a class="btn btn-outline"
+         href="{{ url_for('marketing.export', kind='research', search=search) }}">
+        Export CSV
+      </a>
+      {% endif %}
+    </form>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>{% if research_items %}{{ research_items | length }} record{{ '' if research_items | length == 1 else 's' }}{% else %}Records{% endif %}</h2>
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Study</th><th>Type</th><th>Segment</th><th>Date</th>
+              <th>Findings</th><th>Prepared by</th><th>Last modified</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in research_items %}
+            <tr>
+              <td>{{ item["title"] }}</td>
+              <td>{{ item["research_type"] or '—' }}</td>
+              <td>{{ item["market_segment"] or '—' }}</td>
+              <td class="nowrap">{{ item["research_date"] or '—' }}</td>
+              <td class="wrap-cell">
+                {{ item["findings"] | truncate(140) if item["findings"] else '—' }}
+              </td>
+              <td>{{ item["prepared_by_name"] or '—' }}</td>
+              <td class="nowrap">
+                {{ item["updated_by_name"] or '—' }}
+                <br><span class="feed-meta">{{ item["updated_at"] | audit_time }}</span>
+              </td>
+              <td class="row-actions">
+                {% if 'marketing_research' in granted_permissions %}
+                <a class="btn"
+                   href="{{ url_for('marketing.edit_research', research_id=item['id']) }}">
+                  Edit
+                </a>
+                {% else %}
+                <span class="feed-meta">—</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="8">No research records match this search.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

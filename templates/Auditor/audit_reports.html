@@ -1,0 +1,239 @@
+
+{% extends "base.html" %}
+
+{% block title %}Audit Reports | Audit Management{% endblock %}
+
+{% block content %}
+
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Audit Management</span>
+            <h1>Audit Reports</h1>
+            <p>
+                Prepare, review, approve and maintain audit reports
+                with traceable records and accountability.
+            </p>
+        </div>
+
+        <div class="stock-actions">
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.dashboard') }}">
+                Dashboard
+            </a>
+
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.audit_findings') }}">
+                Audit Findings
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="container finance-page">
+
+    <!-- REPORT SUMMARY -->
+
+    <div class="hr-stats">
+
+        <div class="dash-panel">
+            <span class="eyebrow">Total Reports</span>
+            <h2>{{ stats.total | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Draft</span>
+            <h2>{{ stats.draft | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Under Review</span>
+            <h2>{{ stats.under_review | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Approved</span>
+            <h2>{{ stats.approved | default(0) }}</h2>
+        </div>
+
+    </div>
+
+
+    <!-- REPORT REGISTER -->
+
+    <div class="dash-panel hr-table-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Audit Report Register</h2>
+                <p>
+                    View report information, approval progress and audit references.
+                </p>
+            </div>
+
+            <span class="status-badge neutral">
+                {{ reports | length }} Records
+            </span>
+        </div>
+
+        <div class="table-scroll">
+
+            <table class="report-table">
+
+                <thead>
+                    <tr>
+                        <th>Report Reference</th>
+                        <th>Report Title</th>
+                        <th>Audit Plan</th>
+                        <th>Department</th>
+                        <th>Prepared By</th>
+                        <th>Report Date</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for report in reports | default([]) %}
+
+                    <tr>
+
+                        <td>
+                            {{ report.report_number
+                               | default(report.reference | default('—')) }}
+                        </td>
+
+                        <td>
+                            <strong>
+                                {{ report.title | default('Untitled Report') }}
+                            </strong>
+                        </td>
+
+                        <td>
+                            {{ report.plan_number | default('—') }}
+                        </td>
+
+                        <td>
+                            {{ report.department | default('—') }}
+                        </td>
+
+                        <td>
+                            {{ report.prepared_by_name
+                               | default(report.prepared_by | default('—')) }}
+                        </td>
+
+                        <td>
+                            {{ report.report_date
+                               | default(report.created_at | default('—')) }}
+                        </td>
+
+                        <td>
+
+                            {% set status = report.status | default('Draft') %}
+
+                            <span class="status-badge
+                                {{ 'active' if status == 'Approved'
+                                else 'neutral' }}">
+                                {{ status }}
+                            </span>
+
+                        </td>
+
+                        <td>
+                            <a class="btn btn-outline btn-sm"
+                               href="{{ url_for(
+                                   'audit.audit_report_detail',
+                                   report_id=report.id
+                               ) }}">
+                                View Report
+                            </a>
+                        </td>
+
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="8" class="report-empty">
+                            No audit reports have been registered.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <!-- REPORT APPROVAL PROCESS -->
+
+    <div class="dash-panel">
+
+        <h2>Audit Report Approval Process</h2>
+
+        <div class="hr-stats">
+
+            <div>
+                <strong>1. Preparation</strong>
+                <p>
+                    The assigned auditor prepares the report using
+                    verified audit evidence and findings.
+                </p>
+            </div>
+
+            <div>
+                <strong>2. Review</strong>
+                <p>
+                    An authorized reviewer checks accuracy,
+                    completeness and supporting evidence.
+                </p>
+            </div>
+
+            <div>
+                <strong>3. Approval</strong>
+                <p>
+                    The designated approving authority approves
+                    the report according to organizational policy.
+                </p>
+            </div>
+
+            <div>
+                <strong>4. Finalization</strong>
+                <p>
+                    The approved report is retained with its
+                    version history and approval record.
+                </p>
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- REPORT CONTROL -->
+
+    <div class="dash-panel">
+
+        <h2>Report Management Controls</h2>
+
+        <ul>
+            <li>Assign a unique reference number to each audit report.</li>
+            <li>Link every report to its corresponding audit plan.</li>
+            <li>Maintain report versions and revision history.</li>
+            <li>Restrict approval to authorized users.</li>
+            <li>Record reviewer comments and approval timestamps.</li>
+            <li>Prevent unauthorized modification of approved reports.</li>
+            <li>Maintain confidentiality and permission-controlled downloads.</li>
+        </ul>
+
+    </div>
+
+</section>
+
+{% endblock %}

@@ -1,0 +1,442 @@
+
+{% extends "base.html" %}
+
+{% block title %}
+    {{ report.title | default('Audit Report') }} | Audit Management
+{% endblock %}
+
+{% block content %}
+
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Audit Management / Reports</span>
+            <h1>{{ report.title | default('Audit Report Details') }}</h1>
+            <p>
+                Report reference:
+                {{ report.report_number | default(report.reference | default('Not assigned')) }}
+            </p>
+        </div>
+
+        <div class="stock-actions">
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.audit_reports') }}">
+                Back to Reports
+            </a>
+
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.dashboard') }}">
+                Dashboard
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="container finance-page">
+
+    <!-- REPORT OVERVIEW -->
+
+    <div class="hr-stats">
+
+        <div class="dash-panel">
+            <span class="eyebrow">Report Reference</span>
+            <h3>
+                {{ report.report_number | default(report.id | default('—')) }}
+            </h3>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Department</span>
+            <h3>{{ report.department | default('—') }}</h3>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Report Date</span>
+            <h3>{{ report.report_date | default('—') }}</h3>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Status</span>
+            <h3>
+                <span class="status-badge
+                    {{ 'active' if report.status | default('Draft') == 'Approved'
+                    else 'neutral' }}">
+                    {{ report.status | default('Draft') }}
+                </span>
+            </h3>
+        </div>
+
+    </div>
+
+
+    <!-- REPORT INFORMATION -->
+
+    <div class="dash-panel">
+
+        <h2>Report Information</h2>
+
+        <div class="form-grid">
+
+            <div>
+                <span class="eyebrow">Report Title</span>
+                <p>{{ report.title | default('—') }}</p>
+            </div>
+
+            <div>
+                <span class="eyebrow">Audit Plan</span>
+                <p>
+                    {{ report.plan_number
+                       | default(report.plan_title | default('—')) }}
+                </p>
+            </div>
+
+            <div>
+                <span class="eyebrow">Prepared By</span>
+                <p>
+                    {{ report.prepared_by_name
+                       | default(report.prepared_by | default('—')) }}
+                </p>
+            </div>
+
+            <div>
+                <span class="eyebrow">Reviewed By</span>
+                <p>
+                    {{ report.reviewed_by_name
+                       | default(report.reviewed_by | default('Not reviewed')) }}
+                </p>
+            </div>
+
+            <div>
+                <span class="eyebrow">Approved By</span>
+                <p>
+                    {{ report.approved_by_name
+                       | default(report.approved_by | default('Not approved')) }}
+                </p>
+            </div>
+
+            <div>
+                <span class="eyebrow">Last Updated</span>
+                <p>{{ report.updated_at | default('—') }}</p>
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- EXECUTIVE SUMMARY -->
+
+    <div class="dash-panel">
+
+        <h2>Executive Summary</h2>
+
+        <p>
+            {{ report.executive_summary
+               | default('No executive summary has been provided.') }}
+        </p>
+
+    </div>
+
+
+    <!-- AUDIT OBJECTIVES AND SCOPE -->
+
+    <div class="dash-panel">
+
+        <h2>Audit Objectives</h2>
+
+        <p>
+            {{ report.audit_objectives
+               | default('No audit objectives have been recorded.') }}
+        </p>
+
+        <hr>
+
+        <h2>Audit Scope</h2>
+
+        <p>
+            {{ report.audit_scope
+               | default('No audit scope has been recorded.') }}
+        </p>
+
+        <hr>
+
+        <h2>Audit Methodology</h2>
+
+        <p>
+            {{ report.methodology
+               | default('No audit methodology has been recorded.') }}
+        </p>
+
+    </div>
+
+
+    <!-- FINDINGS -->
+
+    <div class="dash-panel hr-table-panel">
+
+        <h2>Related Audit Findings</h2>
+
+        <div class="table-scroll">
+
+            <table class="report-table">
+
+                <thead>
+                    <tr>
+                        <th>Finding Reference</th>
+                        <th>Finding Title</th>
+                        <th>Department</th>
+                        <th>Severity</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for finding in findings | default([]) %}
+
+                    <tr>
+
+                        <td>
+                            {{ finding.finding_number
+                               | default(finding.id | default('—')) }}
+                        </td>
+
+                        <td>
+                            {{ finding.title | default('—') }}
+                        </td>
+
+                        <td>
+                            {{ finding.department | default('—') }}
+                        </td>
+
+                        <td>
+                            {{ finding.severity | default('—') }}
+                        </td>
+
+                        <td>
+                            {{ finding.status | default('Open') }}
+                        </td>
+
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="5" class="report-empty">
+                            No findings have been linked to this report.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <!-- RECOMMENDATIONS -->
+
+    <div class="dash-panel">
+
+        <h2>Recommendations</h2>
+
+        <p>
+            {{ report.recommendations
+               | default('No recommendations have been recorded.') }}
+        </p>
+
+    </div>
+
+
+    <!-- SUPPORTING EVIDENCE -->
+
+    <div class="dash-panel hr-table-panel">
+
+        <h2>Supporting Evidence</h2>
+
+        <div class="table-scroll">
+
+            <table class="report-table">
+
+                <thead>
+                    <tr>
+                        <th>Evidence Reference</th>
+                        <th>Description</th>
+                        <th>Evidence Type</th>
+                        <th>Uploaded By</th>
+                        <th>Upload Date</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for evidence in evidence_records | default([]) %}
+
+                    <tr>
+
+                        <td>
+                            {{ evidence.evidence_number
+                               | default(evidence.id | default('—')) }}
+                        </td>
+
+                        <td>
+                            {{ evidence.description | default('—') }}
+                        </td>
+
+                        <td>
+                            {{ evidence.evidence_type | default('—') }}
+                        </td>
+
+                        <td>
+                            {{ evidence.uploaded_by_name
+                               | default(evidence.uploaded_by | default('—')) }}
+                        </td>
+
+                        <td>
+                            {{ evidence.created_at | default('—') }}
+                        </td>
+
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="5" class="report-empty">
+                            No supporting evidence is linked to this report.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <!-- APPROVAL HISTORY -->
+
+    <div class="dash-panel">
+
+        <h2>Report Approval History</h2>
+
+        <div class="table-scroll">
+
+            <table class="report-table">
+
+                <thead>
+                    <tr>
+                        <th>Action</th>
+                        <th>Performed By</th>
+                        <th>Date</th>
+                        <th>Comments</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for item in approval_history | default([]) %}
+
+                    <tr>
+                        <td>{{ item.action | default('—') }}</td>
+                        <td>
+                            {{ item.user_name
+                               | default(item.user_id | default('—')) }}
+                        </td>
+                        <td>{{ item.created_at | default('—') }}</td>
+                        <td>{{ item.comments | default('—') }}</td>
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="4" class="report-empty">
+                            No approval history is available.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <!-- REPORT APPROVAL -->
+
+    {% if report.status | default('Draft') != 'Approved'
+          and has_audit_approval_permission | default(false) %}
+
+    <div class="dash-panel">
+
+        <h2>Approve Audit Report</h2>
+
+        <p>
+            Approval should only be performed after reviewing the
+            report contents and supporting evidence.
+        </p>
+
+        <form method="POST"
+              action="{{ url_for(
+                  'audit.approve_audit_report',
+                  report_id=report.id
+              ) }}">
+
+            {% if csrf_token is defined %}
+                {{ csrf_token() }}
+            {% endif %}
+
+            <div class="form-group">
+                <label for="approval_comments">
+                    Approval Comments
+                </label>
+
+                <textarea id="approval_comments"
+                          name="comments"
+                          rows="4"
+                          maxlength="2000"
+                          placeholder="Enter review or approval comments"></textarea>
+            </div>
+
+            <button type="submit" class="btn btn-primary">
+                Approve Report
+            </button>
+
+        </form>
+
+    </div>
+
+    {% endif %}
+
+
+    <!-- REPORT CONTROLS -->
+
+    <div class="dash-panel">
+
+        <h2>Report Control and Confidentiality</h2>
+
+        <ul>
+            <li>Only authorized users may view confidential audit reports.</li>
+            <li>Approved reports should not be silently overwritten.</li>
+            <li>Maintain version history for report revisions.</li>
+            <li>Record all review and approval activities.</li>
+            <li>Ensure findings and evidence are linked to the correct audit plan.</li>
+            <li>Protect report downloads through permission-checked routes.</li>
+        </ul>
+
+    </div>
+
+</section>
+
+{% endblock %}

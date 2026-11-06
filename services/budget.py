@@ -1,6 +1,6 @@
 """Budget plans, allocations, commitments and finance sync."""
 
-from core.config import EMPLOYEE_DEPARTMENTS
+from database.database_config import table_exists
 from services.hr import hr_department_options
 from datetime import date
 from datetime import datetime
@@ -503,13 +503,30 @@ def migrate_budget_links(db):
     ):
         db.execute(statement)
 
-    for table in ("budget_allocations", "budget_requests"):
-        db.execute("""
-            UPDATE {0} SET department_id = (
-                SELECT d.id FROM departments AS d
-                WHERE d.name = {0}.department COLLATE NOCASE
-            ) WHERE department_id IS NULL
-        """.format(table))
+    # The department register lives in the HR file, so a correlated
+    # "UPDATE budget... SET x = (SELECT ... FROM hr...)" cannot name its own
+    # table bare inside the subquery - the two files make the reference
+    # unresolvable. One lookup and one keyed write per row keeps each statement
+    # inside a single file, and it only runs once both sides exist on a first
+    # boot.
+    if table_exists(db, "departments"):
+        department_ids = {
+            (name or "").strip().lower(): department_id
+            for department_id, name in db.execute("SELECT id, name FROM departments")
+        }
+        for table in ("budget_allocations", "budget_requests"):
+            pending = db.execute(
+                "SELECT id, department FROM {0}"
+                " WHERE department_id IS NULL AND department <> ''".format(table)
+            ).fetchall()
+            for row in pending:
+                department_id = department_ids.get(
+                    (row["department"] or "").strip().lower())
+                if department_id is None:
+                    continue
+                db.execute(
+                    "UPDATE {0} SET department_id = ? WHERE id = ?".format(table),
+                    (department_id, row["id"]))
 
     budget_sync_finance_history(db)
 

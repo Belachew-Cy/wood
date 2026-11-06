@@ -1,0 +1,75 @@
+<script>
+  (function () {
+    document.querySelectorAll("[data-perm-catalog]").forEach(function (catalog) {
+      catalog.querySelectorAll("[data-perm-jump]").forEach(function (button) {
+        button.addEventListener("click", function () {
+          var target = catalog.querySelector(
+            '[data-perm-group="' + button.dataset.permJump + '"]');
+          if (!target) return;
+          target.open = true;
+          target.scrollIntoView({ block: "nearest", behavior: "smooth" });
+        });
+      });
+    });
+
+    document.querySelectorAll("[data-perm-category]").forEach(function (details) {
+      var all = details.querySelector("[data-perm-all]");
+      var count = details.querySelector("[data-perm-count]");
+      var boxes = Array.prototype.slice.call(
+        details.querySelectorAll('.perm-cat-grid input[type="checkbox"]'));
+
+      function usable() {
+        return boxes.filter(function (box) { return !box.disabled; });
+      }
+
+      function refresh() {
+        var open = usable();
+        var checked = open.filter(function (box) { return box.checked; });
+        var partial = open.some(function (box) {
+          return box.dataset.partial === "1" && !box.checked;
+        });
+        var totalChecked = boxes.filter(function (box) { return box.checked; }).length;
+        if (count) count.textContent = totalChecked + "/" + boxes.length;
+        var catalog = details.closest("[data-perm-catalog]");
+        var indexCount = catalog && catalog.querySelector(
+          '[data-perm-jump="' + details.dataset.permGroup +
+          '"] [data-perm-index-count]');
+        if (indexCount) indexCount.textContent = totalChecked + "/" + boxes.length;
+        if (!all) return;
+        if (!open.length) {
+          all.checked = totalChecked === boxes.length;
+          all.disabled = true;
+          all.indeterminate = false;
+          return;
+        }
+        all.checked = checked.length === open.length && !partial;
+        all.indeterminate = !all.checked && (checked.length > 0 || partial);
+      }
+
+      // A partial row keeps the rights it already had until the administrator
+      // touches it; the hidden input is what carries that "leave as it stands".
+      boxes.forEach(function (box) {
+        box.addEventListener("change", function () {
+          var keep = box.parentElement.querySelector("[data-perm-keep]");
+          if (keep) keep.remove();
+          if (box.dataset.partial) delete box.dataset.partial;
+          refresh();
+        });
+      });
+
+      if (all) {
+        all.addEventListener("change", function () {
+          usable().forEach(function (box) {
+            box.checked = all.checked;
+            var keep = box.parentElement.querySelector("[data-perm-keep]");
+            if (keep) keep.remove();
+            if (box.dataset.partial) delete box.dataset.partial;
+          });
+          refresh();
+        });
+      }
+
+      refresh();
+    });
+  })();
+</script>

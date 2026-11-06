@@ -6,13 +6,13 @@ creates the money tables there, and moves records out of a database that still
 holds them inline. Cross-module joins keep working because SQLite can join an
 attached database in the same query; the link columns stay on both sides.
 """
-import os
 import sqlite3
 from pathlib import Path
 
+from database import database_config
+
 BASE_DIR = Path(__file__).resolve().parent
-DB_PATH = Path(os.environ.get(
-    "WK_FINANCE_DB_PATH", str(BASE_DIR / "finance.db"))).resolve()
+DB_PATH = database_config.module_path("finance")
 
 SCHEMA = "finance"
 TABLES = ("finance_transactions", "finance_invoices", "finance_payments",
@@ -263,10 +263,7 @@ def ref(table):
 
 def attach(db):
     """Attach finance.db once per connection."""
-    for row in db.execute("PRAGMA database_list"):
-        if row[1] == SCHEMA:
-            return
-    db.execute("ATTACH DATABASE ? AS {}".format(SCHEMA), (str(DB_PATH),))
+    database_config.ensure_attached(db, SCHEMA)
 
 
 def table_names(db):

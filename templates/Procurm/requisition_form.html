@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}{{ 'Requisition ' ~ item.request_number if item else 'New requisition' }} | Dereje Wood &amp; Kitchen{% endblock %}
+{% block title %}{{ 'Requisition ' ~ item.request_number if item else 'New requisition' }} | Procurement Management{% endblock %}
 
 {% block content %}
 <section class="dash-head">
   <div class="container">
     <div>
-      <span class="eyebrow">Purchasing</span>
+      <span class="eyebrow">Procurement Management</span>
       <h1>{{ 'Revise requisition ' ~ item.request_number if item else 'New purchase requisition' }}</h1>
       <p>Add every material the job needs with its quantity and estimated price. The
         total decides who signs it.</p>

@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}Overtime Approvals | Dereje Belay Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Human Resources</span>
+      <h1>Overtime Approvals</h1>
+      <p>Review overtime requests from your department and record a decision.</p>
+    </div>
+    <nav class="stock-actions" aria-label="Overtime actions">
+      <a class="btn btn-outline btn-sm" href="{{ url_for('hr.overtime_dashboard') }}">Back to Overtime</a>
+    </nav>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    <nav class="hr-navigation" aria-label="HR Management">
+      <a class="hr-nav-link" href="{{ url_for('hr_dashboard') }}">Dashboard</a>
+      <a class="hr-nav-link" href="{{ url_for('employees') }}">Employees</a>
+      <a class="hr-nav-link" href="{{ url_for('attendance') }}">Attendance</a>
+      <a class="hr-nav-link" href="{{ url_for('recruitment.hr_vacancies') }}">Hiring desk</a>
+      <a class="hr-nav-link" href="{{ url_for('leave_management') }}">Leave</a>
+      <a class="hr-nav-link active" href="{{ url_for('hr.overtime_dashboard') }}">Overtime</a>
+      <a class="hr-nav-link" href="{{ url_for('training_performance') }}">Training &amp; Performance</a>
+      <a class="hr-nav-link" href="{{ url_for('manage_hierarchy') }}">Organization</a>
+      <a class="hr-nav-link" href="{{ url_for('reports_centre') }}">Reports</a>
+      <a class="hr-nav-link" href="{{ url_for('hr_settings.index') }}">HR Settings</a>
+    </nav>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+  </div>
+</section>
+
+<section class="section bg-white">
+  <div class="container">
+    <div class="dash-panel hr-table-panel">
+      <h2>Pending requests</h2>
+
+      {% if overtime_requests %}
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Employee</th>
+              <th>Date</th>
+              <th>Start</th>
+              <th>End</th>
+              <th>Hours</th>
+              <th>Reason</th>
+              <th>Decision</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in overtime_requests %}
+            <tr>
+              <td>
+                <strong>{{ item.full_name }}</strong><br />
+                <span class="cell-note">{{ item.employee_code }}</span>
+              </td>
+              <td>{{ item.overtime_date }}</td>
+              <td>{{ item.start_time }}</td>
+              <td>{{ item.end_time }}</td>
+              <td>{{ "%.2f"|format(item.requested_hours|default(0)|float) }}</td>
+              <td>{{ item.reason }}</td>
+              <td>
+                <form class="status-form" method="POST"
+                      action="{{ url_for('hr.approve_overtime', request_id=item.id) }}">
+                  {{ csrf_field() }}
+                  <textarea name="comment" rows="2" maxlength="1000" required
+                            placeholder="Approval comment"></textarea>
+                  <button type="submit" name="decision" value="approve" class="btn btn-sm">Approve</button>
+                  <button type="submit" name="decision" value="reject" class="btn btn-outline btn-sm">Reject</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="empty-state">No pending overtime requests.</p>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}

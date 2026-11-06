@@ -3,12 +3,10 @@
 from core.access import current_user
 from core.access import perm
 from core.config import DATE_PATTERN
-from core.db import FINANCE_TABLES
-from core.db import LETTER_TABLES
 from core.db import connect_db
 from core.db import get_db
-from core.db import qualified_table
 from core.formatting import money_etb
+from database import database_config
 from datetime import datetime
 from datetime import timezone
 from flask import abort
@@ -19,9 +17,7 @@ from flask import has_app_context
 from flask import has_request_context
 from flask import request
 from flask import url_for
-import finance
 import json
-import letters_db
 import sqlite3
 
 
@@ -438,6 +434,10 @@ AUDITOR_RECORD_TABLES = (
     ("Oversight", ("approval_requests", "approval_actions", "audit_reviews",
                    "audit_findings", "audit_logs", "users")),
     ("Correspondence", ("letters",)),
+    ("Marketing", ("marketing_plans", "marketing_campaigns", "marketing_leads",
+                   "market_research", "digital_campaigns", "customer_feedback")),
+    ("Projects", ("projects", "project_milestones", "project_tasks",
+                  "project_members")),
 )
 
 
@@ -518,8 +518,8 @@ AUDITOR_REPORTS = (
     },
     {
         "key": "procurement",
-        "label": "Procurement",
-        "title": "Procurement report",
+        "label": "Procurement Management",
+        "title": "Procurement Management report",
         "subtitle": "Requisitions raised, what they cost and who signed them",
         "requires": "procurement_requests",
         "date_column": "recorded_on",
@@ -611,10 +611,8 @@ AUDITOR_REPORTS = (
 
 
 def auditor_table_names(db):
-    """Every table an auditor may open, finance and letters included."""
-    local = {row[0] for row in db.execute(
-        "SELECT name FROM sqlite_master WHERE type = 'table'")}
-    return local | finance.table_names(db) | letters_db.table_names(db)
+    """Every table an auditor may open, read across all module files."""
+    return database_config.all_table_names()
 
 
 def auditor_records_url(table, **kwargs):
@@ -629,8 +627,7 @@ def auditor_record_groups(db, present):
         for table in tables:
             if table not in present:
                 continue
-            count = db.execute("SELECT COUNT(*) FROM %s"
-                               % qualified_table(table)).fetchone()[0]
+            count = database_config.table_count(table)
             rows.append({"table": table,
                          "label": table.replace("_", " ").title(),
                          "count": count,
@@ -641,11 +638,16 @@ def auditor_record_groups(db, present):
 
 
 def auditor_visible_columns(db, table):
-    """Every column except the ones a credential could ever live in."""
-    if table in FINANCE_TABLES:
-        pragma = "{}.table_info({})".format(finance.SCHEMA, table)
-    elif table in LETTER_TABLES:
-        pragma = "{}.table_info({})".format(letters_db.SCHEMA, table)
+    """Every column except the ones a credential could ever live in.
+
+    A bare PRAGMA reads the main file only, so the table's owning module has to
+    name its schema first. The registry already knows who owns what, which is
+    how one rule covers the finance file, the letters file and every desk added
+    after them.
+    """
+    schema = database_config.TABLE_SCHEMA.get(table)
+    if schema and schema != "main":
+        pragma = "{}.table_info({})".format(schema, table)
     else:
         pragma = "table_info({})".format(table)
     columns = [row[1] for row in db.execute("PRAGMA " + pragma)]
@@ -741,6 +743,24 @@ def auditor_cell(row, key, money):
     return str(value)
 
 
+def csv_safe(value):
+    """One cell as the spreadsheet file receives it, never as a formula.
+
+    Every exported column can carry text some account typed - a party name, a
+    note, a job title - and a reader who opens the file in Excel would run a
+    value starting with =, +, @ or a tab as a formula on their own machine. A
+    leading apostrophe keeps the cell as text. Figures are left alone, so a
+    negative amount still arrives as a number.
+    """
+    text = auditor_display(value)
+    if text[:1] in ("=", "+", "-", "@", "\t", "\r"):
+        try:
+            float(text.replace(",", "").replace("%", ""))
+        except ValueError:
+            return "'" + text
+    return text
+
+
 def auditor_csv(columns, rows):
     """A complete copy of the table for the spreadsheet, byte for byte what the
     screen shows. Written here rather than in the browser so an export cannot be
@@ -749,7 +769,7 @@ def auditor_csv(columns, rows):
                       for _key, label in columns)]
     for row in rows:
         lines.append(",".join(
-            '"%s"' % auditor_display(row[key]).replace('"', '""')
+            '"%s"' % csv_safe(row[key]).replace('"', '""')
             for key, _label in columns))
     # the byte order mark is what makes Excel open a UTF-8 file as UTF-8
     return ("\ufeff" + "\r\n".join(lines) + "\r\n").encode("utf-8")

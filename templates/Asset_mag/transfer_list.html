@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container-fluid py-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+
+        <div>
+            <h3>Asset Transfer Management</h3>
+            <p class="text-muted">
+                Manage department transfer requests and approvals.
+            </p>
+        </div>
+
+        <a
+            href="{{ url_for('asset_management.create_asset_transfer') }}"
+            class="btn btn-success"
+        >
+            New Transfer Request
+        </a>
+
+    </div>
+
+    <div class="card shadow-sm">
+
+        <div class="table-responsive">
+
+            <table class="table table-hover align-middle">
+
+                <thead class="table-light">
+                    <tr>
+                        <th>Asset</th>
+                        <th>From Department ID</th>
+                        <th>To Department ID</th>
+                        <th>Request Date</th>
+                        <th>Reason</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for transfer in transfers %}
+
+                    <tr>
+
+                        <td>
+                            {{ transfer.asset.asset_code }}
+                            - {{ transfer.asset.name }}
+                        </td>
+
+                        <td>{{ transfer.from_department_id }}</td>
+
+                        <td>{{ transfer.to_department_id }}</td>
+
+                        <td>{{ transfer.request_date }}</td>
+
+                        <td>{{ transfer.reason }}</td>
+
+                        <td>{{ transfer.status }}</td>
+
+                        <td>
+
+                            {% if transfer.status == "Pending" %}
+
+                            <form
+                                method="POST"
+                                action="{{ url_for(
+                                    'asset_management.decide_asset_transfer',
+                                    transfer_id=transfer.id
+                                ) }}"
+                                class="d-inline"
+                            >
+
+                                <input type="hidden"
+                                       name="csrf_token"
+                                       value="{{ csrf_token() }}">
+
+                                <input type="hidden"
+                                       name="decision"
+                                       value="Approved">
+
+                                <button class="btn btn-sm btn-success">
+                                    Approve
+                                </button>
+
+                            </form>
+
+                            <form
+                                method="POST"
+                                action="{{ url_for(
+                                    'asset_management.decide_asset_transfer',
+                                    transfer_id=transfer.id
+                                ) }}"
+                                class="d-inline"
+                            >
+
+                                <input type="hidden"
+                                       name="csrf_token"
+                                       value="{{ csrf_token() }}">
+
+                                <input type="hidden"
+                                       name="decision"
+                                       value="Rejected">
+
+                                <button class="btn btn-sm btn-danger">
+                                    Reject
+                                </button>
+
+                            </form>
+
+                            {% elif transfer.status == "Approved" %}
+
+                            <form
+                                method="POST"
+                                action="{{ url_for(
+                                    'asset_management.receive_asset_transfer',
+                                    transfer_id=transfer.id
+                                ) }}"
+                            >
+
+                                <input type="hidden"
+                                       name="csrf_token"
+                                       value="{{ csrf_token() }}">
+
+                                <button class="btn btn-sm btn-primary">
+                                    Confirm Receipt
+                                </button>
+
+                            </form>
+
+                            {% else %}
+
+                            <span class="text-muted">No action</span>
+
+                            {% endif %}
+
+                        </td>
+
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="7" class="text-center py-4">
+                            No transfer requests found.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

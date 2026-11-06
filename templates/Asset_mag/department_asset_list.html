@@ -1,0 +1,116 @@
+
+{% extends "base.html" %}
+
+{% block title %}Department Assets{% endblock %}
+
+{% block content %}
+
+<div class="asset-dashboard">
+
+    <div class="asset-page-header">
+        <div>
+            <h2>Department Assets</h2>
+            <p>Department ID: {{ department_id }}</p>
+        </div>
+
+        <a href="{{ url_for('asset_management.department_assets') }}"
+           class="asset-btn asset-btn-secondary">
+            Back to Departments
+        </a>
+    </div>
+
+    <div class="asset-kpi-grid">
+
+        <div class="asset-kpi-card">
+            <div>
+                <span>Total Assets</span>
+                <h3>{{ total_assets }}</h3>
+            </div>
+        </div>
+
+        <div class="asset-kpi-card">
+            <div>
+                <span>Available</span>
+                <h3>{{ available_assets }}</h3>
+            </div>
+        </div>
+
+        <div class="asset-kpi-card">
+            <div>
+                <span>Assigned</span>
+                <h3>{{ assigned_assets }}</h3>
+            </div>
+        </div>
+
+        <div class="asset-kpi-card">
+            <div>
+                <span>Maintenance</span>
+                <h3>{{ maintenance_assets }}</h3>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="asset-panel">
+
+        <h3>Department Asset Register</h3>
+
+        <div class="asset-table-wrapper">
+
+            <table class="asset-table">
+
+                <thead>
+                    <tr>
+                        <th>Asset Code</th>
+                        <th>Asset Name</th>
+                        <th>Category</th>
+                        <th>Serial Number</th>
+                        <th>Location</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for asset in assets %}
+
+                    <tr>
+                        <td>{{ asset.asset_code }}</td>
+                        <td>{{ asset.name }}</td>
+                        <td>{{ asset.category.name if asset.category else '-' }}</td>
+                        <td>{{ asset.serial_number or '-' }}</td>
+                        <td>{{ asset.location or '-' }}</td>
+                        <td>{{ asset.status }}</td>
+
+                        <td>
+                            <a href="{{ url_for(
+                                'asset_management.view_asset',
+                                asset_id=asset.id
+                            ) }}" class="asset-view-link">
+                                View
+                            </a>
+                        </td>
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="7" class="asset-empty">
+                            No assets assigned to this department.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

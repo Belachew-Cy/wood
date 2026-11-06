@@ -2,6 +2,7 @@
 
 from core.access import current_user
 from core.access import effective_permissions
+from core.access import has_permission
 from core.access import login_required
 from core.access import perm
 from core.db import get_db
@@ -14,15 +15,31 @@ from flask import render_template
 from flask import request
 from flask import url_for
 from services.audit import log_activity
+from services.department_access import create_standard_roles
 from services.hr import hr_department_options
 from services.notifications import deliver_notification
+from services.org import DEPARTMENT_UNIT_TYPES
 from services.org import POSITION_LEVEL_LABEL
 from services.org import clean_department_position
+from services.org import clean_unit_type
+from services.org import department_ancestor_ids
 from services.org import hierarchy_columns
 from services.org import hierarchy_db
 from services.org import org_leadership_level
 from services.org import organization_snapshot
+from services.org import sync_department_head
+from services.org_structure import apply_standard_structure
+from services.org_structure import structure_plan
 import sqlite3
+
+
+def form_int(value):
+    """A form field as an integer, or None when it was left empty."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
 
 
 @route("/api/organizational-hierarchy")
@@ -124,7 +141,7 @@ def create_department():
 
 
 @route("/manage-hierarchy", methods=["GET", "POST"])
-@perm("hr")
+@perm("hr_organization")
 def manage_hierarchy():
     user = current_user()
     is_admin = "accounts" in effective_permissions(user)
@@ -133,6 +150,7 @@ def manage_hierarchy():
         if request.method == "POST":
             action = request.form.get("action", "").strip()
             audit_note = None
+            action_details = None
 
             try:
                 if action in ("set_department_status", "delete_department") and not is_admin:
@@ -140,7 +158,44 @@ def manage_hierarchy():
                         "Only an administrator can change status or delete a department."
                     )
 
-                if action == "add_department":
+                if action == "apply_standard_structure":
+                    if not is_admin:
+                        raise ValueError(
+                            "Only an administrator can publish the standard "
+                            "organization structure."
+                        )
+                    try:
+                        summary = apply_standard_structure(conn)
+                    except Exception:
+                        conn.rollback()
+                        raise
+                    added = (len(summary["units_created"]),
+                             len(summary["positions_created"]),
+                             summary["links_added"])
+                    if not any(added):
+                        flash(
+                            "The standard structure is already in place. No "
+                            "existing unit, position or reporting line was changed.",
+                            "info")
+                    else:
+                        flash(
+                            "Standard structure applied: {} new unit(s), {} new "
+                            "position(s) and {} reporting line(s). Existing "
+                            "records were kept as they were.".format(*added),
+                            "success")
+                    audit_note = (
+                        "Standard organization structure applied: {} unit(s) "
+                        "created, {} position(s) created, {} reporting line(s) "
+                        "added".format(*added))
+                    action_details = {
+                        "units_created": summary["units_created"],
+                        "positions_created": summary["positions_created"],
+                        "links_added": summary["links_added"],
+                        "matched_units": len(summary["units_matched"]),
+                        "matched_positions": len(summary["positions_matched"]),
+                    }
+
+                elif action == "add_department":
                     name = request.form.get(
                         "department_name", ""
                     ).strip()
@@ -151,6 +206,11 @@ def manage_hierarchy():
 
                     position = clean_department_position(
                         request.form.get("leadership_position", ""))
+
+                    unit_type = clean_unit_type(
+                        request.form.get("unit_type", "Department"))
+                    parent_id = form_int(request.form.get("parent_id"))
+                    head_id = form_int(request.form.get("head_employee_id"))
 
                     if not name:
                         flash("Department name is required.", "error")
@@ -160,21 +220,33 @@ def manage_hierarchy():
                             "department's leadership position.",
                             "error"
                         )
+                    elif parent_id and conn.execute(
+                            "SELECT 1 FROM departments WHERE id = ?",
+                            (parent_id,)).fetchone() is None:
+                        flash("The selected parent unit does not exist.", "error")
                     else:
-                        conn.execute("""
+                        department_id = conn.execute("""
                             INSERT INTO departments
-                                (name, description, leadership_position)
-                            VALUES (?, ?, ?)
-                        """, (name, description, position))
+                                (name, description, leadership_position,
+                                 unit_type, parent_id, head_employee_id)
+                            VALUES (?, ?, ?, ?, ?, ?)
+                        """, (name, description, position, unit_type,
+                              parent_id, head_id)).lastrowid
+
+                        head_name = sync_department_head(
+                            conn,
+                            {"id": department_id, "name": name},
+                            head_id)
 
                         flash("Department added successfully.", "success")
-                        audit_note = "Department '{}' added ({})".format(
-                            name, position)
+                        audit_note = "Department '{}' added ({} · {})".format(
+                            name, unit_type, position)
+                        if head_name:
+                            audit_note += ", head {}".format(head_name)
 
                 elif action == "edit_department":
-                    department_id = int(
-                        request.form.get("department_id", "0")
-                    )
+                    department_id = form_int(
+                        request.form.get("department_id"))
                     name = request.form.get(
                         "department_name", ""
                     ).strip()
@@ -183,10 +255,17 @@ def manage_hierarchy():
                     ).strip()
                     position = clean_department_position(
                         request.form.get("leadership_position", ""))
+                    unit_type = clean_unit_type(
+                        request.form.get("unit_type", "Department"))
+                    parent_id = form_int(request.form.get("parent_id"))
+                    head_id = form_int(request.form.get("head_employee_id"))
 
                     current = conn.execute("""
-                        SELECT name FROM departments WHERE id = ?
+                        SELECT * FROM departments WHERE id = ?
                     """, (department_id,)).fetchone()
+
+                    branch = conn.execute(
+                        "SELECT id, parent_id FROM departments").fetchall()
 
                     if not name:
                         flash("Department name is required.", "error")
@@ -198,12 +277,26 @@ def manage_hierarchy():
                         )
                     elif current is None:
                         flash("Department not found.", "error")
+                    elif parent_id and conn.execute(
+                            "SELECT 1 FROM departments WHERE id = ?",
+                            (parent_id,)).fetchone() is None:
+                        flash("The selected parent unit does not exist.", "error")
+                    elif parent_id and (
+                            parent_id == department_id
+                            or department_id in department_ancestor_ids(
+                                branch, parent_id)):
+                        flash(
+                            "A department cannot sit inside its own branch.",
+                            "error"
+                        )
                     else:
                         conn.execute("""
                             UPDATE departments
-                            SET name = ?, description = ?, leadership_position = ?
+                            SET name = ?, description = ?, leadership_position = ?,
+                                unit_type = ?, parent_id = ?, head_employee_id = ?
                             WHERE id = ?
-                        """, (name, description, position, department_id))
+                        """, (name, description, position, unit_type,
+                              parent_id, head_id, department_id))
 
                         # Employees store the department name, not its id.
                         if current["name"] != name:
@@ -224,10 +317,32 @@ def manage_hierarchy():
                                 """.format(table),
                                     (name, department_id, department_id,
                                      current["name"]))
+                            # The vacancy and integration files keep their own
+                            # copy of the name, which has to follow the rename.
+                            conn.execute("""
+                                UPDATE job_vacancies
+                                SET department = ?, department_id = ?
+                                WHERE department_id = ?
+                                   OR department = ? COLLATE NOCASE
+                            """, (name, department_id, department_id,
+                                  current["name"]))
+                            conn.execute("""
+                                UPDATE integration_department_mappings
+                                SET hr_department_name = ?, hr_department_id = ?
+                                WHERE hr_department_id = ?
+                                   OR hr_department_name = ? COLLATE NOCASE
+                            """, (name, department_id, department_id,
+                                  current["name"]))
+
+                        head_name = sync_department_head(
+                            conn,
+                            {"id": department_id, "name": name},
+                            head_id)
 
                         flash("Department updated.", "success")
                         audit_note = "Department '{}' updated".format(name)
-                        audit_note = "Department '{}' updated".format(name)
+                        if head_name:
+                            audit_note += ", head {}".format(head_name)
 
                 elif action == "set_department_status":
                     department_id = int(
@@ -259,23 +374,179 @@ def manage_hierarchy():
                         "position_title", ""
                     ).strip()
 
-                    department_id = request.form.get(
-                        "position_department_id"
-                    ) or None
-
-                    level = request.form.get("level", "4")
+                    department_id = form_int(
+                        request.form.get("position_department_id"))
+                    reports_to_id = form_int(
+                        request.form.get("reports_to_position_id"))
+                    level = form_int(request.form.get("level"))
+                    if level is None or level < 0 or level > 4:
+                        level = 4
 
                     if not title:
                         flash("Position title is required.", "error")
+                    elif department_id and conn.execute(
+                            "SELECT 1 FROM departments WHERE id = ?",
+                            (department_id,)).fetchone() is None:
+                        flash("The selected department does not exist.", "error")
+                    elif reports_to_id and conn.execute(
+                            "SELECT 1 FROM organizational_positions WHERE id = ?",
+                            (reports_to_id,)).fetchone() is None:
+                        flash("The position it reports to does not exist.",
+                              "error")
                     else:
                         conn.execute("""
                             INSERT INTO organizational_positions
-                                (title, department_id, level)
-                            VALUES (?, ?, ?)
-                        """, (title, department_id, int(level)))
+                                (title, department_id, level,
+                                 reports_to_position_id)
+                            VALUES (?, ?, ?, ?)
+                        """, (title, department_id, level, reports_to_id))
 
                         flash("Position added successfully.", "success")
                         audit_note = "Position '{}' added".format(title)
+                        if reports_to_id:
+                            parent = conn.execute("""
+                                SELECT title FROM organizational_positions
+                                WHERE id = ?
+                            """, (reports_to_id,)).fetchone()
+                            if parent is not None:
+                                audit_note += " under '{}'".format(
+                                    parent["title"])
+
+                elif action == "edit_position":
+                    position_id = form_int(request.form.get("position_id"))
+                    title = request.form.get(
+                        "position_title", "").strip()
+                    department_id = form_int(
+                        request.form.get("position_department_id"))
+                    reports_to_id = form_int(
+                        request.form.get("reports_to_position_id"))
+                    level = form_int(request.form.get("level"))
+                    if level is None or level < 0 or level > 4:
+                        level = 4
+
+                    current = conn.execute("""
+                        SELECT * FROM organizational_positions WHERE id = ?
+                    """, (position_id,)).fetchone()
+
+                    if current is None:
+                        flash("Position not found.", "error")
+                    elif not title:
+                        flash("Position title is required.", "error")
+                    elif department_id and conn.execute(
+                            "SELECT 1 FROM departments WHERE id = ?",
+                            (department_id,)).fetchone() is None:
+                        flash("The selected department does not exist.", "error")
+                    elif reports_to_id == position_id:
+                        flash("A position cannot report to itself.", "error")
+                    elif reports_to_id and not conn.execute(
+                            "SELECT 1 FROM organizational_positions WHERE id = ?",
+                            (reports_to_id,)).fetchone():
+                        flash("The position it reports to does not exist.",
+                              "error")
+                    else:
+                        # Walk the proposed parent's own chain: reaching this
+                        # position would close a loop on the reporting map.
+                        seen, cursor, cycle = set(), reports_to_id, False
+                        while cursor is not None and cursor not in seen:
+                            if cursor == position_id:
+                                cycle = True
+                                break
+                            seen.add(cursor)
+                            row = conn.execute("""
+                                SELECT reports_to_position_id
+                                FROM organizational_positions WHERE id = ?
+                            """, (cursor,)).fetchone()
+                            cursor = (row["reports_to_position_id"]
+                                      if row is not None else None)
+                        if cycle:
+                            flash("That reporting line would create a cycle.",
+                                  "error")
+                        else:
+                            conn.execute("""
+                                UPDATE organizational_positions
+                                SET title = ?, department_id = ?, level = ?,
+                                    reports_to_position_id = ?
+                                WHERE id = ?
+                            """, (title, department_id, level, reports_to_id,
+                                  position_id))
+
+                            # The HR row carries a copy of the title and the
+                            # department, so both holders follow an edit.
+                            if title != current["title"]:
+                                conn.execute("""
+                                    UPDATE employees SET job_title = ?
+                                    WHERE position_id = ?
+                                """, (title, position_id))
+                            department = None
+                            if department_id:
+                                department = conn.execute("""
+                                    SELECT name FROM departments WHERE id = ?
+                                """, (department_id,)).fetchone()
+                            if department_id != current["department_id"]:
+                                conn.execute("""
+                                    UPDATE employees SET department = ?
+                                    WHERE position_id = ?
+                                """, (department["name"] if department else "",
+                                      position_id))
+                                conn.execute("""
+                                    UPDATE users SET department_id = ?
+                                    WHERE position_id = ?
+                                """, (department_id, position_id))
+
+                            flash("Position updated.", "success")
+                            audit_note = "Position '{}' updated ({} · {})".format(
+                                title, POSITION_LEVEL_LABEL.get(level, "Staff"),
+                                department["name"] if department else
+                                "no department")
+
+                elif action == "set_position_status":
+                    if not is_admin:
+                        raise ValueError(
+                            "Only an administrator can retire a position."
+                        )
+                    position_id = form_int(request.form.get("position_id"))
+                    active = 0 if request.form.get("active") == "0" else 1
+
+                    position = conn.execute("""
+                        SELECT id, title FROM organizational_positions
+                        WHERE id = ?
+                    """, (position_id,)).fetchone()
+
+                    if position is None:
+                        flash("Position not found.", "error")
+                    elif not active:
+                        staff = conn.execute("""
+                            SELECT COUNT(*) AS n FROM employees
+                            WHERE position_id = ?
+                              AND COALESCE(employment_status, 'Active') = 'Active'
+                        """, (position_id,)).fetchone()["n"]
+                        accounts = conn.execute("""
+                            SELECT COUNT(*) AS n FROM users
+                            WHERE position_id = ? AND status = 'Active'
+                        """, (position_id,)).fetchone()["n"]
+                        if staff or accounts:
+                            flash(
+                                "Position {} is still held by {} active staff "
+                                "member(s) and {} account(s). Reassign them "
+                                "before retiring it.".format(
+                                    position["title"], staff, accounts),
+                                "error")
+                        else:
+                            conn.execute("""
+                                UPDATE organizational_positions
+                                SET is_active = 0 WHERE id = ?
+                            """, (position_id,))
+                            flash("Position retired.", "success")
+                            audit_note = "Position '{}' retired".format(
+                                position["title"])
+                    else:
+                        conn.execute("""
+                            UPDATE organizational_positions
+                            SET is_active = 1 WHERE id = ?
+                        """, (position_id,))
+                        flash("Position restored.", "success")
+                        audit_note = "Position '{}' restored".format(
+                            position["title"])
 
                 elif action == "assign_employee":
                     employee_id = int(
@@ -317,7 +588,9 @@ def manage_hierarchy():
                         position = None
                         if position_id:
                             position = conn.execute("""
-                                SELECT p.title, d.name AS department_name
+                                SELECT p.id, p.title, p.department_id,
+                                       COALESCE(p.is_active, 1) AS is_active,
+                                       d.name AS department_name
                                 FROM organizational_positions p
                                 LEFT JOIN departments d
                                     ON d.id = p.department_id
@@ -328,6 +601,15 @@ def manage_hierarchy():
                                 raise ValueError(
                                     "Selected position does not exist."
                                 )
+                            if not position["is_active"]:
+                                raise ValueError(
+                                    "Selected position is retired. Choose an "
+                                    "active position."
+                                )
+                            # A position belongs to one department, so placing
+                            # somebody on it also puts them in that team.
+                            if position["department_id"]:
+                                department_id = position["department_id"]
 
                         department = None
                         if department_id:
@@ -383,7 +665,7 @@ def manage_hierarchy():
                         conn.execute("""
                             UPDATE employees
                             SET department = ?,
-                                job_title = ?,
+                                job_title = COALESCE(NULLIF(?, ''), job_title),
                                 position_id = ?,
                                 manager_id = ?
                             WHERE id = ?
@@ -443,12 +725,17 @@ def manage_hierarchy():
                         position = None
                         if position_id:
                             position = conn.execute("""
-                                SELECT id, title, department_id
+                                SELECT id, title, department_id,
+                                       COALESCE(is_active, 1) AS is_active
                                 FROM organizational_positions WHERE id = ?
                             """, (int(position_id),)).fetchone()
                             if position is None:
                                 raise ValueError(
                                     "Selected position does not exist.")
+                            if not position["is_active"]:
+                                raise ValueError(
+                                    "Selected position is retired. Choose an "
+                                    "active position.")
                             # A position belongs to one department; assigning
                             # it also moves the account into that team.
                             if position["department_id"]:
@@ -513,6 +800,13 @@ def manage_hierarchy():
                             WHERE department = ?
                         """, (department["name"],))
 
+                        # Sub-units are released to the top level instead of
+                        # being deleted with their parent.
+                        conn.execute("""
+                            UPDATE departments SET parent_id = NULL
+                            WHERE parent_id = ?
+                        """, (department_id,))
+
                         conn.execute("""
                             UPDATE organizational_positions
                             SET department_id = NULL
@@ -531,6 +825,18 @@ def manage_hierarchy():
                                 UPDATE {0} SET department_id = NULL
                                 WHERE department_id = ?
                             """.format(table), (department_id,))
+
+                        # The vacancy and integration files keep their own copy
+                        # of the link, so the release has to reach them too.
+                        conn.execute("""
+                            UPDATE job_vacancies SET department_id = NULL
+                            WHERE department_id = ?
+                        """, (department_id,))
+                        conn.execute("""
+                            UPDATE integration_department_mappings
+                            SET hr_department_id = NULL
+                            WHERE hr_department_id = ?
+                        """, (department_id,))
 
                         conn.execute("""
                             DELETE FROM departments WHERE id = ?
@@ -554,12 +860,23 @@ def manage_hierarchy():
 
             if audit_note:
                 conn.commit()
+                if action == "apply_standard_structure":
+                    # The standard roles file themselves under the units that
+                    # were just published, so the console groups them at once
+                    # instead of waiting for the next start.
+                    try:
+                        roles_db = get_db()
+                        create_standard_roles(roles_db)
+                        roles_db.commit()
+                    except sqlite3.Error:
+                        pass
                 log_activity(
                     {"add_department": "CREATE", "add_position": "CREATE",
+                     "apply_standard_structure": "CREATE",
                      "delete_department": "DELETE"}.get(action, "UPDATE"),
                     "hr", audit_note,
                     record_type="org_structure",
-                    details={"action": action})
+                    details=action_details or {"action": action})
 
             return redirect(url_for("manage_hierarchy"))
 
@@ -578,12 +895,51 @@ def manage_hierarchy():
                 SELECT * FROM departments WHERE id = ?
             """, (edit_department_id,)).fetchone()
 
+        # The parent picker hides the unit itself and everything under it, so a
+        # save can only move a branch, never fold it into its own loop.
+        blocked_parent_ids = set()
+        if edit_department is not None:
+            branch = conn.execute(
+                "SELECT id, parent_id FROM departments").fetchall()
+            blocked_parent_ids = {
+                row["id"] for row in branch
+                if row["id"] == edit_department["id"]
+                or edit_department["id"] in department_ancestor_ids(
+                    branch, row["id"])
+            }
+
         positions = conn.execute("""
-            SELECT p.*, d.name AS department_name
+            SELECT p.*, COALESCE(p.is_active, 1) AS is_active,
+                   d.name AS department_name
             FROM organizational_positions p
             LEFT JOIN departments d ON d.id = p.department_id
             ORDER BY p.level, p.title
         """).fetchall()
+        position_names = {row["id"]: row["title"] for row in positions}
+
+        edit_position = None
+        edit_position_id = request.args.get("edit_position", type=int)
+        if edit_position_id:
+            edit_position = conn.execute("""
+                SELECT * FROM organizational_positions WHERE id = ?
+            """, (edit_position_id,)).fetchone()
+
+        # A reporting target may not be this position or anything beneath it,
+        # or the map would close a loop when the edit saves.
+        blocked_reports_ids = set()
+        if edit_position is not None:
+            blocked_reports_ids = {edit_position["id"]}
+            changed = True
+            while changed:
+                changed = False
+                for row in conn.execute("""
+                    SELECT id, reports_to_position_id
+                    FROM organizational_positions
+                """).fetchall():
+                    if (row["reports_to_position_id"] in blocked_reports_ids
+                            and row["id"] not in blocked_reports_ids):
+                        blocked_reports_ids.add(row["id"])
+                        changed = True
 
         employees = conn.execute("""
             SELECT e.id, e.full_name, e.department, e.job_title,
@@ -614,16 +970,25 @@ def manage_hierarchy():
                                if not account["department_id"]]
 
         org = organization_snapshot(conn, current_user())
+        standard = structure_plan(conn)
 
     return render_template(
         "manage_hierarchy.html",
         departments=departments,
         edit_department=edit_department,
         positions=positions,
+        position_names=position_names,
+        edit_position=edit_position,
+        blocked_reports_ids=blocked_reports_ids,
         employees=employees,
         directory=directory,
         accounts=accounts,
         unassigned_accounts=unassigned_accounts,
         position_level_label=POSITION_LEVEL_LABEL,
+        unit_types=DEPARTMENT_UNIT_TYPES,
+        blocked_parent_ids=blocked_parent_ids,
+        can_manage_roles=has_permission("admin_roles"),
+        can_apply_structure=is_admin,
+        standard=standard,
         org=org
     )

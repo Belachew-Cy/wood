@@ -1,0 +1,325 @@
+
+{% extends "base.html" %}
+
+{% block title %}Audit Activity Logs | Audit Management{% endblock %}
+
+{% block content %}
+
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Audit Management / Security</span>
+            <h1>Audit Activity Logs</h1>
+            <p>
+                Monitor user activities, audit operations and
+                important events across the Audit Management module.
+            </p>
+        </div>
+
+        <div class="stock-actions">
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.dashboard') }}">
+                Dashboard
+            </a>
+
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.integration_status') }}">
+                Integration Status
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="container finance-page">
+
+    <!-- ACTIVITY SUMMARY -->
+
+    <div class="hr-stats">
+
+        <div class="dash-panel">
+            <span class="eyebrow">Total Activities</span>
+            <h2>{{ stats.total | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Today</span>
+            <h2>{{ stats.today | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">User Activities</span>
+            <h2>{{ stats.user_activities | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Security Events</span>
+            <h2>{{ stats.security_events | default(0) }}</h2>
+        </div>
+
+    </div>
+
+
+    <!-- FILTERS -->
+
+    <div class="dash-panel">
+
+        <h2>Search Activity History</h2>
+
+        <form method="GET"
+              action="{{ url_for('audit.audit_logs') }}">
+
+            <div class="form-grid">
+
+                <div class="form-group">
+                    <label for="search">Search</label>
+                    <input type="text"
+                           id="search"
+                           name="search"
+                           value="{{ filters.search | default('') }}"
+                           placeholder="Search user, action or description">
+                </div>
+
+                <div class="form-group">
+                    <label for="module">Module</label>
+                    <select id="module" name="module">
+                        <option value="">All Modules</option>
+
+                        {% for module in modules | default([]) %}
+                            <option value="{{ module }}"
+                                {% if filters.module | default('') == module %}
+                                    selected
+                                {% endif %}>
+                                {{ module }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="activity_type">Activity Type</label>
+                    <select id="activity_type" name="activity_type">
+                        <option value="">All Activities</option>
+                        <option value="CREATE">Create</option>
+                        <option value="UPDATE">Update</option>
+                        <option value="DELETE">Delete</option>
+                        <option value="VIEW">View</option>
+                        <option value="APPROVE">Approve</option>
+                        <option value="EXPORT">Export</option>
+                        <option value="LOGIN">Login</option>
+                        <option value="SECURITY">Security Event</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="date_from">From Date</label>
+                    <input type="date"
+                           id="date_from"
+                           name="date_from"
+                           value="{{ filters.date_from | default('') }}">
+                </div>
+
+                <div class="form-group">
+                    <label for="date_to">To Date</label>
+                    <input type="date"
+                           id="date_to"
+                           name="date_to"
+                           value="{{ filters.date_to | default('') }}">
+                </div>
+
+            </div>
+
+            <div class="form-actions">
+
+                <button type="submit" class="btn btn-primary">
+                    Apply Filters
+                </button>
+
+                <a class="btn btn-outline"
+                   href="{{ url_for('audit.audit_logs') }}">
+                    Clear Filters
+                </a>
+
+            </div>
+
+        </form>
+
+    </div>
+
+
+    <!-- ACTIVITY REGISTER -->
+
+    <div class="dash-panel hr-table-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Activity Register</h2>
+                <p>
+                    Recorded activities and security-related events.
+                </p>
+            </div>
+
+            <span class="status-badge neutral">
+                {{ logs | length }} Records
+            </span>
+        </div>
+
+        <div class="table-scroll">
+
+            <table class="report-table">
+
+                <thead>
+                    <tr>
+                        <th>Date / Time</th>
+                        <th>User</th>
+                        <th>Module</th>
+                        <th>Activity</th>
+                        <th>Description</th>
+                        <th>Record Reference</th>
+                        <th>IP Address</th>
+                        <th>Result</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for log in logs | default([]) %}
+
+                    <tr>
+
+                        <td>
+                            {{ log.created_at
+                               | default(log.timestamp | default('—')) }}
+                        </td>
+
+                        <td>
+                            <strong>
+                                {{ log.username
+                                   | default(log.user_name
+                                   | default(log.user_id | default('System'))) }}
+                            </strong>
+                        </td>
+
+                        <td>
+                            {{ log.module | default('Audit') }}
+                        </td>
+
+                        <td>
+                            {{ log.action
+                               | default(log.activity_type | default('—')) }}
+                        </td>
+
+                        <td>
+                            {{ log.description | default('—') }}
+                        </td>
+
+                        <td>
+                            {{ log.record_reference
+                               | default(log.record_id | default('—')) }}
+                        </td>
+
+                        <td>
+                            {{ log.ip_address | default('—') }}
+                        </td>
+
+                        <td>
+                            {% set result = log.result | default('Recorded') %}
+
+                            <span class="status-badge
+                                {{ 'active' if result in ['Success', 'Successful']
+                                else ('off' if result in ['Failed', 'Failure']
+                                else 'neutral') }}">
+                                {{ result }}
+                            </span>
+                        </td>
+
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="8" class="report-empty">
+                            No audit activity records were found.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <!-- PAGINATION -->
+
+    {% if pagination is defined and pagination %}
+
+    <div class="dash-panel">
+
+        <div class="dash-panel-head">
+
+            <p>
+                Page {{ pagination.page | default(1) }}
+                of {{ pagination.pages | default(1) }}
+            </p>
+
+            <div class="stock-actions">
+
+                {% if pagination.has_prev | default(false) %}
+
+                <a class="btn btn-outline btn-sm"
+                   href="{{ url_for(
+                       'audit.audit_logs',
+                       page=pagination.page - 1
+                   ) }}">
+                    Previous
+                </a>
+
+                {% endif %}
+
+                {% if pagination.has_next | default(false) %}
+
+                <a class="btn btn-outline btn-sm"
+                   href="{{ url_for(
+                       'audit.audit_logs',
+                       page=pagination.page + 1
+                   ) }}">
+                    Next
+                </a>
+
+                {% endif %}
+
+            </div>
+
+        </div>
+
+    </div>
+
+    {% endif %}
+
+
+    <!-- AUDIT LOG SECURITY -->
+
+    <div class="dash-panel">
+
+        <h2>Audit Log Security and Integrity</h2>
+
+        <ul>
+            <li>Audit logs should be generated automatically by server-side operations.</li>
+            <li>Users must not be allowed to modify or delete historical activity records.</li>
+            <li>Record the authenticated user, action, timestamp and relevant record reference.</li>
+            <li>Restrict access to sensitive IP addresses and security-event information.</li>
+            <li>Protect logs against unauthorized modification and deletion.</li>
+            <li>Use consistent timestamps and document the timezone.</li>
+            <li>Record failed access attempts and authorization failures where appropriate.</li>
+            <li>Apply the existing Audit Management permission system.</li>
+        </ul>
+
+    </div>
+
+</section>
+
+{% endblock %}

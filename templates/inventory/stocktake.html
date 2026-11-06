@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi with context %}
+
+{% block title %}Stocktake | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">INVENTORY MANAGEMENT</span>
+      <h1>Stocktake</h1>
+      <p>Count the shelf, record what is there, and correct the ledger only after
+        a second desk approves the difference.</p>
+    </div>
+    <a class="btn btn-outline btn-sm" href="{{ url_for('inventory.dashboard') }}">
+      ← Inventory desk
+    </a>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="hr-stats">
+      {{ kpi('Open counts', counts["counting"], 'on the shelf now',
+             'flat' if not counts["counting"] else 'up') }}
+      {{ kpi('Waiting approval', counts["waiting"], 'with the reviewing desk',
+             'down' if counts["waiting"] else 'flat') }}
+      {{ kpi('Approved', counts["approved"], 'ready to post',
+             'up' if counts["approved"] else 'flat') }}
+      {{ kpi('Posted', counts["posted"], 'ledger corrected') }}
+    </div>
+
+    {% if can_count %}
+    <div class="dash-panel">
+      <h2>Open a count</h2>
+      <form method="POST" action="{{ url_for('inventory.new_stocktake') }}"
+            class="dash-form stock-grid">
+        {{ csrf_field() }}
+        <div>
+          <label for="title">Title *</label>
+          <input id="title" name="title" maxlength="120" required
+                 placeholder="e.g. Main store, October count" />
+        </div>
+        <div>
+          <label for="count_date">Count date *</label>
+          <input id="count_date" name="count_date" type="date" required
+                 value="{{ today }}" />
+        </div>
+        <div class="stock-notes">
+          <label for="notes">Notes</label>
+          <input id="notes" name="notes" maxlength="400"
+                 placeholder="Shift, team or anything the reviewer should know" />
+        </div>
+        <div class="stock-form-actions">
+          <button class="btn btn-sm" type="submit">Open stocktake</button>
+        </div>
+      </form>
+    </div>
+    {% endif %}
+
+    <div class="dash-panel hr-table-panel">
+      <h2>Count sessions</h2>
+      <div class="hr-table-wrap table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Number</th><th>Title</th><th>Count date</th><th>Status</th>
+              <th>Counted</th><th>Variances</th><th>Opened by</th>
+              <th>Opened</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for session in sessions %}
+            <tr>
+              <td>{{ session["number"] }}</td>
+              <td>{{ session["title"] }}</td>
+              <td>{{ session["count_date"] }}</td>
+              <td>
+                {% set badge = 'neutral' if session['status'] == 'COUNTING'
+                   else 'medium' if session['status'] == 'SUBMITTED'
+                   else 'active' %}
+                <span class="status-badge {{ badge }}">
+                  {{ statuses[session["status"]] }}
+                </span>
+              </td>
+              <td>{{ session["counted_count"] }} / {{ session["line_count"] }}</td>
+              <td>{{ session["variance_count"] }}</td>
+              <td>{{ session["created_by_name"] }}</td>
+              <td class="nowrap">{{ session["created_at"] | audit_time }}</td>
+              <td class="row-actions">
+                <a class="btn"
+                   href="{{ url_for('inventory.stocktake_detail', stocktake_id=session['id']) }}">
+                  Open
+                </a>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="9">No stocktake has been opened yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

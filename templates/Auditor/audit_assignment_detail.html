@@ -1,0 +1,309 @@
+
+{% extends "base.html" %}
+
+{% block title %}Audit Assignment Details | Audit Management{% endblock %}
+
+{% block content %}
+
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Audit Management / Assignments</span>
+            <h1>Assignment Details</h1>
+            <p>Review auditor responsibilities, assignment progress and history.</p>
+        </div>
+
+        <div class="stock-actions">
+            <a href="{{ url_for('audit.audit_assignments') }}"
+               class="btn btn-outline btn-sm">All Assignments</a>
+
+            <a href="{{ url_for('audit.dashboard') }}"
+               class="btn btn-outline btn-sm">Dashboard</a>
+        </div>
+    </div>
+</section>
+
+<section class="container finance-page">
+
+    {% set assignment_data = assignment | default({}, true) %}
+
+    <!-- ASSIGNMENT SUMMARY -->
+
+    <div class="hr-stats">
+
+        <div class="dash-panel">
+            <span class="eyebrow">Assignment Reference</span>
+            <h2>{{ assignment_data.assignment_number | default(assignment_data.id | default('—')) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Assignment Status</span>
+            <h2>{{ assignment_data.status | default('Assigned') }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Priority</span>
+            <h2>{{ assignment_data.priority | default('Normal') }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Due Date</span>
+            <h2>{{ assignment_data.due_date | default('—') }}</h2>
+        </div>
+
+    </div>
+
+    <!-- ASSIGNMENT INFORMATION -->
+
+    <div class="dash-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Assignment Information</h2>
+                <p>Details of the audit assignment and its responsibilities.</p>
+            </div>
+        </div>
+
+        <div class="table-scroll">
+            <table class="report-table">
+                <tbody>
+                    <tr>
+                        <th>Assignment Reference</th>
+                        <td>{{ assignment_data.assignment_number | default(assignment_data.id | default('—')) }}</td>
+                    </tr>
+
+                    <tr>
+                        <th>Audit Plan</th>
+                        <td>{{ assignment_data.plan_number | default('—') }}</td>
+                    </tr>
+
+                    <tr>
+                        <th>Audit Title</th>
+                        <td>{{ assignment_data.plan_title | default('—') }}</td>
+                    </tr>
+
+                    <tr>
+                        <th>Department</th>
+                        <td>{{ assignment_data.department | default('—') }}</td>
+                    </tr>
+
+                    <tr>
+                        <th>Auditor</th>
+                        <td>{{ assignment_data.auditor_name | default('—') }}</td>
+                    </tr>
+
+                    <tr>
+                        <th>Assignment Role</th>
+                        <td>{{ assignment_data.assignment_role | default('Auditor') }}</td>
+                    </tr>
+
+                    <tr>
+                        <th>Assigned Date</th>
+                        <td>{{ assignment_data.assigned_at | default('—') }}</td>
+                    </tr>
+
+                    <tr>
+                        <th>Start Date</th>
+                        <td>{{ assignment_data.start_date | default('—') }}</td>
+                    </tr>
+
+                    <tr>
+                        <th>Due Date</th>
+                        <td>{{ assignment_data.due_date | default('—') }}</td>
+                    </tr>
+
+                    <tr>
+                        <th>Completion Date</th>
+                        <td>{{ assignment_data.completed_at | default('Not completed') }}</td>
+                    </tr>
+
+                    <tr>
+                        <th>Status</th>
+                        <td>{{ assignment_data.status | default('Assigned') }}</td>
+                    </tr>
+
+                    <tr>
+                        <th>Assigned By</th>
+                        <td>{{ assignment_data.assigned_by_name | default('—') }}</td>
+                    </tr>
+
+                    <tr>
+                        <th>Remarks</th>
+                        <td>{{ assignment_data.remarks | default('No remarks provided') }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+    <!-- RESPONSIBILITIES -->
+
+    <div class="dash-panel">
+
+        <h2>Auditor Responsibilities</h2>
+
+        <div class="table-scroll">
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>Responsibility</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    <tr>
+                        <td>Audit Planning</td>
+                        <td>Review the approved audit objectives, scope and methodology.</td>
+                    </tr>
+
+                    <tr>
+                        <td>Evidence Collection</td>
+                        <td>Collect and document relevant audit evidence.</td>
+                    </tr>
+
+                    <tr>
+                        <td>Audit Testing</td>
+                        <td>Perform authorized audit procedures and document results.</td>
+                    </tr>
+
+                    <tr>
+                        <td>Finding Documentation</td>
+                        <td>Document findings and supporting evidence.</td>
+                    </tr>
+
+                    <tr>
+                        <td>Reporting</td>
+                        <td>Submit audit results through the established review process.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+    <!-- ASSIGNMENT HISTORY -->
+
+    <div class="dash-panel hr-table-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Assignment History</h2>
+                <p>Recorded assignment changes and status updates.</p>
+            </div>
+        </div>
+
+        <div class="table-scroll">
+            <table class="report-table">
+
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Action</th>
+                        <th>Performed By</th>
+                        <th>Previous Value</th>
+                        <th>New Value</th>
+                        <th>Remarks</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for item in history | default([], true) %}
+                    <tr>
+                        <td>{{ item.created_at | default('—') }}</td>
+                        <td>{{ item.action | default('—') }}</td>
+                        <td>{{ item.performed_by | default('—') }}</td>
+                        <td>{{ item.old_value | default('—') }}</td>
+                        <td>{{ item.new_value | default('—') }}</td>
+                        <td>{{ item.remarks | default('—') }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="report-empty">
+                            No assignment history is available.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+
+            </table>
+        </div>
+
+    </div>
+
+    <!-- AUTHORIZED STATUS UPDATE -->
+
+    {% if can_manage_assignment | default(false) %}
+
+    <div class="dash-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Update Assignment Status</h2>
+                <p>Only authorized audit managers can update assignment status.</p>
+            </div>
+        </div>
+
+        <form method="POST"
+              action="{{ url_for('audit.update_assignment', assignment_id=assignment_data.id) }}">
+
+            <input type="hidden" name="csrf_token"
+                   value="{{ csrf_token() }}">
+
+            <div class="form-grid">
+
+                <div class="form-group">
+                    <label for="status">New Status</label>
+
+                    <select name="status" id="status" required>
+                        {% for status in ['Assigned', 'In Progress', 'Completed', 'Overdue', 'Cancelled'] %}
+                        <option value="{{ status }}"
+                            {% if assignment_data.status == status %}selected{% endif %}>
+                            {{ status }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="remarks">Update Remarks</label>
+
+                    <textarea name="remarks" id="remarks"
+                              rows="3"
+                              placeholder="Enter the reason for this update..."
+                              required></textarea>
+                </div>
+
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    Save Assignment Update
+                </button>
+            </div>
+
+        </form>
+
+    </div>
+
+    {% endif %}
+
+    <!-- NAVIGATION -->
+
+    <div class="dash-panel">
+        <div class="stock-actions">
+            <a href="{{ url_for('audit.audit_assignments') }}"
+               class="btn btn-outline">Back to Assignments</a>
+
+            <a href="{{ url_for('audit.audit_plans') }}"
+               class="btn btn-outline">Audit Plans</a>
+
+            <a href="{{ url_for('audit.auditor_workload') }}"
+               class="btn btn-outline">Auditor Workload</a>
+        </div>
+    </div>
+
+</section>
+
+{% endblock %}

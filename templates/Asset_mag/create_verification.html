@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container py-4">
+
+    <h3>Create Asset Verification Campaign</h3>
+
+    <div class="card border-0 shadow-sm mt-3">
+        <div class="card-body">
+
+            <form method="POST">
+
+                <input type="hidden"
+                       name="csrf_token"
+                       value="{{ csrf_token() }}">
+
+                <div class="mb-3">
+                    <label class="form-label">Campaign Title</label>
+                    <input type="text"
+                           name="title"
+                           class="form-control"
+                           required>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Description</label>
+                    <textarea name="description"
+                              class="form-control"
+                              rows="3"></textarea>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Department</label>
+
+                    <select name="department_id" class="form-select">
+                        <option value="">All Departments</option>
+
+                        {% for department in departments %}
+                        <option value="{{ department.id }}">
+                            {{ department.name }}
+                        </option>
+                        {% endfor %}
+
+                    </select>
+                </div>
+
+                <div class="row">
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Start Date</label>
+                        <input type="date"
+                               name="start_date"
+                               class="form-control"
+                               required>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">End Date</label>
+                        <input type="date"
+                               name="end_date"
+                               class="form-control">
+                    </div>
+
+                </div>
+
+                <button type="submit" class="btn btn-success">
+                    Create Campaign
+                </button>
+
+            </form>
+
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}

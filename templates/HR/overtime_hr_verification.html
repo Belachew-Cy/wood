@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}Overtime HR Verification | Dereje Belay Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Human Resources</span>
+      <h1>HR Overtime Verification</h1>
+      <p>Verify department-manager-approved overtime before payroll processing.</p>
+    </div>
+    <nav class="stock-actions" aria-label="Overtime actions">
+      <a class="btn btn-outline btn-sm" href="{{ url_for('hr.overtime_dashboard') }}">Back to Overtime</a>
+    </nav>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% set ot_active = request.endpoint and (request.endpoint == 'hr.overtime_dashboard' or request.endpoint.startswith('hr.overtime_') or request.endpoint == 'hr.submit_overtime_request') %}
+    <nav class="hr-navigation" aria-label="HR Management">
+      <a class="hr-nav-link" href="{{ url_for('hr_dashboard') }}">Dashboard</a>
+      <a class="hr-nav-link" href="{{ url_for('employees') }}">Employees</a>
+      <a class="hr-nav-link" href="{{ url_for('attendance') }}">Attendance</a>
+      <a class="hr-nav-link" href="{{ url_for('recruitment.hr_vacancies') }}">Hiring desk</a>
+      <a class="hr-nav-link" href="{{ url_for('leave_management') }}">Leave</a>
+      <a class="hr-nav-link {% if ot_active %}active{% endif %}" href="{{ url_for('hr.overtime_dashboard') }}">Overtime</a>
+      <a class="hr-nav-link" href="{{ url_for('training_performance') }}">Training &amp; Performance</a>
+      <a class="hr-nav-link" href="{{ url_for('manage_hierarchy') }}">Organization</a>
+      <a class="hr-nav-link" href="{{ url_for('reports_centre') }}">Reports</a>
+      <a class="hr-nav-link" href="{{ url_for('hr_settings.index') }}">HR Settings</a>
+    </nav>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+  </div>
+</section>
+
+<section class="section bg-white">
+  <div class="container">
+    <div class="dash-panel hr-table-panel">
+      <h2>Requests awaiting HR verification</h2>
+
+      {% if overtime_requests %}
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Employee</th>
+              <th>Department</th>
+              <th>Date</th>
+              <th>Requested</th>
+              <th>Manager approved</th>
+              <th>Attendance</th>
+              <th>Reason</th>
+              <th>HR verification</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in overtime_requests %}
+            <tr>
+              <td>
+                <strong>{{ item.full_name }}</strong><br />
+                <span class="cell-note">{{ item.employee_code }}</span>
+              </td>
+              <td>{{ item.department or '—' }}</td>
+              <td>{{ item.overtime_date }}</td>
+              <td>{{ "%.2f"|format(item.requested_hours|default(0)|float) }}</td>
+              <td>{{ "%.2f"|format(item.approved_hours|default(0)|float) }}</td>
+              <td>
+                {% if item.attendance_status %}
+                  <span class="status-badge {{ 'off' if item.attendance_status == 'Absent' else 'active' }}">{{ item.attendance_status }}</span>
+                  {% if item.check_in or item.check_out %}
+                  <br /><span class="cell-note">{{ item.check_in or "—" }} to {{ item.check_out or "—" }}</span>
+                  {% endif %}
+                {% else %}
+                  <span class="status-badge neutral">No record</span>
+                {% endif %}
+              </td>
+              <td>{{ item.reason }}</td>
+              <td>
+                {% if not item.attendance_status %}
+                  <span class="cell-note" style="color: var(--danger, #b42318);">
+                    Mark attendance for {{ item.overtime_date }} before verifying this overtime.
+                  </span>
+                {% elif item.attendance_status == "Absent" %}
+                  <span class="cell-note" style="color: var(--danger, #b42318);">
+                    The employee was marked Absent on this date, so the overtime cannot be verified.
+                  </span>
+                {% else %}
+                <form class="status-form" method="POST"
+                      action="{{ url_for('hr.verify_overtime', request_id=item.id) }}">
+                  {{ csrf_field() }}
+
+                  <label for="verified_hours_{{ item.id }}">Verified hours *</label>
+                  <input type="number"
+                         id="verified_hours_{{ item.id }}"
+                         name="verified_hours"
+                         min="0.01"
+                         max="{{ item.approved_hours }}"
+                         step="0.01"
+                         value="{{ item.approved_hours }}"
+                         required />
+
+                  <label for="hr_comment_{{ item.id }}">HR comment *</label>
+                  <textarea id="hr_comment_{{ item.id }}"
+                            name="hr_comment"
+                            rows="2"
+                            maxlength="1000"
+                            placeholder="Enter verification details…"
+                            required></textarea>
+
+                  <button type="submit" class="btn btn-sm">Verify</button>
+                </form>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="empty-state">No overtime requests are waiting for HR verification.</p>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}

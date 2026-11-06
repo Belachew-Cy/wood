@@ -1,0 +1,302 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi, bars, feed, dash_icon with context %}
+{% from "integrations/_module_nav.html" import module_tabs with context %}
+
+{% block title %}Directory connections | System Integrations{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">System Integration · Directory</span>
+      <h1>Directory connections</h1>
+      <p>Accounts, groups and sign-in from Active Directory or Microsoft Entra ID, mapped onto
+        the roles this system already uses. Every connection here is also a row in the
+        integration registry, with its own credential, tests, schedule and history.</p>
+    </div>
+    <div class="dash-stats">
+      <div class="stat"><strong>{{ health.connections }}</strong><span>Connections</span></div>
+      <div class="stat"><strong>{{ health.active_connections }}</strong><span>Enabled</span></div>
+      <div class="stat"><strong>{{ health.managed }}</strong><span>Managed accounts</span></div>
+      <div class="stat"><strong>{{ health.mappings }}</strong><span>Group mappings</span></div>
+    </div>
+    {{ module_tabs('directory') }}
+  </div>
+</section>
+
+{% set attention = [] %}
+{% if not health.ready %}
+  {% set _ = attention.append({
+    'icon': 'warn', 'tone': 'warn',
+    'title': 'The directory tables are not ready',
+    'meta': 'Restart the application so the integration schema is created.',
+    'time': 'Start'
+  }) %}
+{% endif %}
+{% if not connections %}
+  {% set _ = attention.append({
+    'icon': 'network', 'tone': '',
+    'title': 'No directory connection is stored yet',
+    'meta': 'Add one so accounts, groups and sign-in come from the domain instead of by hand.',
+    'time': 'Start'
+  }) %}
+{% endif %}
+{% for c in connections %}
+  {% if c.last_status == 'failed' %}
+    {% set _ = attention.append({
+      'icon': 'warn', 'tone': 'warn',
+      'title': '{} could not be reached'.format(c.name),
+      'meta': c.last_error or 'The last test failed.',
+      'time': c.last_test_at | audit_time or 'Never',
+      'href': url_for('integrations.directory_connection', connection_id=c.id)
+    }) %}
+  {% elif c.last_status == 'untested' %}
+    {% set _ = attention.append({
+      'icon': 'search', 'tone': '',
+      'title': '{} has never been tested'.format(c.name),
+      'meta': 'Run a test before synchronizing so a wrong base DN or secret is found here.',
+      'time': 'Check',
+      'href': url_for('integrations.directory_sync', connection_id=c.id)
+    }) %}
+  {% endif %}
+  {% if not c.enabled %}
+    {% set _ = attention.append({
+      'icon': 'lock', 'tone': 'neutral',
+      'title': '{} is disabled'.format(c.name),
+      'meta': 'Nothing is read from it and scheduled synchronization skips it.',
+      'time': 'Disabled',
+      'href': url_for('integrations.directory_connection', connection_id=c.id)
+    }) %}
+  {% endif %}
+  {% if c.id in due and c.enabled %}
+    {% set _ = attention.append({
+      'icon': 'clock', 'tone': 'warn',
+      'title': '{} is overdue for a sync'.format(c.name),
+      'meta': 'Every {} minutes, last run {}.'.format(
+        c.interval_minutes, (c.last_sync_at or c.last_preview_at) | audit_time or 'never'),
+      'time': 'Due',
+      'href': url_for('integrations.directory_sync', connection_id=c.id)
+    }) %}
+  {% endif %}
+  {% if c.departed_count %}
+    {% set _ = attention.append({
+      'icon': 'users', 'tone': 'warn',
+      'title': '{} account{} marked as departed on {}'.format(
+        c.departed_count, '' if c.departed_count == 1 else 's', c.name),
+      'meta': 'Disabled by the last sync because the directory no longer has them.',
+      'time': 'Accounts',
+      'href': url_for('integrations.directory_accounts')
+    }) %}
+  {% endif %}
+  {% for note in notes.get(c.id, []) %}
+    {% set _ = attention.append({
+      'icon': 'shield', 'tone': 'warn',
+      'title': '{}: {}'.format(c.name, note),
+      'meta': 'Fix it on the connection screen before this directory is relied on.',
+      'time': 'Setup',
+      'href': url_for('integrations.directory_connection', connection_id=c.id)
+    }) %}
+  {% endfor %}
+{% endfor %}
+{% if health.trouble %}
+  {% set _ = attention.append({
+    'icon': 'file', 'tone': 'warn',
+    'title': '{} applied synchronize{} ended with errors'.format(
+      health.trouble, '' if health.trouble == 1 else 'd'),
+    'meta': 'Opened runs in the last 30 days that reported a problem or ran only partly.',
+    'time': 'Last 30 days'
+  }) %}
+{% endif %}
+
+{% set conn_rows = [] %}
+{% for c in connections %}
+  {% set _ = conn_rows.append({
+    'label': c.name,
+    'value': summaries[c.id].accounts,
+    'display': '{} acct'.format(summaries[c.id].accounts)
+  }) %}
+{% endfor %}
+
+<section class="section bg-white">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="hr-stats">
+      {{ kpi('Accounts owned by a directory', health.managed,
+             'Sign-in and status follow the domain', icon='users') }}
+      {{ kpi('Active under management', health.active_accounts,
+             'Everything else is disabled by a person or by sync', tone='good', icon='check') }}
+      {{ kpi('Departed', health.departed,
+             'Disabled because the directory dropped them', tone='bad', icon='warn') }}
+      {{ kpi('Failing connections', health.failing_connections,
+             'Last test could not read the directory', tone='bad', icon='network',
+             href=url_for('integrations.directory_connections')) }}
+    </div>
+
+    <div class="chart-grid" style="margin-top: 1.5rem;">
+      {{ bars('Managed accounts per connection', conn_rows, 'Local figures only') }}
+      {{ feed('Needs attention', attention, 'Before the next synchronization') }}
+    </div>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    <div class="emp-panel">
+      <div class="account-card">
+        <header class="account-head">
+          <div>
+            <h3 class="account-name">Connections</h3>
+            <span class="cell-note">A credential is stored sealed in the registry; this screen
+              only ever says whether one is present.</span>
+          </div>
+          <div class="row-actions">
+            <a class="btn btn-sm" href="{{ url_for('integrations.directory_accounts') }}">Managed accounts</a>
+            <a class="btn btn-sm" href="{{ url_for('integrations.directory_connection', kind='ldap') }}">
+              New Active Directory</a>
+            <a class="btn btn-outline-dark btn-sm"
+               href="{{ url_for('integrations.directory_connection', kind='entra') }}">New Entra ID</a>
+          </div>
+        </header>
+
+        <div class="dash-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Connection</th><th>Directory</th><th>Status</th><th>Groups</th>
+                <th>Accounts</th><th>Schedule</th><th>Last read</th><th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for c in connections %}
+              <tr class="{{ 'is-disabled' if not c.enabled }}">
+                <td>
+                  <a href="{{ url_for('integrations.directory_sync', connection_id=c.id) }}">{{ c.name }}</a>
+                  {% if c.id in due and c.enabled %}
+                  <span class="status-badge neutral">due</span>
+                  {% endif %}
+                  <p class="cell-note">
+                    {{ c.server_url or c.tenant_id }}
+                    {%- if c.kind == 'ldap' and not (c.server_url | lower).startswith('ldaps://')
+                          and not c.use_starttls %} · not encrypted{% endif %}
+                  </p>
+                </td>
+                <td>{{ kind_label[c.kind] }}</td>
+                <td>
+                  <span class="status-badge {{ 'active' if c.last_status == 'ok'
+                                               else ('off' if c.last_status == 'failed' else 'neutral') }}">
+                    {{ c.last_status }}</span>
+                  {% if c.last_error %}<p class="cell-note">{{ c.last_error }}</p>{% endif %}
+                </td>
+                <td>{{ c.mapping_count }} mapped</td>
+                <td>
+                  {{ c.account_count }}
+                  {% if c.departed_count %}
+                  <span class="cell-note">{{ c.departed_count }} departed</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {{ 'Every {} min'.format(c.interval_minutes) if c.interval_minutes else 'Manual' }}
+                </td>
+                <td>
+                  <p class="cell-note">test {{ c.last_test_at | audit_time or 'never' }}</p>
+                  <p class="cell-note">sync {{ c.last_sync_at | audit_time or 'never' }}</p>
+                </td>
+                <td>
+                  <div class="row-actions">
+                    <a class="btn btn-outline-dark btn-sm"
+                       href="{{ url_for('integrations.directory_groups', connection_id=c.id) }}">Groups</a>
+                    <a class="btn btn-outline-dark btn-sm"
+                       href="{{ url_for('integrations.directory_sync', connection_id=c.id) }}">Sync</a>
+                    <a class="btn btn-outline-dark btn-sm"
+                       href="{{ url_for('integrations.directory_connection', connection_id=c.id) }}">Edit</a>
+                    <form method="POST">
+                      {{ csrf_field() }}
+                      <input type="hidden" name="action" value="test" />
+                      <input type="hidden" name="connection_id" value="{{ c.id }}" />
+                      <button class="btn btn-outline-dark btn-sm" type="submit">Test</button>
+                    </form>
+                    <form method="POST">
+                      {{ csrf_field() }}
+                      <input type="hidden" name="action" value="enabled" />
+                      <input type="hidden" name="connection_id" value="{{ c.id }}" />
+                      <input type="hidden" name="enabled" value="{{ 0 if c.enabled else 1 }}" />
+                      <button class="btn btn-outline-dark btn-sm" type="submit">
+                        {{ 'Disable' if c.enabled else 'Enable' }}</button>
+                    </form>
+                    <form method="POST"
+                          onsubmit="return confirm('Delete {{ c.name }}? Managed accounts keep their local password and must be released first.');">
+                      {{ csrf_field() }}
+                      <input type="hidden" name="action" value="delete" />
+                      <input type="hidden" name="connection_id" value="{{ c.id }}" />
+                      <button class="btn-danger btn-sm" type="submit">Delete</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="8" class="cell-note">
+                  No connection yet. Add the domain controller or the Entra app registration and
+                  test it before mapping any group.
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="account-card">
+        <header class="account-head">
+          <div>
+            <h3 class="account-name">Recent synchronizations</h3>
+            <span class="cell-note">A preview changes nothing; an apply works from the preview
+              an administrator just read.</span>
+          </div>
+        </header>
+        <div class="dash-table-wrap">
+          <table>
+            <thead>
+              <tr><th>Connection</th><th>Mode</th><th>Result</th><th>Seen</th>
+                  <th>Created</th><th>Linked</th><th>Disabled</th><th>Started</th><th></th></tr>
+            </thead>
+            <tbody>
+              {% for r in runs %}
+              <tr>
+                <td>{{ r.connection_name }}</td>
+                <td>{{ 'Apply' if r.mode == 'apply' else 'Preview' }}</td>
+                <td>
+                  <span class="status-badge {{ 'active' if r.status in ('success', 'preview')
+                                               else ('off' if r.status in ('failed', 'partial')
+                                               else 'neutral') }}">{{ r.status }}</span>
+                  {% if r.error %}<p class="cell-note">{{ r.error }}</p>{% endif %}
+                </td>
+                <td>{{ r.seen }}</td>
+                <td>{{ r.created }}</td>
+                <td>{{ r.linked }}</td>
+                <td>{{ r.disabled }}</td>
+                <td class="cell-note">{{ r.started_at | audit_time }}</td>
+                <td>
+                  <a class="btn btn-outline-dark btn-sm"
+                     href="{{ url_for('integrations.directory_sync', run_id=r.id) }}">Open</a>
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="9" class="cell-note">Nothing has been read from a directory yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <p class="perm-note">Every step is written to the activity log under module
+          <strong>integrations</strong>, so the audit console shows who read the domain and what
+          it did to local accounts.</p>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

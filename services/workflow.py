@@ -25,6 +25,9 @@ APPROVAL_DEPARTMENTS = {
     "payroll": "payroll",
     "inventory": "inventory",
     "procurement": "procurement",
+    "asset": "management",
+    "marketing": "management",
+    "project": "management",
     "production": "management",
     "sales": "management",
     "general": "management",
@@ -88,15 +91,17 @@ def account_position_level(account, db=None):
 
     keys = set(account.keys())
     if "position_id" in keys and account["position_id"]:
-        level = read("SELECT level FROM organizational_positions WHERE id = ?",
-                     account["position_id"])
+        level = read("""
+            SELECT level FROM organizational_positions
+            WHERE id = ? AND COALESCE(is_active, 1) = 1
+        """, account["position_id"])
         if level is not None:
             return level
     if "employee_id" in keys and account["employee_id"]:
         return read("""
             SELECT p.level FROM employees AS e
             JOIN organizational_positions AS p ON p.id = e.position_id
-            WHERE e.id = ?
+            WHERE e.id = ? AND COALESCE(p.is_active, 1) = 1
         """, account["employee_id"])
     return None
 
@@ -360,11 +365,28 @@ def approval_acted_ids(db, user_id):
     )}
 
 
+def request_steps(row):
+    """Every step a stored request was routed through.
+
+    The frozen chain wins over the live policy so a retune cannot hide a finished
+    stage from the desk that was asked to sign it; rows raised before the column
+    existed fall back to the policy in force when they were opened.
+    """
+    stored = (row["approval_path"] if "approval_path" in row.keys() else "") or ""
+    if stored.strip():
+        return [step for step in stored.split(",") if step in APPROVAL_STEPS]
+    request_type = row["request_type"] if "request_type" in row.keys() else ""
+    return approval_path(row["department"], float(row["amount"] or 0),
+                         request_type)
+
+
 def can_view_request(row, user, acted):
+    # A desk that was asked to sign may still open the request after it closed,
+    # which is what keeps the notification it received from dead-ending.
     return (user["role"] == "admin" or row["created_by"] == user["id"]
             or row["id"] in acted
-            or (row["status"] == "Pending"
-                and holds_step(user, row["current_approver_step"])))
+            or holds_step(user, row["current_approver_step"])
+            or any(holds_step(user, step) for step in request_steps(row)))
 
 
 def can_decide_request(row, user):

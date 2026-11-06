@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi, bars with context %}
+
+{% block title %}Results | {{ exam.exam_title }}{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Examination results</span>
+      <h1>{{ exam.exam_title }}</h1>
+      <p>{{ exam.job_title }} · {{ exam.vacancy_department }} · marked against the
+        published key, highest first</p>
+    </div>
+    <nav class="stock-actions" aria-label="Result actions">
+      <a class="btn btn-outline btn-sm" href="{{ url_for('recruitment.exam_questions', exam_id=exam.id) }}">
+        The paper
+      </a>
+      <a class="btn btn-outline btn-sm"
+         href="{{ url_for('recruitment.vacancy_detail', vacancy_id=exam.vacancy_id) }}">
+        The post
+      </a>
+      <a class="btn btn-outline btn-sm" href="{{ url_for('recruitment.hr_exams') }}">
+        All examinations
+      </a>
+    </nav>
+  </div>
+</section>
+
+<section class="container finance-page">
+  <div class="hr-stats">
+    {{ kpi('Handed in', total, 'marked papers', 'flat', 'inbox') }}
+    {{ kpi('Passed', passed_count, 'at or above ' ~ '%g' | format(exam.pass_mark | float),
+           'up' if passed_count else 'flat', 'check') }}
+    {{ kpi('Below the line', failed_count, 'the score never decides alone',
+           'down' if failed_count else 'flat', 'warn') }}
+    {{ kpi('Seated', exam.candidate_count, 'candidates on the paper', 'flat', 'users') }}
+    {{ kpi('Still missing', (exam.candidate_count | int) - (exam.submitted_count | int),
+           'never started or never handed in', 'down', 'clock') }}
+  </div>
+
+  <div class="dash-grid">
+    {{ bars('Score spread', [
+         {'label': 'At or above pass', 'value': passed_count, 'display': passed_count},
+         {'label': 'Below pass', 'value': failed_count, 'display': failed_count}
+       ], 'of ' ~ total ~ ' handed in') }}
+
+    <div class="dash-panel">
+      <h2>The line</h2>
+      <dl class="detail-list">
+        <dt>Pass mark</dt>
+        <dd>{{ '%g' | format(exam.pass_mark | float) }} of
+          {{ '%g' | format(exam.total_marks | float) }}</dd>
+        <dt>Duration</dt><dd>{{ exam.duration_minutes }} minutes</dd>
+        <dt>Paper status</dt>
+        <dd>
+          <span class="status-badge {{ 'active' if exam.status == 'Published'
+                                        else 'off' if exam.status == 'Closed'
+                                        else 'neutral' }}">{{ exam.status }}</span>
+        </dd>
+        <dt>Average</dt>
+        <dd>
+          {% if total %}
+          {{ '%.1f' | format((applicants | sum(attribute='score')) / total) }} marks
+          {% else %}No paper handed in yet{% endif %}
+        </dd>
+      </dl>
+      <p class="panel-note">Ranking is competition-style: two candidates on the same mark
+        hold the same place and the next one is skipped.</p>
+    </div>
+  </div>
+
+  <div class="dash-panel hr-table-panel">
+    <h2>Marked candidates</h2>
+    <div class="hr-table-wrap table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Place</th>
+            <th>Candidate</th>
+            <th>Score</th>
+            <th>Result</th>
+            <th>Handed in</th>
+            <th>Application stage</th>
+            <th>GPA</th>
+            <th aria-label="Actions"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for applicant in applicants %}
+          <tr>
+            <td class="nowrap">{{ applicant.rank }}</td>
+            <td class="wrap-cell">
+              <strong>{{ applicant.full_name }}</strong>
+              <span class="cell-note">{{ applicant.email }}</span>
+            </td>
+            <td class="nowrap">
+              <strong>{{ '%g' | format(applicant.score | float) }}</strong> /
+              {{ '%g' | format(exam.total_marks | float) }}
+            </td>
+            <td class="nowrap">
+              <span class="status-badge {{ 'active' if applicant.passed else 'off' }}">
+                {{ 'Pass' if applicant.passed else 'Below' }}
+              </span>
+            </td>
+            <td class="nowrap">{{ applicant.submitted_at | audit_time }}</td>
+            <td>
+              <span class="status-badge {{ 'active' if applicant.application_status in ('Selected', 'Hired')
+                                            else 'off' if applicant.application_status == 'Rejected'
+                                            else 'neutral' }}">
+                {{ applicant.application_status }}
+              </span>
+            </td>
+            <td>{{ '%.2f' | format(applicant.gpa | float) if applicant.gpa is not none else '—' }}</td>
+            <td class="nowrap">
+              <a class="btn btn-outline btn-sm"
+                 href="{{ url_for('recruitment.applicant_detail', application_id=applicant.application_id) }}">
+                Candidate</a>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="8" class="employee-empty">
+              Nobody has handed this paper in yet. The register fills as candidates submit.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if scope.can_manage %}
+    <p class="panel-note">Shortlist from here: the desk&rsquo;s answer is recorded on the
+      candidate&rsquo;s own page, where the CV, the marked paper and the panel meet.</p>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

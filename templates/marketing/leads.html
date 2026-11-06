@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi with context %}
+
+{% block title %}Marketing Leads | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+{% set ns = namespace(open=0, won=0, unassigned=0) %}
+{% for lead in leads %}
+  {% if lead["status"] not in ("Converted", "Lost") %}
+    {% set ns.open = ns.open + 1 %}
+  {% elif lead["status"] == "Converted" %}
+    {% set ns.won = ns.won + 1 %}
+  {% endif %}
+  {% if not lead["assigned_to_name"] %}
+    {% set ns.unassigned = ns.unassigned + 1 %}
+  {% endif %}
+{% endfor %}
+
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">MARKETING MANAGEMENT</span>
+      <h1>Marketing Leads</h1>
+      <p>Every enquiry the channels brought in, with the seat that has to answer
+        it.</p>
+    </div>
+    <div class="row-actions">
+      <a class="btn btn-outline" href="{{ url_for('marketing.dashboard') }}">
+        ← Marketing desk
+      </a>
+      {% if 'marketing_leads' in granted_permissions %}
+      <a class="btn" href="{{ url_for('marketing.create_lead') }}">Register lead →</a>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="hr-stats">
+      {{ kpi('Leads listed', leads | length, 'matching this filter') }}
+      {{ kpi('Still open', ns.open, 'not won or lost') }}
+      {{ kpi('Converted', ns.won, 'became enquiries we served') }}
+      {{ kpi('Without an owner', ns.unassigned, 'no seat named yet',
+             'warn' if ns.unassigned else 'flat') }}
+    </div>
+
+    <form method="GET" class="stock-search">
+      <label for="search">Search</label>
+      <input id="search" name="search" value="{{ search }}"
+             placeholder="Name, phone or email" />
+      <label for="status">Status</label>
+      <select id="status" name="status">
+        <option value="">All statuses</option>
+        {% for value in lead_statuses %}
+        <option value="{{ value }}" {% if status == value %}selected{% endif %}>
+          {{ value }}</option>
+        {% endfor %}
+      </select>
+      <label for="follow_up">Follow-up</label>
+      <select id="follow_up" name="follow_up">
+        <option value="">Any date</option>
+        <option value="today" {% if follow_up == 'today' %}selected{% endif %}>
+          Due today</option>
+        <option value="overdue" {% if follow_up == 'overdue' %}selected{% endif %}>
+          Past due</option>
+      </select>
+      <button class="btn" type="submit">Search</button>
+      <a class="btn btn-outline" href="{{ url_for('marketing.leads') }}">Reset</a>
+      {% if 'marketing_reports' in granted_permissions %}
+      <a class="btn btn-outline"
+         href="{{ url_for('marketing.export', kind='leads', status=status, search=search) }}">
+        Export CSV
+      </a>
+      {% endif %}
+    </form>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>{% if leads %}{{ leads | length }} lead{{ '' if leads | length == 1 else 's' }}{% else %}Leads{% endif %}</h2>
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Lead</th><th>Contact</th><th>Interest</th><th>Source</th>
+              <th>Owner</th><th>Follow-up</th><th>Status</th>
+              <th>Last modified</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for lead in leads %}
+            <tr>
+              <td>{{ lead["name"] }}</td>
+              <td>
+                {{ lead["phone"] or '—' }}
+                <br><span class="feed-meta">{{ lead["email"] or '' }}</span>
+              </td>
+              <td>{{ lead["product_interest"] or '—' }}</td>
+              <td>{{ lead["source"] or '—' }}</td>
+              <td>{{ lead["assigned_to_name"] or 'Unassigned' }}</td>
+              <td class="nowrap">{{ lead["follow_up_date"] or '—' }}</td>
+              <td>
+                <span class="status-badge {{ 'active' if lead["status"] == 'Converted'
+                      else 'off' if lead["status"] == 'Lost' else 'neutral' }}">
+                  {{ lead["status"] }}
+                </span>
+              </td>
+              <td class="nowrap">
+                {{ lead["updated_by_name"] or lead["created_by_name"] or '—' }}
+                <br><span class="feed-meta">{{ lead["updated_at"] | audit_time }}</span>
+              </td>
+              <td class="row-actions">
+                {% if 'marketing_leads' in granted_permissions %}
+                <a class="btn" href="{{ url_for('marketing.edit_lead', lead_id=lead['id']) }}">
+                  Edit
+                </a>
+                {% if lead["status"] != 'Contacted' %}
+                <form method="POST"
+                      action="{{ url_for('marketing.mark_lead', lead_id=lead['id']) }}">
+                  {{ csrf_field() }}
+                  <button class="btn btn-outline" type="submit" name="status"
+                          value="Contacted">Contacted</button>
+                </form>
+                {% endif %}
+                {% if lead["status"] != 'Converted' %}
+                <form method="POST"
+                      action="{{ url_for('marketing.mark_lead', lead_id=lead['id']) }}">
+                  {{ csrf_field() }}
+                  <button class="btn" type="submit" name="status"
+                          value="Converted">Won</button>
+                </form>
+                {% endif %}
+                {% if lead["status"] != 'Lost' %}
+                <form method="POST"
+                      action="{{ url_for('marketing.mark_lead', lead_id=lead['id']) }}"
+                      onsubmit="return confirm('Mark {{ lead['name'] }} as lost?');">
+                  {{ csrf_field() }}
+                  <button class="btn btn-outline" type="submit" name="status"
+                          value="Lost">Lost</button>
+                </form>
+                {% endif %}
+                {% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="9">No leads match this filter.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="dash-panel">
+      <h2>Registration rule</h2>
+      <p>A lead is stored once: the same name with the same phone number, or the
+        same phone or email on another name, is refused with the id of the record
+        that already exists. At least one of phone or email is required so the
+        desk can always reach the person back.</p>
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Review' if plan else 'New' }} Marketing Plan | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+{% set can_edit = 'marketing_plans' in granted_permissions
+                  and (not plan or plan["status"] in ('Draft', 'Pending')) %}
+
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">MARKETING MANAGEMENT</span>
+      <h1>{{ plan["title"] if plan else 'New Marketing Plan' }}</h1>
+      <p>{% if plan %}
+          {{ plan["status"] }} · raised by {{ plan["created_by_name"] or '—' }}
+          · {{ plan["start_date"] }} to {{ plan["end_date"] }}
+        {% else %}
+          A plan carries the budget the desk may spend. It authorises nothing
+          until the approval desk signs it.
+        {% endif %}</p>
+    </div>
+    <a class="btn btn-outline" href="{{ url_for('marketing.plans') }}">
+      ← Back to plans
+    </a>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="dash-panel">
+      <h2>{{ 'Plan details' if plan else 'Raise a plan' }}</h2>
+
+      {% if can_edit %}
+      <form method="POST" class="dash-form stock-grid">
+        {{ csrf_field() }}
+        <div>
+          <label for="title">Plan title *</label>
+          <input id="title" name="title" maxlength="150" required
+                 value="{{ plan['title'] if plan else '' }}"
+                 placeholder="e.g. Q1 Kitchen Showroom Push" />
+        </div>
+
+        <div>
+          <label for="currency">Currency</label>
+          <select id="currency" name="currency">
+            {% for code in currencies %}
+            <option value="{{ code }}"
+              {% if plan and plan['currency'] == code %}selected{% endif %}>
+              {{ code }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label for="start_date">Start date *</label>
+          <input id="start_date" type="date" name="start_date" required
+                 value="{{ plan['start_date'] if plan else '' }}" />
+        </div>
+
+        <div>
+          <label for="end_date">End date *</label>
+          <input id="end_date" type="date" name="end_date" required
+                 value="{{ plan['end_date'] if plan else '' }}" />
+        </div>
+
+        <div>
+          <label for="budget">Plan budget</label>
+          <input id="budget" type="number" step="0.01" min="0" name="budget"
+                 value="{{ plan['budget'] if plan else 0 }}" />
+        </div>
+
+        <div class="stock-notes">
+          <label for="description">Description</label>
+          <textarea id="description" name="description" rows="4" maxlength="2000"
+                    placeholder="Target market, channels in mind, what success looks like.">{{ plan['description'] if plan else '' }}</textarea>
+        </div>
+
+        <div class="stock-form-actions">
+          <button class="btn" type="submit">Save plan</button>
+          <a class="btn btn-outline" href="{{ url_for('marketing.plans') }}">Cancel</a>
+        </div>
+      </form>
+      {% else %}
+      <dl class="detail-list">
+        <dt>Status</dt>
+        <dd>
+          <span class="status-badge {{ 'active' if plan["status"] == 'Approved'
+                else 'off' if plan["status"] in ('Rejected', 'Closed')
+                else 'neutral' }}">{{ plan["status"] }}</span>
+        </dd>
+        <dt>Period</dt><dd>{{ plan["start_date"] }} to {{ plan["end_date"] }}</dd>
+        <dt>Budget</dt>
+        <dd>{{ "{:,.2f}".format(plan["budget"] | float) }} {{ plan["currency"] }}</dd>
+        <dt>Description</dt><dd class="wrap-cell">{{ plan["description"] or '—' }}</dd>
+        <dt>Raised by</dt><dd>{{ plan["created_by_name"] or '—' }}</dd>
+        <dt>Last modified</dt>
+        <dd>{{ plan["updated_by_name"] or '—' }} ·
+            {{ plan["updated_at"] | audit_time }}</dd>
+      </dl>
+      <p class="panel-note">
+        {{ 'A signed or closed plan is history and can no longer be rewritten.'
+           if plan["status"] not in ('Draft', 'Pending')
+           else 'The approval desk reads a plan here; it does not rewrite one.' }}
+      </p>
+      {% endif %}
+    </div>
+
+    {% if plan and can_approve and plan["status"] in ('Draft', 'Pending') %}
+    <div class="dash-panel">
+      <h2>Decision</h2>
+      <p class="panel-note">
+        Signing releases the budget to the campaigns under this plan; refusing
+        ends it. Either answer is written to the audit trail with the fields that
+        moved and sent to {{ plan["created_by_name"] or 'the desk that raised it' }}.
+      </p>
+      <form method="POST" class="finance-form decision-form"
+            action="{{ url_for('marketing.decide_plan', plan_id=plan['id']) }}">
+        {{ csrf_field() }}
+        <label for="comment">Your comment (what the desk hears back)</label>
+        <textarea id="comment" name="comment" rows="3" maxlength="500"
+                  placeholder="e.g. Approved at 60% of the ask; the show cost has to come down."></textarea>
+        <div class="finance-form-actions">
+          <button class="btn" type="submit" name="decision" value="Approved">
+            Approve
+          </button>
+          <button class="btn-danger" type="submit" name="decision" value="Rejected"
+                  onclick="return confirm('Refuse this plan?');">
+            Refuse
+          </button>
+        </div>
+      </form>
+    </div>
+    {% endif %}
+
+    {% if plan and plan["status"] == 'Draft'
+          and 'marketing_plans' in granted_permissions %}
+    <div class="dash-panel">
+      <h2>Next step</h2>
+      <p class="panel-note">A draft waits on this desk until it is submitted for a
+        decision. Submitting wakes every seat that holds the plan-approval right.</p>
+      <form method="POST"
+            action="{{ url_for('marketing.submit_plan', plan_id=plan['id']) }}">
+        {{ csrf_field() }}
+        <div class="finance-form-actions">
+          <button class="btn btn-outline" type="submit">Submit for approval</button>
+        </div>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

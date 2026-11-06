@@ -11,7 +11,7 @@
 
 {% set health_rows = [
   {'label': 'Healthy', 'value': healthy, 'display': healthy},
-  {'label': 'At or below minimum', 'value': low, 'display': low},
+  {'label': 'Below minimum', 'value': low, 'display': low},
   {'label': 'Out of stock', 'value': out, 'display': out}
 ] %}
 
@@ -46,7 +46,9 @@
       <h1>Inventory &amp; Stock</h1>
       <p>Track timber, plywood, hardware and finishes, and every stock movement.</p>
     </div>
+    {% if 'inventory_items' in granted_permissions %}
     <a class="btn" href="{{ url_for('inventory.items') }}">Inventory items →</a>
+    {% endif %}
   </div>
 </section>
 
@@ -81,9 +83,23 @@
     </div>
 
     <div class="stock-actions">
-      <a class="btn" href="{{ url_for('inventory.new_item') }}">Register item</a>
-      <a class="btn btn-outline-dark" href="{{ url_for('inventory.stock_movement') }}">Stock in / out</a>
-      <a class="btn btn-outline-dark" href="{{ url_for('inventory.history') }}">Movement history</a>
+      {% if 'inventory_items' in granted_permissions %}
+      <a class="btn btn-sm" href="{{ url_for('inventory.new_item') }}">Register item</a>
+      {% endif %}
+      {% if 'inventory_movements' in granted_permissions %}
+      <a class="btn btn-outline-dark btn-sm" href="{{ url_for('inventory.stock_movement') }}">Stock in / out</a>
+      <a class="btn btn-outline-dark btn-sm" href="{{ url_for('inventory.history') }}">Movement history</a>
+      {% endif %}
+      {% if 'inventory_stocktake' in granted_permissions
+            or 'inventory_stocktake_approve' in granted_permissions %}
+      <a class="btn btn-outline-dark btn-sm" href="{{ url_for('inventory.stocktakes') }}">Stocktake</a>
+      {% endif %}
+      {% if 'inventory_alerts' in granted_permissions %}
+      <a class="btn btn-outline-dark btn-sm" href="{{ url_for('inventory.alerts') }}">Reorder alerts</a>
+      {% endif %}
+      {% if 'inventory_reports' in granted_permissions %}
+      <a class="btn btn-outline-dark btn-sm" href="{{ url_for('inventory.reports') }}">Stock reports</a>
+      {% endif %}
     </div>
 
     <div class="dash-panel hr-table-panel">

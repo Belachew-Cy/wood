@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}Upload questions | {{ exam.exam_title }}{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Examination drafting</span>
+      <h1>Upload questions</h1>
+      <p>{{ exam.exam_title }} · {{ exam.job_title }} ·
+        {{ '%g' | format(total_question_marks | float) }} of
+        {{ '%g' | format(exam.total_marks | float) }} marks already assigned</p>
+    </div>
+    <nav class="stock-actions" aria-label="Question actions">
+      <a class="btn btn-outline btn-sm" href="{{ url_for('recruitment.exam_questions', exam_id=exam.id) }}">
+        Back to the paper
+      </a>
+    </nav>
+  </div>
+</section>
+
+<section class="container finance-page">
+  {% if result %}
+  <div class="dash-panel hr-table-panel">
+    <h2>{{ 'Rows kept' if result.added else 'Nothing added' }}</h2>
+    <p class="panel-note">
+      {{ result.added }} question{{ '' if result.added == 1 else 's' }} added from
+      {{ result.file }}{% if result.rejected %}, {{ result.rejected | length }}
+      row{{ '' if result.rejected | length == 1 else 's' }} refused.{% else %}.{% endif %}
+    </p>
+    {% if result.rejected %}
+    <div class="hr-table-wrap table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Row</th>
+            <th>Question</th>
+            <th>Why it was refused</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in result.rejected %}
+          <tr>
+            <td class="nowrap">{{ row.line }}</td>
+            <td class="wrap-cell">{{ row.question or '—' }}</td>
+            <td class="wrap-cell">{{ row.reason }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="panel-note">Correct the sheet and upload it again - only the rows that
+      were refused are missing.</p>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <div class="dash-grid">
+    <div class="dash-panel">
+      <h2>The sheet</h2>
+      <form method="POST" enctype="multipart/form-data" class="dash-form"
+            action="{{ url_for('recruitment.import_exam_questions', exam_id=exam.id) }}">
+        {{ csrf_field() }}
+        <div class="full">
+          <label for="file">CSV file *</label>
+          <input id="file" name="file" type="file" accept=".csv,text/csv" required />
+          <p class="cell-note">UTF-8 CSV, at most 200 questions and 256 KB.</p>
+        </div>
+        <div class="full">
+          <button class="btn finance-btn primary" type="submit">Upload the questions</button>
+          <a class="btn finance-btn secondary"
+             href="{{ url_for('recruitment.exam_question_template', exam_id=exam.id) }}">
+            Download the template
+          </a>
+        </div>
+      </form>
+      <p class="panel-note">Every row that passes is added to the paper; a row that
+        does not is listed above with its reason and the rest of the sheet still lands.</p>
+    </div>
+
+    <div class="dash-panel">
+      <h2>Columns the file needs</h2>
+      <dl class="detail-list">
+        <dt>question</dt><dd class="wrap-cell">The text a candidate reads. Required.</dd>
+        <dt>option_a … option_d</dt>
+        <dd class="wrap-cell">All four options, none of them blank.</dd>
+        <dt>correct_answer</dt>
+        <dd class="wrap-cell">The key: a single letter - A, B, C or D. Required.</dd>
+        <dt>marks</dt>
+        <dd class="wrap-cell">A number above zero, decimals allowed.</dd>
+      </dl>
+      <p class="panel-note">
+        {{ '%g' | format((exam.total_marks | float) - (total_question_marks | float)) }}
+        marks are still unassigned, and a row is refused when it would take the paper
+        past {{ '%g' | format(exam.total_marks | float) }}. The header may use plain
+        words such as "Correct option" or "Option A" instead of the column names.</p>
+    </div>
+  </div>
+</section>
+{% endblock %}

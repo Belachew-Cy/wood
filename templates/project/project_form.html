@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit' if project else 'New' }} Project | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">PROJECT MANAGEMENT</span>
+      <h1>{{ project["project_name"] if project else 'Register a project' }}</h1>
+      <p>{% if project %}
+          {{ project["project_code"] }} · {{ project["status"] }}
+          {% if project["is_archived"] %}· archived{% endif %}
+        {% else %}
+          A job carries the client, the site, the team and the budget it will draw
+          on. It authorises nothing until the approval desk signs it.
+        {% endif %}</p>
+    </div>
+    <a class="btn btn-outline"
+       href="{{ url_for('project.project_detail', project_id=project['id']) if project
+                else url_for('project.projects') }}">
+      ← {{ 'Back to project' if project else 'Back to register' }}
+    </a>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="dash-panel">
+      <h2>{{ 'Project details' if project else 'Raise a job' }}</h2>
+
+      <form method="POST" class="dash-form stock-grid"
+            action="{{ url_for('project.edit_project', project_id=project['id']) if project
+                     else url_for('project.create_project') }}">
+        {{ csrf_field() }}
+
+        <div>
+          <label for="project_code">Project code</label>
+          <input id="project_code" name="project_code" maxlength="40"
+                 value="{{ project['project_code'] if project else '' }}"
+                 placeholder="Leave blank to issue the next DBP number" />
+        </div>
+
+        <div>
+          <label for="project_name">Project name *</label>
+          <input id="project_name" name="project_name" maxlength="180" required
+                 value="{{ project['project_name'] if project else '' }}"
+                 placeholder="e.g. Bole kitchen fit-out" />
+        </div>
+
+        <div>
+          <label for="client_name">Client</label>
+          <input id="client_name" name="client_name" maxlength="180"
+                 value="{{ project['client_name'] if project else '' }}"
+                 placeholder="Who the job is for" />
+        </div>
+
+        <div>
+          <label for="location">Site</label>
+          <input id="location" name="location" maxlength="180"
+                 value="{{ project['location'] if project else '' }}"
+                 placeholder="Where the work happens" />
+        </div>
+
+        <div>
+          <label for="department_id">Department</label>
+          <select id="department_id" name="department_id">
+            <option value="">No department</option>
+            {% for row in departments %}
+            <option value="{{ row['id'] }}"
+              {% if project and project['department_id'] == row['id'] %}selected{% endif %}>
+              {{ row["name"] }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label for="approval_department">Approval desk</label>
+          <select id="approval_department" name="approval_department">
+            <option value="">Follow the department</option>
+            {% for key in approval_departments %}
+            <option value="{{ key }}"
+              {% if project and project['department'] == key %}selected{% endif %}>
+              {{ step_label.get(key, key) }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label for="manager_user_id">Project manager</label>
+          <select id="manager_user_id" name="manager_user_id">
+            <option value="">Unassigned</option>
+            {% for account in managers %}
+            <option value="{{ account['id'] }}"
+              {% if project and project['manager_user_id'] == account['id'] %}selected{% endif %}>
+              {{ account["full_name"] }} ({{ account["username"] }})
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label for="priority">Priority</label>
+          <select id="priority" name="priority">
+            {% for value in project_priorities %}
+            <option value="{{ value }}"
+              {% if (project and project['priority'] == value)
+                    or (not project and value == 'Normal') %}selected{% endif %}>
+              {{ value }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label for="start_date">Start date</label>
+          <input id="start_date" type="date" name="start_date"
+                 value="{{ project['start_date'] if project else '' }}" />
+        </div>
+
+        <div>
+          <label for="end_date">End date</label>
+          <input id="end_date" type="date" name="end_date"
+                 value="{{ project['end_date'] if project else '' }}" />
+        </div>
+
+        <div>
+          <label for="budget">Budget</label>
+          <input id="budget" type="number" step="0.01" min="0" name="budget"
+                 value="{{ project['budget'] if project else 0 }}" />
+        </div>
+
+        <div>
+          <label for="currency">Currency</label>
+          <select id="currency" name="currency">
+            {% for code in project_currencies %}
+            <option value="{{ code }}"
+              {% if (project and project['currency'] == code)
+                    or (not project and code == 'ETB') %}selected{% endif %}>
+              {{ code }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label for="budget_allocation_id">Budget allocation</label>
+          <select id="budget_allocation_id" name="budget_allocation_id">
+            <option value="">No allocation</option>
+            {% for row in allocations %}
+            <option value="{{ row['id'] }}"
+              {% if project and project['budget_allocation_id'] == row['id'] %}selected{% endif %}>
+              {{ row["plan_title"] }} · {{ row["allocation_name"] }}
+              ({{ "{:,.0f}".format(row["allocated_amount"] | float) }} {{ row["currency"] }})
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="stock-notes">
+          <label for="description">Description</label>
+          <textarea id="description" name="description" rows="4" maxlength="2000"
+                    placeholder="Scope of the job, what has to be delivered, anything the signing desks should know.">{{ project['description'] if project else '' }}</textarea>
+        </div>
+
+        <div class="stock-form-actions">
+          <button class="btn" type="submit">Save project</button>
+          <a class="btn btn-outline"
+             href="{{ url_for('project.project_detail', project_id=project['id']) if project
+                      else url_for('project.projects') }}">Cancel</a>
+        </div>
+      </form>
+
+      {% if project and project["status"] == "Pending" %}
+      <p class="panel-note">
+        This job came back from the approval chain for a revision. Saving the new
+        figures re-sends it up the path those figures fall in and wakes the desks
+        that have to sign again.
+      </p>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}

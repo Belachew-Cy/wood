@@ -10,6 +10,7 @@ different facts.
 from core.access import current_user
 from core.db import connect_db
 from core.db import qualified_table
+from database import database_config
 from datetime import datetime
 from datetime import timezone
 from flask import has_request_context
@@ -36,6 +37,27 @@ RECORD_TABLES = {
     "finance_invoices": ("created_by", None),
     "finance_payments": ("created_by", None),
     "letters": ("created_by", None),
+    # A vacancy names the account that raised it, so the stamp can start from the
+    # creator; an application is written by the candidate, so it starts blank.
+    "job_vacancies": ("created_by_id", "created_by_name"),
+    "job_applications": (None, None),
+    # The exam and interview desks stamp their rows the same way; without these
+    # entries the columns are never created and the stamp fails on write.
+    "recruitment_exams": ("created_by_id", "created_by_name"),
+    "recruitment_interviews": ("created_by_id", "created_by_name"),
+    # Every marketing desk stamps the same way; a research record names the person
+    # who prepared it rather than who signed in, so its creator pair differs.
+    "marketing_plans": ("created_by", "created_by_name"),
+    "marketing_campaigns": ("created_by", "created_by_name"),
+    "marketing_leads": ("created_by", "created_by_name"),
+    "market_research": ("prepared_by", "prepared_by_name"),
+    "digital_campaigns": ("created_by", "created_by_name"),
+    "customer_feedback": ("created_by", "created_by_name"),
+    # The project register stamps the job and everything hanging off it, so the
+    # detail page can say who last touched a milestone or a task.
+    "projects": ("created_by", "created_by_name"),
+    "project_milestones": ("created_by", "created_by_name"),
+    "project_tasks": ("created_by", "created_by_name"),
 }
 
 RECENCY_COLUMNS = (("updated_by", "INTEGER"), ("updated_by_name", "TEXT"),
@@ -87,14 +109,7 @@ def ensure_recency_schema():
     db = connect_db()
     try:
         for table, (creator_id, creator_name) in RECORD_TABLES.items():
-            exists = db.execute(
-                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?"
-                " UNION ALL SELECT 1 FROM finance.sqlite_master"
-                " WHERE type = 'table' AND name = ?"
-                " UNION ALL SELECT 1 FROM letter.sqlite_master"
-                " WHERE type = 'table' AND name = ?",
-                (table, table, table)).fetchone()
-            if not exists:
+            if not database_config.table_exists(db, table):
                 continue
             if _add_missing(db, table):
                 _seed(db, table, creator_id, creator_name)
@@ -119,12 +134,4 @@ def stamp(db, table, record_id, user=None, name=None):
         " WHERE id = ?" % _ref(table),
         (user_id, editor, datetime.now(timezone.utc).isoformat(timespec="seconds"),
          record_id))
-
-
-def editor_label(row, prefix=""):
-    """The stored editor label, or an empty string for a record never touched."""
-    try:
-        return row[prefix + "updated_by_name"] or ""
-    except (IndexError, KeyError):
-        return ""
 

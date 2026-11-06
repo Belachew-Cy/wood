@@ -1,0 +1,247 @@
+
+{% extends "base.html" %}
+
+{% block title %}
+    {{ 'Edit Audit Plan' if plan else 'Create Audit Plan' }} | Audit Management
+{% endblock %}
+
+{% block content %}
+
+{% set current_plan = plan | default({}, true) %}
+
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Audit Management</span>
+            <h1>
+                {{ 'Edit Audit Plan' if current_plan else 'Create Audit Plan' }}
+            </h1>
+            <p>Define the audit scope, department, schedule, risk and responsibilities.</p>
+        </div>
+
+        <a class="btn btn-outline btn-sm"
+           href="{{ url_for('audit.audit_plans') }}">
+            Back to Audit Plans
+        </a>
+    </div>
+</section>
+
+<section class="container finance-page">
+
+    <div class="dash-panel">
+
+        <form method="POST">
+
+            {% if csrf_token is defined %}
+                {{ csrf_token() }}
+            {% endif %}
+
+            <h2>Audit Plan Information</h2>
+
+            <div class="form-grid">
+
+                <div class="form-group">
+                    <label for="plan_number">Plan Number</label>
+                    <input
+                        type="text"
+                        id="plan_number"
+                        name="plan_number"
+                        value="{{ current_plan.plan_number | default('') }}"
+                        placeholder="Example: AUD-2026-001"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="title">Audit Title *</label>
+                    <input
+                        type="text"
+                        id="title"
+                        name="title"
+                        value="{{ current_plan.title | default('') }}"
+                        placeholder="Enter audit title"
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="department">Department *</label>
+                    <select id="department" name="department" required>
+                        <option value="">Select Department</option>
+
+                        {% for department in departments | default([]) %}
+                        <option
+                            value="{{ department }}"
+                            {% if current_plan.department | default('') == department %}
+                                selected
+                            {% endif %}
+                        >
+                            {{ department }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="audit_type">Audit Type</label>
+                    <select id="audit_type" name="audit_type">
+                        {% for item in [
+                            'Internal Audit',
+                            'Financial Audit',
+                            'Operational Audit',
+                            'Compliance Audit',
+                            'Performance Audit',
+                            'IT Audit',
+                            'Special Audit'
+                        ] %}
+                        <option
+                            value="{{ item }}"
+                            {% if current_plan.audit_type | default('Internal Audit') == item %}
+                                selected
+                            {% endif %}
+                        >
+                            {{ item }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="start_date">Start Date *</label>
+                    <input
+                        type="date"
+                        id="start_date"
+                        name="start_date"
+                        value="{{ current_plan.start_date | default('') }}"
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="end_date">End Date *</label>
+                    <input
+                        type="date"
+                        id="end_date"
+                        name="end_date"
+                        value="{{ current_plan.end_date | default('') }}"
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="risk_level">Risk Level *</label>
+                    <select id="risk_level" name="risk_level" required>
+                        {% for risk in ['Low', 'Medium', 'High', 'Critical'] %}
+                        <option
+                            value="{{ risk }}"
+                            {% if current_plan.risk_level | default('Medium') == risk %}
+                                selected
+                            {% endif %}
+                        >
+                            {{ risk }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="status">Status</label>
+                    <select id="status" name="status">
+                        {% for status in ['Planned', 'Ongoing', 'On Hold', 'Completed', 'Cancelled'] %}
+                        <option
+                            value="{{ status }}"
+                            {% if current_plan.status | default('Planned') == status %}
+                                selected
+                            {% endif %}
+                        >
+                            {{ status }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+            </div>
+
+            <div class="form-group">
+                <label for="description">Audit Description</label>
+                <textarea
+                    id="description"
+                    name="description"
+                    rows="4"
+                    placeholder="Describe the purpose and background of this audit"
+                >{{ current_plan.description | default('') }}</textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="scope">Audit Scope</label>
+                <textarea
+                    id="scope"
+                    name="scope"
+                    rows="4"
+                    placeholder="Describe the processes, activities and records to be reviewed"
+                >{{ current_plan.scope | default('') }}</textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="objectives">Audit Objectives</label>
+                <textarea
+                    id="objectives"
+                    name="objectives"
+                    rows="4"
+                    placeholder="List the intended audit objectives"
+                >{{ current_plan.objectives | default('') }}</textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="methodology">Audit Methodology</label>
+                <textarea
+                    id="methodology"
+                    name="methodology"
+                    rows="3"
+                    placeholder="Describe the audit methods and procedures"
+                >{{ current_plan.methodology | default('') }}</textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="assigned_auditor_id">Assigned Auditor ID</label>
+                <input
+                    type="text"
+                    id="assigned_auditor_id"
+                    name="assigned_auditor_id"
+                    value="{{ current_plan.assigned_auditor_id | default('') }}"
+                    placeholder="Enter an existing user ID"
+                >
+                <small>
+                    Use an existing authorized auditor account.
+                </small>
+            </div>
+
+            <div class="form-group">
+                <label for="remarks">Additional Remarks</label>
+                <textarea
+                    id="remarks"
+                    name="remarks"
+                    rows="3"
+                    placeholder="Additional planning information"
+                >{{ current_plan.remarks | default('') }}</textarea>
+            </div>
+
+            <div class="stock-actions">
+
+                <button type="submit" class="btn btn-sm">
+                    {{ 'Update Audit Plan' if current_plan else 'Save Audit Plan' }}
+                </button>
+
+                <a href="{{ url_for('audit.audit_plans') }}"
+                   class="btn btn-outline btn-sm">
+                    Cancel
+                </a>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</section>
+
+{% endblock %}

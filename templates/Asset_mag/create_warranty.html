@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container py-4">
+
+    <h3>Register Asset Warranty</h3>
+
+    <div class="card border-0 shadow-sm mt-3">
+        <div class="card-body">
+
+            <form method="POST">
+
+                <input type="hidden"
+                       name="csrf_token"
+                       value="{{ csrf_token() }}">
+
+                <div class="mb-3">
+                    <label class="form-label">Asset</label>
+
+                    <select name="asset_id"
+                            class="form-select"
+                            required>
+
+                        <option value="">Select Asset</option>
+
+                        {% for asset in assets %}
+                        <option value="{{ asset.id }}">
+                            {{ asset.asset_code }} - {{ asset.name }}
+                        </option>
+                        {% endfor %}
+
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label>Warranty Provider</label>
+                    <input name="warranty_provider"
+                           class="form-control">
+                </div>
+
+                <div class="mb-3">
+                    <label>Warranty Reference</label>
+                    <input name="warranty_reference"
+                           class="form-control">
+                </div>
+
+                <div class="mb-3">
+                    <label>Warranty Type</label>
+                    <input name="warranty_type"
+                           class="form-control">
+                </div>
+
+                <div class="row">
+
+                    <div class="col-md-6 mb-3">
+                        <label>Start Date</label>
+                        <input type="date"
+                               name="start_date"
+                               class="form-control"
+                               required>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label>Expiry Date</label>
+                        <input type="date"
+                               name="expiry_date"
+                               class="form-control"
+                               required>
+                    </div>
+
+                </div>
+
+                <div class="mb-3">
+                    <label>Coverage Details</label>
+                    <textarea name="coverage_details"
+                              class="form-control"></textarea>
+                </div>
+
+                <div class="mb-3">
+                    <label>Terms and Conditions</label>
+                    <textarea name="terms_and_conditions"
+                              class="form-control"></textarea>
+                </div>
+
+                <button class="btn btn-success">
+                    Save Warranty
+                </button>
+
+            </form>
+
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}

@@ -1,0 +1,380 @@
+
+{% extends "base.html" %}
+
+{% block title %}Contract Management | Dereje Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Procurement / Contracts</span>
+            <h1>Supplier Contract Management</h1>
+            <p>Manage supplier agreements, contract values, renewals and compliance.</p>
+        </div>
+
+        <nav class="stock-actions">
+            <a href="{{ url_for('procurement.dashboard') }}"
+               class="btn btn-outline btn-sm">
+                Back to Procurement
+            </a>
+
+            {% if can_create_contract %}
+            <a href="#contract-form" class="btn btn-primary btn-sm">
+                Add Contract
+            </a>
+            {% endif %}
+        </nav>
+    </div>
+</section>
+
+<section class="container finance-page">
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+            <div class="finance-alert {{ category }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endwith %}
+
+    {% if not can_view_contracts %}
+        <div class="finance-alert info">
+            You do not have permission to view supplier contracts.
+        </div>
+    {% else %}
+
+    <!-- CONTRACT STATISTICS -->
+    <div class="hr-stats">
+        {{ kpi('Total Contracts', stats.total) }}
+        {{ kpi('Active Contracts', stats.active) }}
+        {{ kpi('Expiring Soon', stats.expiring_soon) }}
+        {{ kpi('Expired Contracts', stats.expired) }}
+    </div>
+
+    <!-- CREATE CONTRACT -->
+    {% if can_create_contract %}
+    <div class="finance-panel" id="contract-form">
+
+        <h2>Register Supplier Contract</h2>
+
+        <form method="post"
+              action="{{ url_for('procurement.create_contract') }}"
+              enctype="multipart/form-data"
+              class="finance-form">
+
+            {{ csrf_field() }}
+
+            <div class="finance-grid">
+
+                <div>
+                    <label for="supplier_id">Supplier *</label>
+                    <select name="supplier_id"
+                            id="supplier_id"
+                            required>
+                        <option value="">Select supplier</option>
+
+                        {% for supplier in suppliers %}
+                        <option value="{{ supplier.id }}">
+                            {{ supplier.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label for="contract_number">Contract Number *</label>
+                    <input type="text"
+                           name="contract_number"
+                           id="contract_number"
+                           maxlength="100"
+                           required
+                           placeholder="e.g. CNT-2026-001">
+                </div>
+
+                <div>
+                    <label for="contract_title">Contract Title *</label>
+                    <input type="text"
+                           name="contract_title"
+                           id="contract_title"
+                           maxlength="200"
+                           required
+                           placeholder="Enter contract title">
+                </div>
+
+                <div>
+                    <label for="contract_type">Contract Type *</label>
+                    <select name="contract_type"
+                            id="contract_type"
+                            required>
+                        <option value="">Select contract type</option>
+                        <option value="Supply Agreement">Supply Agreement</option>
+                        <option value="Service Agreement">Service Agreement</option>
+                        <option value="Maintenance Agreement">Maintenance Agreement</option>
+                        <option value="Framework Agreement">Framework Agreement</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="start_date">Start Date *</label>
+                    <input type="date"
+                           name="start_date"
+                           id="start_date"
+                           required>
+                </div>
+
+                <div>
+                    <label for="end_date">Expiry Date *</label>
+                    <input type="date"
+                           name="end_date"
+                           id="end_date"
+                           required>
+                </div>
+
+                <div>
+                    <label for="contract_value">Contract Value *</label>
+                    <input type="number"
+                           name="contract_value"
+                           id="contract_value"
+                           min="0.01"
+                           step="0.01"
+                           required>
+                </div>
+
+                <div>
+                    <label for="currency">Currency *</label>
+                    <select name="currency" id="currency" required>
+                        <option value="ETB">ETB</option>
+                        <option value="USD">USD</option>
+                        <option value="EUR">EUR</option>
+                        <option value="GBP">GBP</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="renewal_notice_days">Renewal Notice (Days)</label>
+                    <input type="number"
+                           name="renewal_notice_days"
+                           id="renewal_notice_days"
+                           min="0"
+                           max="365"
+                           value="30">
+                </div>
+
+                <div>
+                    <label for="responsible_person">Responsible Person</label>
+                    <input type="text"
+                           name="responsible_person"
+                           id="responsible_person"
+                           maxlength="150">
+                </div>
+
+                <div class="full">
+                    <label for="contract_description">Contract Description</label>
+                    <textarea name="description"
+                              id="contract_description"
+                              rows="3"
+                              maxlength="2000"></textarea>
+                </div>
+
+                <div class="full">
+                    <label for="contract_terms">Terms and Conditions</label>
+                    <textarea name="terms"
+                              id="contract_terms"
+                              rows="4"
+                              maxlength="5000"></textarea>
+                </div>
+
+                <div class="full">
+                    <label for="contract_file">Contract Document</label>
+                    <input type="file"
+                           name="contract_file"
+                           id="contract_file"
+                           accept=".pdf,.doc,.docx">
+                    <small>Upload an authorized contract document.</small>
+                </div>
+
+            </div>
+
+            <div class="finance-form-actions">
+                <button type="submit" class="finance-btn primary">
+                    Save Contract
+                </button>
+            </div>
+
+        </form>
+    </div>
+    {% endif %}
+
+    <!-- CONTRACT FILTERS -->
+    <div class="dash-panel">
+
+        <h2>Search Contracts</h2>
+
+        <form method="get"
+              action="{{ url_for('procurement.contracts') }}"
+              class="finance-form">
+
+            <div class="finance-grid">
+
+                <div>
+                    <label for="search">Search</label>
+                    <input type="search"
+                           name="search"
+                           id="search"
+                           value="{{ filters.search }}"
+                           placeholder="Contract number, title or supplier">
+                </div>
+
+                <div>
+                    <label for="status">Status</label>
+                    <select name="status" id="status">
+                        <option value="">All statuses</option>
+
+                        {% for status in contract_statuses %}
+                        <option value="{{ status }}"
+                            {% if filters.status == status %}selected{% endif %}>
+                            {{ status }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label for="supplier">Supplier</label>
+                    <select name="supplier_id" id="supplier">
+                        <option value="">All suppliers</option>
+
+                        {% for supplier in suppliers %}
+                        <option value="{{ supplier.id }}"
+                            {% if filters.supplier_id|string == supplier.id|string %}selected{% endif %}>
+                            {{ supplier.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+            </div>
+
+            <div class="finance-form-actions">
+                <button type="submit" class="finance-btn primary">
+                    Search
+                </button>
+
+                <a href="{{ url_for('procurement.contracts') }}"
+                   class="finance-btn secondary">
+                    Clear
+                </a>
+            </div>
+
+        </form>
+    </div>
+
+    <!-- CONTRACT REGISTER -->
+    <div class="dash-panel hr-table-panel">
+
+        <h2>Supplier Contract Register</h2>
+
+        <div class="hr-table-wrap table-scroll">
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Contract Number</th>
+                        <th>Contract Title</th>
+                        <th>Supplier</th>
+                        <th>Contract Type</th>
+                        <th>Value</th>
+                        <th>Start Date</th>
+                        <th>Expiry Date</th>
+                        <th>Days Remaining</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for contract in contracts %}
+                    <tr>
+                        <td>{{ contract.contract_number }}</td>
+
+                        <td>{{ contract.contract_title }}</td>
+
+                        <td>{{ contract.supplier_name }}</td>
+
+                        <td>{{ contract.contract_type }}</td>
+
+                        <td>
+                            {{ contract.currency }}
+                            {{ "{:,.2f}".format(contract.contract_value | float) }}
+                        </td>
+
+                        <td class="nowrap">{{ contract.start_date }}</td>
+
+                        <td class="nowrap">{{ contract.end_date }}</td>
+
+                        <td>
+                            {% if contract.days_remaining is not none %}
+                                {{ contract.days_remaining }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            <span class="status-badge neutral">
+                                {{ contract.status }}
+                            </span>
+                        </td>
+
+                        <td>
+                            <div class="stock-actions">
+                                <a href="{{ url_for(
+                                    'procurement.contract_details',
+                                    contract_id=contract.id
+                                ) }}"
+                                   class="finance-btn secondary">
+                                    View
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+
+                    {% else %}
+                    <tr>
+                        <td colspan="10" class="employee-empty">
+                            No supplier contracts found.
+                        </td>
+                    </tr>
+                    {% endfor %}
+
+                </tbody>
+            </table>
+
+        </div>
+    </div>
+
+    <!-- CONTRACT CONTROL -->
+    <div class="dash-panel">
+
+        <h2>Contract Control and Compliance</h2>
+
+        <ul>
+            <li>Every contract must be linked to an existing supplier.</li>
+            <li>Contract approval must follow the existing organizational approval workflow.</li>
+            <li>Expired contracts must not be treated as active agreements.</li>
+            <li>Renewal reminders should be generated before the expiry date.</li>
+            <li>Contract amendments and renewals must retain the original audit history.</li>
+            <li>Only authorized users may view or download confidential contract documents.</li>
+            <li>Contract values and currencies must be validated before approval.</li>
+        </ul>
+
+    </div>
+
+    {% endif %}
+
+</section>
+
+{% endblock %}

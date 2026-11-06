@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}New examination{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Recruitment desk</span>
+      <h1>New examination</h1>
+      <p>A paper belongs to one post. Its marks, its window and its pass line are set
+        here; the questions come next, and publishing freezes both.</p>
+    </div>
+    <nav class="stock-actions" aria-label="Examination actions">
+      <a class="btn btn-outline btn-sm" href="{{ url_for('recruitment.hr_exams') }}">
+        Back to examinations
+      </a>
+    </nav>
+  </div>
+</section>
+
+<section class="container finance-page">
+  <div class="dash-panel">
+    <h2>The paper</h2>
+    {% if posts %}
+    <form method="POST" action="{{ url_for('recruitment.create_exam') }}"
+          class="dash-form account-grid">
+      {{ csrf_field() }}
+      <div class="full">
+        <label for="vacancy_id">Post *</label>
+        <select id="vacancy_id" name="vacancy_id" required>
+          <option value="">Choose the post this examination belongs to</option>
+          {% for post in posts %}
+          {% set wanted = vacancy_id if vacancy_id is defined else '' %}
+          <option value="{{ post.id }}" {% if wanted == post.id | string %}selected{% endif %}>
+            {{ post.job_title }} · {{ post.department }} ({{ post.status }})
+          </option>
+          {% endfor %}
+        </select>
+        <p class="cell-note">Only open and draft posts inside your reach are listed.</p>
+      </div>
+
+      <div>
+        <label for="exam_title">Title *</label>
+        <input id="exam_title" name="exam_title" maxlength="200" required
+               placeholder="Cabinet finishing - trade test" />
+      </div>
+      <div>
+        <label for="duration_minutes">Minutes to sit *</label>
+        <input id="duration_minutes" name="duration_minutes" type="number"
+               min="1" max="480" value="60" required />
+      </div>
+      <div>
+        <label for="total_marks">Total marks *</label>
+        <input id="total_marks" name="total_marks" type="number" step="0.5"
+               min="1" max="1000" value="100" required />
+      </div>
+      <div>
+        <label for="pass_mark">Pass mark *</label>
+        <input id="pass_mark" name="pass_mark" type="number" step="0.5" min="0"
+               value="50" required />
+      </div>
+      <div>
+        <label for="start_datetime">Sitting opens</label>
+        <input id="start_datetime" name="start_datetime" type="datetime-local" />
+      </div>
+      <div>
+        <label for="end_datetime">Sitting closes</label>
+        <input id="end_datetime" name="end_datetime" type="datetime-local" />
+        <p class="cell-note">Both are needed before publishing, and the close has to fall
+          after the open.</p>
+      </div>
+
+      <div class="full">
+        <label for="description">What the paper covers</label>
+        <textarea id="description" name="description" rows="4" maxlength="2000"></textarea>
+      </div>
+
+      <div class="full">
+        <button class="btn finance-btn primary" type="submit">Create as draft</button>
+        <a class="btn btn-outline" href="{{ url_for('recruitment.hr_exams') }}">Cancel</a>
+        <span class="cell-note">Every shortlisted candidate is seated when you publish.</span>
+      </div>
+    </form>
+    {% else %}
+    <p class="empty-state"><strong>No post is available for a paper.</strong> An
+      examination needs an open or draft vacancy inside your reach -
+      <a href="{{ url_for('recruitment.hr_vacancies') }}">open one</a> first.</p>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

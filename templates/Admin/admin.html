@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "base.html" import bars, feed with context %}
+{% from "base.html" import bars, feed, kpi with context %}
 {% block title %}Admin Dashboard | Dereje Belay Wood &amp; Kitchen Cabinet Finishing{% endblock %}
 
 {% block content %}
@@ -14,6 +14,7 @@
       <div class="stat"><strong>{{ projects | length }}</strong><span>Projects</span></div>
       <div class="stat"><strong>{{ employees | length }}</strong><span>Employees</span></div>
       <div class="stat"><strong>{{ projects | map(attribute='category') | unique | list | length }}</strong><span>Categories</span></div>
+      <div class="stat"><strong>{{ integration_stats.active }}</strong><span>Integrations active</span></div>
     </div>
   </div>
 </section>
@@ -59,6 +60,24 @@
     'time': 'Projects'
   }) %}
 {% endif %}
+{% if integration_stats.open_errors %}
+  {% set _ = attention.append({
+    'icon': 'warn', 'tone': 'warn',
+    'title': "{} integration error{} still open".format(integration_stats.open_errors, '' if integration_stats.open_errors == 1 else 's'),
+    'meta': 'A failed test or synchronization is waiting on the monitoring desk.',
+    'time': 'Integrations',
+    'href': url_for('integrations.monitoring') if 'integrations' in permissions else ''
+  }) %}
+{% endif %}
+{% if integration_stats.total and not integration_stats.active %}
+  {% set _ = attention.append({
+    'icon': 'network', 'tone': 'warn',
+    'title': 'No external connection is active',
+    'meta': 'Registered systems stay inert until they are activated on the registry.',
+    'time': 'Integrations',
+    'href': url_for('integrations.dashboard') if 'integrations' in permissions else ''
+  }) %}
+{% endif %}
 
 
 <section class="section bg-white">
@@ -70,6 +89,96 @@
     </div>
   </div>
 </section>
+
+{% if 'integrations' in permissions %}
+<section class="section bg-white">
+  <div class="container">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow">Administration</span>
+        <h2>System integration</h2>
+      </div>
+      <p>The external systems this company talks to: their endpoint, whether it answers,
+        what its synchronization has done and what still needs a person.</p>
+    </div>
+
+    <div class="hr-stats">
+      {{ kpi('Connections', integration_stats.total,
+             'Active Directory, services, mail, SMS and ERP', icon='network') }}
+      {{ kpi('Active', integration_stats.active,
+             'Only an active connection may synchronize', tone='up', icon='check') }}
+      {{ kpi('Scheduled', integration_stats.scheduled,
+             'Read by the integration scheduler worker', icon='clock') }}
+      {{ kpi('Unresolved errors', integration_stats.open_errors,
+             'Cleared on the monitoring desk' if integration_stats.open_errors
+             else 'Every run reported clean',
+             tone='down' if integration_stats.open_errors else 'flat', icon='warn',
+             href=url_for('integrations.monitoring') if integration_stats.open_errors else '') }}
+    </div>
+
+    <div class="account-card" style="margin-top: 1.5rem;">
+      <header class="account-head">
+        <div>
+          <h3 class="account-name">Connections</h3>
+          <span class="cell-note">Credentials are stored sealed; this summary never shows one.</span>
+        </div>
+        <div class="row-actions">
+          <a class="btn btn-outline-dark btn-sm" href="{{ url_for('integrations.monitoring') }}">Monitoring</a>
+          <a class="btn btn-outline-dark btn-sm" href="{{ url_for('integrations.logs') }}">Activity</a>
+          <a class="btn btn-sm" href="{{ url_for('integrations.add') }}">Add connection</a>
+        </div>
+      </header>
+      <div class="dash-table-wrap">
+        <table>
+          <thead>
+            <tr><th>Connection</th><th>Type</th><th>Status</th><th>Schedule</th>
+                <th>Last test</th><th>Last sync</th><th>Errors</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for item in integration_rows %}
+            <tr class="{{ 'is-disabled' if item.status != 'active' }}">
+              <td>{{ item.name }}</td>
+              <td>{{ item.integration_type }}</td>
+              <td>
+                <span class="status-badge {{ 'active' if item.status == 'active' else 'off' }}">
+                  {{ item.status }}</span>
+              </td>
+              <td>{{ 'Every {} min'.format(item.sync_interval) if item.sync_enabled else 'Manual' }}</td>
+              <td>
+                <span class="status-badge {{ 'active' if item.last_test == 'success'
+                                              else ('off' if item.last_test == 'failed'
+                                              else 'neutral') }}">{{ item.last_test or 'untested' }}</span>
+              </td>
+              <td class="cell-note nowrap">{{ item.last_sync_at | audit_time or 'never' }}</td>
+              <td>
+                {% if item.open_errors %}
+                <span class="status-badge off">{{ item.open_errors }}</span>
+                {% else %}
+                <span class="cell-note">none</span>
+                {% endif %}
+              </td>
+              <td>
+                <div class="row-actions">
+                  <a class="btn btn-outline-dark btn-sm"
+                     href="{{ url_for('integrations.edit', integration_id=item.id) }}">Open</a>
+                </div>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="8" class="cell-note">
+              No system is registered yet. Add the connection, store its credential and test
+              the endpoint before anyone relies on it.
+            </td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="perm-note">The full registry, its schedule, credentials, directory mapping and
+        activity log sit under <strong>System Integration</strong> in the sidebar.</p>
+    </div>
+  </div>
+</section>
+{% endif %}
 
 <section class="section bg-ivory">
   <div class="container">
@@ -124,6 +233,7 @@
   </div>
 </section>
 
+{% if 'hr_employees' in permissions %}
 <section class="section bg-ivory">
   <div class="container">
     <div class="section-head">
@@ -171,5 +281,6 @@
     </div>
   </div>
 </section>
+{% endif %}
 
 {% endblock %}

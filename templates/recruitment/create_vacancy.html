@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Revise ' ~ vacancy.job_title if vacancy else 'Raise a recruitment request' }}{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Recruitment desk</span>
+      <h1>{{ 'Revise the draft' if vacancy else 'New recruitment request' }}</h1>
+      <p>
+        {% if vacancy %}
+        {{ vacancy.reference or '#' ~ vacancy.id }} · raised by
+        {{ vacancy.created_by_name or 'the HR desk' }}
+        {% elif scope.can_manage %}
+        The HR desk publishes a post directly or sends it through approval first.
+        {% else %}
+        A department seat raises a draft; the approval route publishes it once every desk
+        has signed.
+        {% endif %}
+      </p>
+    </div>
+    <nav class="stock-actions" aria-label="Form actions">
+      <a class="btn btn-outline btn-sm" href="{{ url_for('recruitment.hr_vacancies') }}">
+        Back to the register
+      </a>
+      {% if vacancy %}
+      <a class="btn btn-outline btn-sm"
+         href="{{ url_for('recruitment.vacancy_detail', vacancy_id=vacancy.id) }}">
+        Open the post
+      </a>
+      {% endif %}
+    </nav>
+  </div>
+</section>
+
+<section class="container finance-page">
+  {% if chain %}
+  <p class="finance-alert {{ 'error' if chain.status in ('Rejected', 'Returned') else 'success' }}">
+    This request is {{ chain.status | lower }} on chain #{{ chain.id }}.
+    {% if chain.status == 'Returned' %}
+    Fix what the desk asked for and submit it again.
+    {% endif %}
+  </p>
+  {% endif %}
+
+  <div class="dash-panel">
+    <h2>{{ 'Post details' if vacancy else 'What the department needs' }}</h2>
+    <form method="POST"
+          action="{{ url_for('recruitment.edit_vacancy', vacancy_id=vacancy.id) if vacancy
+                     else url_for('recruitment.create_vacancy') }}"
+          class="dash-form account-grid">
+      {{ csrf_field() }}
+
+    <div>
+      <label for="job_title">Job title *</label>
+      <input id="job_title" name="job_title" maxlength="120" required
+             value="{{ values.get('job_title') or '' }}" />
+    </div>
+
+    <div>
+      <label for="department">Department *</label>
+      <select id="department" name="department" required>
+        <option value="">Choose a registered department</option>
+        {% for department in departments %}
+          {% if scope.can_manage or department.id == scope.department_id
+                or (vacancy and vacancy.department | lower == department.name | lower) %}
+          <option value="{{ department.name }}"
+            {% if (values.get('department') or '') | lower == department.name | lower %}selected{% endif %}>
+            {{ department.name }}
+          </option>
+          {% endif %}
+        {% endfor %}
+      </select>
+      <p class="cell-note">Only departments the organisation already registers, so a
+        request never splits one in two.</p>
+    </div>
+
+    <div>
+      <label for="job_type">Employment type</label>
+      <select id="job_type" name="job_type">
+        {% for job_type in vacancy_job_types %}
+        <option value="{{ job_type }}"
+          {% if values.get('job_type') == job_type %}selected{% endif %}>{{ job_type }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div>
+      <label for="location">Work location</label>
+      <input id="location" name="location" maxlength="80"
+             value="{{ values.get('location') or '' }}" placeholder="Addis Ababa plant" />
+    </div>
+
+    <div>
+      <label for="openings">Openings *</label>
+      <input id="openings" name="openings" type="number" min="1" max="50" required
+             value="{{ values.get('openings') or 1 }}" />
+    </div>
+
+    <div>
+      <label for="closing_date">Closing date</label>
+      <input id="closing_date" name="closing_date" type="date"
+             value="{{ values.get('closing_date') or '' }}" />
+    </div>
+
+    <div>
+      <label for="minimum_gpa">Minimum GPA</label>
+      <input id="minimum_gpa" name="minimum_gpa" type="number" step="0.01" min="0" max="7"
+             value="{{ values.get('minimum_gpa') or 0 }}" />
+      <p class="cell-note">0 means the post sets no minimum.</p>
+    </div>
+
+    <div>
+      <label for="minimum_age">Minimum age</label>
+      <input id="minimum_age" name="minimum_age" type="number" min="0" max="70"
+             value="{{ values.get('minimum_age') or 0 }}" />
+    </div>
+
+    <div>
+      <label for="maximum_age">Maximum age</label>
+      <input id="maximum_age" name="maximum_age" type="number" min="0" max="80"
+             value="{{ values.get('maximum_age') or 0 }}" />
+      <p class="cell-note">0 means no upper limit.</p>
+    </div>
+
+    <div>
+      <label for="estimated_cost">Estimated annual cost (ETB)</label>
+      <input id="estimated_cost" name="estimated_cost" type="number" step="0.01" min="0"
+             value="{{ values.get('estimated_cost') or 0 }}" />
+      <p class="cell-note">The amount decides how many desks sign the request.</p>
+    </div>
+
+    <div>
+      <label for="budget_allocation_id">Budget allocation</label>
+      <select id="budget_allocation_id" name="budget_allocation_id">
+        <option value="">Not charged to an allocation</option>
+        {% for allocation in allocations %}
+        <option value="{{ allocation.id }}"
+          {% if values.get('budget_allocation_id') | string == allocation.id | string %}selected{% endif %}>
+          {{ allocation.allocation_name }} · {{ allocation.department | title }}
+          ({{ "{:,.2f}".format(allocation.available_amount | float) }} ETB free)
+        </option>
+        {% endfor %}
+      </select>
+      <p class="cell-note">Needed before a request that carries money is submitted.</p>
+    </div>
+
+    <div>
+      <label for="internal_only">Who may apply</label>
+      <label class="perm-item">
+        <input id="internal_only" name="internal_only" type="checkbox" value="1"
+               {% if values.get('internal_only') %}checked{% endif %} />
+        <span>Reserved for the company&rsquo;s own staff</span>
+      </label>
+    </div>
+
+    <div class="full">
+      <label for="description">What the work is</label>
+      <textarea id="description" name="description" rows="6"
+                maxlength="4000">{{ values.get('description') or '' }}</textarea>
+    </div>
+
+    <div class="full">
+      <label for="requirements">What we ask for</label>
+      <textarea id="requirements" name="requirements" rows="5"
+                maxlength="2000">{{ values.get('requirements') or '' }}</textarea>
+    </div>
+
+    <div class="full">
+      <button class="btn finance-btn primary" type="submit">
+        {{ 'Save changes' if vacancy else 'Save as draft' }}
+      </button>
+      {% if not vacancy and scope.can_manage %}
+      <button class="btn finance-btn secondary" type="submit" name="action" value="publish">
+        Save and publish now
+      </button>
+      {% endif %}
+      <a class="btn btn-outline" href="{{ url_for('recruitment.hr_vacancies') }}">Cancel</a>
+      {% if not vacancy and not scope.can_manage %}
+      <span class="cell-note">Saving keeps this a draft. Submitting it on its own page
+        starts the approval route.</span>
+      {% endif %}
+    </div>
+    </form>
+  </div>
+</section>
+{% endblock %}

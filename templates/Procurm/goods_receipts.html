@@ -1,0 +1,367 @@
+
+{% extends "base.html" %}
+
+{% block title %}Goods Receipt Management | Dereje Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Procurement / Goods Receipts</span>
+            <h1>Goods Receipt Management</h1>
+            <p>Monitor supplier deliveries and coordinate receipt posting with Inventory and Asset Management.</p>
+        </div>
+
+        <nav class="stock-actions" aria-label="Goods receipt actions">
+            <a href="{{ url_for('procurement.dashboard') }}"
+               class="btn btn-outline btn-sm">
+                Back to Procurement
+            </a>
+
+            <a href="{{ url_for('procurement.purchase_orders') }}"
+               class="btn btn-primary btn-sm">
+                Purchase Orders
+            </a>
+        </nav>
+    </div>
+</section>
+
+<section class="container finance-page">
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+            <div class="finance-alert {{ category }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endwith %}
+
+    {% if not can_view_receipts %}
+    <div class="finance-alert info">
+        You do not have permission to view goods receipt records.
+    </div>
+    {% else %}
+
+    <!-- RECEIPT STATISTICS -->
+    <div class="hr-stats">
+        {{ kpi('Purchase Orders', stats.total_orders) }}
+        {{ kpi('Orders with Deliveries', stats.orders_with_deliveries) }}
+        {{ kpi('Fully Received', stats.fully_received) }}
+        {{ kpi('Outstanding Orders', stats.outstanding) }}
+    </div>
+
+    <!-- DELIVERY SUMMARY -->
+    <div class="dash-panel">
+        <h2>Goods Receipt Summary</h2>
+
+        <div class="finance-grid">
+
+            <div>
+                <label>Total Ordered Quantity</label>
+                <strong>{{ stats.total_ordered_quantity }}</strong>
+            </div>
+
+            <div>
+                <label>Total Received Quantity</label>
+                <strong>{{ stats.total_received_quantity }}</strong>
+            </div>
+
+            <div>
+                <label>Outstanding Quantity</label>
+                <strong>{{ stats.outstanding_quantity }}</strong>
+            </div>
+
+            <div>
+                <label>Receipt Records</label>
+                <strong>{{ stats.total_receipts }}</strong>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- FILTERS -->
+    <div class="dash-panel">
+        <h2>Search Goods Receipts</h2>
+
+        <form method="get"
+              action="{{ url_for('procurement.goods_receipts') }}"
+              class="finance-form">
+
+            <div class="finance-grid">
+
+                <div>
+                    <label for="search">PO Number / Item / Supplier</label>
+                    <input type="search"
+                           id="search"
+                           name="search"
+                           value="{{ filters.search }}"
+                           placeholder="Search receipt records">
+                </div>
+
+                <div>
+                    <label for="supplier_id">Supplier</label>
+                    <select id="supplier_id" name="supplier_id">
+                        <option value="">All suppliers</option>
+
+                        {% for supplier in suppliers %}
+                        <option value="{{ supplier.id }}"
+                            {% if filters.supplier_id|string == supplier.id|string %}
+                            selected
+                            {% endif %}>
+                            {{ supplier.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label for="receipt_status">Receipt Status</label>
+                    <select id="receipt_status" name="status">
+                        <option value="">All statuses</option>
+                        {% for status in receipt_statuses %}
+                        <option value="{{ status }}"
+                            {% if filters.status == status %}selected{% endif %}>
+                            {{ status }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label for="date_from">From Date</label>
+                    <input type="date"
+                           id="date_from"
+                           name="date_from"
+                           value="{{ filters.date_from }}">
+                </div>
+
+                <div>
+                    <label for="date_to">To Date</label>
+                    <input type="date"
+                           id="date_to"
+                           name="date_to"
+                           value="{{ filters.date_to }}">
+                </div>
+
+            </div>
+
+            <div class="finance-form-actions">
+                <button type="submit" class="finance-btn primary">
+                    Apply Filters
+                </button>
+
+                <a href="{{ url_for('procurement.goods_receipts') }}"
+                   class="finance-btn secondary">
+                    Clear Filters
+                </a>
+            </div>
+
+        </form>
+    </div>
+
+    <!-- GOODS RECEIPT REGISTER -->
+    <div class="dash-panel hr-table-panel">
+
+        <h2>Supplier Delivery Register</h2>
+
+        <div class="hr-table-wrap table-scroll">
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Delivery Date</th>
+                        <th>PO Number</th>
+                        <th>Supplier</th>
+                        <th>Item</th>
+                        <th>Quantity Received</th>
+                        <th>Received By</th>
+                        <th>Receipt Reference</th>
+                        <th>Notes</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for receipt in receipts %}
+                    <tr>
+
+                        <td class="nowrap">
+                            {{ receipt.delivery_date }}
+                        </td>
+
+                        <td>
+                            <a href="{{ url_for(
+                                'procurement.order_detail',
+                                order_id=receipt.order_id
+                            ) }}">
+                                {{ receipt.order_number }}
+                            </a>
+                        </td>
+
+                        <td>{{ receipt.supplier_name or '—' }}</td>
+
+                        <td class="wrap-cell">
+                            {{ receipt.item_name }}
+                        </td>
+
+                        <td class="nowrap">
+                            {{ "{:g}".format(receipt.quantity | float) }}
+                            {{ receipt.unit }}
+                        </td>
+
+                        <td>{{ receipt.received_by_name or '—' }}</td>
+
+                        <td>{{ receipt.receipt_number or '—' }}</td>
+
+                        <td class="wrap-cell">
+                            {{ receipt.notes or '—' }}
+                        </td>
+
+                        <td>
+                            <a class="finance-btn secondary"
+                               href="{{ url_for(
+                                   'procurement.order_detail',
+                                   order_id=receipt.order_id
+                               ) }}">
+                                View PO
+                            </a>
+                        </td>
+
+                    </tr>
+
+                    {% else %}
+                    <tr>
+                        <td colspan="9" class="employee-empty">
+                            No supplier delivery records found.
+                        </td>
+                    </tr>
+                    {% endfor %}
+
+                </tbody>
+            </table>
+
+        </div>
+    </div>
+
+    <!-- ORDERS AWAITING DELIVERY -->
+    <div class="dash-panel hr-table-panel">
+
+        <h2>Orders Awaiting Delivery</h2>
+
+        <div class="hr-table-wrap table-scroll">
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>PO Number</th>
+                        <th>Supplier</th>
+                        <th>Item</th>
+                        <th>Ordered</th>
+                        <th>Received</th>
+                        <th>Remaining</th>
+                        <th>Expected Date</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for order in outstanding_orders %}
+                    <tr>
+
+                        <td>{{ order.order_number }}</td>
+
+                        <td>{{ order.supplier_name or '—' }}</td>
+
+                        <td class="wrap-cell">
+                            {{ order.item_name }}
+                        </td>
+
+                        <td>
+                            {{ "{:g}".format(order.quantity | float) }}
+                            {{ order.unit }}
+                        </td>
+
+                        <td>
+                            {{ "{:g}".format(order.received | float) }}
+                            {{ order.unit }}
+                        </td>
+
+                        <td>
+                            <strong>
+                                {{ "{:g}".format(order.remaining | float) }}
+                                {{ order.unit }}
+                            </strong>
+                        </td>
+
+                        <td>{{ order.expected_date or '—' }}</td>
+
+                        <td>
+                            <span class="status-badge neutral">
+                                {{ order.status }}
+                            </span>
+                        </td>
+
+                        <td>
+                            <a class="finance-btn primary"
+                               href="{{ url_for(
+                                   'procurement.order_detail',
+                                   order_id=order.id
+                               ) }}">
+                                Record Delivery
+                            </a>
+                        </td>
+
+                    </tr>
+
+                    {% else %}
+                    <tr>
+                        <td colspan="9" class="employee-empty">
+                            All eligible purchase orders have been fully received.
+                        </td>
+                    </tr>
+                    {% endfor %}
+
+                </tbody>
+            </table>
+
+        </div>
+    </div>
+
+    <!-- INVENTORY HANDOFF -->
+    <div class="dash-panel">
+        <h2>Inventory and Asset Handoff</h2>
+
+        <p class="panel-note">
+            Supplier deliveries are recorded in Procurement. After verification,
+            stock items must be posted through Inventory and qualifying fixed
+            assets must be registered through Asset Management.
+        </p>
+
+        <nav class="stock-actions">
+
+            {% if can_stock %}
+            <a href="{{ url_for('inventory.stock_movement') }}"
+               class="btn btn-outline btn-sm">
+                Open Inventory
+            </a>
+            {% endif %}
+
+            {% if can_asset %}
+            <a href="{{ url_for('asset.create_asset') }}"
+               class="btn btn-outline btn-sm">
+                Open Asset Registration
+            </a>
+            {% endif %}
+
+        </nav>
+    </div>
+
+    {% endif %}
+
+</section>
+
+{% endblock %}

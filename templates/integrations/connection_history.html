@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi with context %}
+{% from "integrations/_module_nav.html" import module_tabs with context %}
+
+{% block title %}Connection tests · {{ row.name }} | System Integrations{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">System Integration</span>
+      <h1>Connection tests</h1>
+      <p>{{ row.name }} · {{ row.endpoint or 'no endpoint set' }}
+        {%- if row.username %} · binds as {{ row.username }}{% endif %}</p>
+    </div>
+    <nav class="stock-actions" aria-label="Connection actions">
+      <a class="btn btn-outline btn-sm"
+         href="{{ url_for('integrations.edit', integration_id=row.id) }}">Settings</a>
+      {% if directory %}
+      <a class="btn btn-outline btn-sm"
+         href="{{ url_for('integrations.directory_sync', connection_id=directory.id) }}">Directory desk</a>
+      {% elif row.integration_type == 'Active Directory / LDAP' %}
+      <a class="btn btn-outline btn-sm"
+         href="{{ url_for('integrations.ad_mapping', integration_id=row.id) }}">Mapping desk</a>
+      {% endif %}
+    </nav>
+    {{ module_tabs('registry') }}
+  </div>
+</section>
+
+<section class="section bg-white">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="hr-stats">
+      {{ kpi('Tests recorded', summary.total or 0,
+             'The newest history kept for this connection', icon='network') }}
+      {{ kpi('Passed', summary.passed or 0,
+             'Endpoint answered and, where stored, the bind succeeded',
+             tone='up', icon='check') }}
+      {{ kpi('Failed', (summary.total or 0) - (summary.passed or 0),
+             'Unreachable endpoint or refused credential',
+             tone='down' if (summary.total or 0) - (summary.passed or 0) else 'flat',
+             icon='warn') }}
+      {{ kpi('Last test', (tests[0].tested_at | audit_time) if tests else 'never', '', icon='clock') }}
+    </div>
+
+    <div class="account-card" style="margin-top: 1.5rem;">
+      <header class="account-head">
+        <div>
+          <h3 class="account-name">Test history</h3>
+          <span class="cell-note">A test only proves reachability - it never writes
+            anything to the system it checks.</span>
+        </div>
+        <form method="POST"
+              action="{{ url_for('integrations.check_connection', integration_id=row.id) }}">
+          {{ csrf_field() }}
+          <button class="btn btn-sm" type="submit">Test now</button>
+        </form>
+      </header>
+
+      <div class="dash-table-wrap">
+        <table>
+          <thead>
+            <tr><th>When</th><th>Result</th><th>Response time</th><th>Message</th></tr>
+          </thead>
+          <tbody>
+            {% for test in tests %}
+            <tr>
+              <td class="nowrap">{{ test.tested_at | audit_time or 'unknown' }}</td>
+              <td>
+                <span class="status-badge {{ 'active' if test.status == 'success' else 'off' }}">
+                  {{ test.status }}</span>
+              </td>
+              <td class="nowrap">
+                {% if test.response_time_ms is not none %}
+                {{ test.response_time_ms }} ms
+                {% else %}
+                <span class="cell-note">not measured</span>
+                {% endif %}
+              </td>
+              <td class="wrap-cell">{{ test.message or '-' }}</td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="4" class="cell-note">
+                No connection test has been run yet. Test the endpoint before the
+                connection is relied on.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <p class="perm-note">Every test is written to the integration activity log with its
+        result; the credential that was tried is never part of the message or the log.</p>
+    </div>
+  </div>
+</section>
+{% endblock %}

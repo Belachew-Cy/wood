@@ -1,0 +1,88 @@
+
+{% extends "base.html" %}
+
+{% block title %}Warehouse Stock Transfer{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">WAREHOUSE MANAGEMENT</span>
+            <h1>Transfer Stock Between Warehouses</h1>
+            <p>Move available stock from one warehouse to another.</p>
+        </div>
+    </div>
+</section>
+
+<section class="section bg-ivory">
+    <div class="container">
+        <div class="dash-panel">
+            <form method="POST">
+                {% if csrf_token is defined %}
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                {% endif %}
+
+                <div class="form-grid">
+                    <div>
+                        <label>Inventory Item *</label>
+                        <select name="item_id" required>
+                            <option value="">Select item</option>
+                            {% for item in items %}
+                            <option value="{{ item.id }}">
+                                {{ item.sku }} — {{ item.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label>Source Warehouse *</label>
+                        <select name="source_warehouse_id" required>
+                            <option value="">Select source</option>
+                            {% for warehouse in warehouses %}
+                            <option value="{{ warehouse.id }}">
+                                {{ warehouse.warehouse_name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label>Destination Warehouse *</label>
+                        <select name="destination_warehouse_id" required>
+                            <option value="">Select destination</option>
+                            {% for warehouse in warehouses %}
+                            <option value="{{ warehouse.id }}">
+                                {{ warehouse.warehouse_name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label>Transfer Quantity *</label>
+                        <input type="number" name="quantity"
+                               min="0.001" step="0.001" required>
+                    </div>
+
+                    <div>
+                        <label>Transfer Reference</label>
+                        <input name="reference_no">
+                    </div>
+
+                    <div>
+                        <label>Remarks</label>
+                        <input name="remarks">
+                    </div>
+                </div>
+
+                <div class="stock-actions">
+                    <button class="btn" type="submit">
+                        Transfer Stock
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</section>
+{% endblock %}

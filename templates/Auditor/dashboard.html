@@ -7,15 +7,22 @@
 <section class="dash-head">
   <div class="container">
     <div>
-      <span class="eyebrow">Audit &amp; Oversight</span>
-      <h1>Audit Console</h1>
+      <span class="eyebrow">Audit Management</span>
+      <h1>Audit Management</h1>
       <p>Read every department's records, raise reviews and findings, and export the reports.</p>
     </div>
     <nav class="stock-actions" aria-label="Audit sections">
       <a class="btn btn-outline btn-sm" href="{{ url_for('auditor_reviews') }}">Reviews</a>
       <a class="btn btn-outline btn-sm" href="{{ url_for('auditor_letters') }}">Letter audit</a>
       <a class="btn btn-outline btn-sm" href="{{ url_for('reports_centre') }}">Reports</a>
+
       <a class="btn btn-sm" href="{{ url_for('audit.audit_dashboard') }}">Audit Trail</a>
+      <a class="btn btn-sm" href="{{ url_for('audit.risk_detail') }}">Audit Risk</a>
+      <a class="btn btn-sm" href="{{ url_for('audit.audit_plans') }}">Audit Plans</a>
+      <a class="btn btn-sm" href="{{ url_for('audit.audit_reports') }}">Audit Report</a>
+      <a class="btn btn-sm" href="{{ url_for('audit.audit_letters') }}">Audit Letters</a>
+      <a class="btn btn-sm" href="{{ url_for('audit.risk_assessments') }}">Risk Assessment</a>
+      <a class="btn btn-sm" href="{{ url_for('audit.audit_logs') }}">Audit Logs</a>
     </nav>
   </div>
 </section>

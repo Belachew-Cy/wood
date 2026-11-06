@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Result: {{ result.exam_title }}{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Examination handed in</span>
+      <h1>{{ result.exam_title }}</h1>
+      <p>Your paper was marked against the published key the moment it reached the
+        desk.</p>
+    </div>
+  </div>
+</section>
+
+<section class="container finance-page">
+  <div class="dash-panel">
+    <h2>Your score</h2>
+    <div class="exam-result">
+      <strong class="exam-result-score">
+        {{ '%g' | format(result.score | float) }}
+        <span>/ {{ '%g' | format(result.total_marks | float) }}</span>
+      </strong>
+      <span class="status-badge {{ 'active' if passed else 'off' }}">
+        {{ 'Passed' if passed else 'Below the pass mark' }}
+      </span>
+    </div>
+    <dl class="detail-list">
+      <dt>Pass mark</dt>
+      <dd>{{ '%g' | format(result.pass_mark | float) }} of
+        {{ '%g' | format(result.total_marks | float) }}</dd>
+      <dt>Paper</dt><dd>{{ result.exam_title }}</dd>
+      <dt>What happens next</dt>
+      <dd>
+        {% if passed %}
+        The recruitment desk reads this alongside the other candidates. Any interview
+        invitation arrives as a notification and by email.
+        {% else %}
+        The desk sees the score with your application. You can ask about the result
+        through the contact desk; a second sitting is not offered on this link.
+        {% endif %}
+      </dd>
+    </dl>
+    <p class="panel-note">This page is the only copy of your score for a candidate without
+      an account - the sitting link that opened it is now closed.</p>
+    <nav class="stock-actions" aria-label="Result actions">
+      <a class="btn btn-sm" href="{{ back }}">Back</a>
+    </nav>
+  </div>
+</section>
+{% endblock %}

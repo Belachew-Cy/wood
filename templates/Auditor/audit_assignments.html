@@ -1,0 +1,246 @@
+
+{% extends "base.html" %}
+
+{% block title %}Audit Assignments | Audit Management{% endblock %}
+
+{% block content %}
+
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Audit Management</span>
+            <h1>Audit Assignments</h1>
+            <p>Assign auditors and monitor responsibilities across audit plans.</p>
+        </div>
+
+        <a class="btn btn-outline btn-sm"
+           href="{{ url_for('audit.dashboard') }}">
+            Back to Dashboard
+        </a>
+    </div>
+</section>
+
+<section class="container finance-page">
+
+    <!-- ASSIGNMENT SUMMARY -->
+
+    <div class="hr-stats">
+
+        <div class="dash-panel">
+            <span class="eyebrow">Total Assignments</span>
+            <h2>{{ stats.total | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Assigned</span>
+            <h2>{{ stats.assigned | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">In Progress</span>
+            <h2>{{ stats.in_progress | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Completed</span>
+            <h2>{{ stats.completed | default(0) }}</h2>
+        </div>
+
+    </div>
+
+
+    <!-- NEW ASSIGNMENT -->
+
+    <div class="dash-panel">
+
+        <h2>Assign Auditor</h2>
+        <p>Select an existing audit plan and an authorized auditor.</p>
+
+        <form method="POST"
+              action="{{ url_for('audit.assign_auditor') }}"
+              class="form-grid">
+
+            {% if csrf_token is defined %}
+                {{ csrf_token() }}
+            {% endif %}
+
+            <div class="form-group">
+                <label for="plan_id">Audit Plan *</label>
+
+                <select id="plan_id" name="plan_id" required>
+                    <option value="">Select Audit Plan</option>
+
+                    {% for plan in plans | default([]) %}
+                    <option value="{{ plan.id }}">
+                        {{ plan.plan_number | default('') }}
+                        — {{ plan.title | default('Untitled Audit') }}
+                    </option>
+                    {% endfor %}
+
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="user_id">Auditor *</label>
+
+                <select id="user_id" name="user_id" required>
+                    <option value="">Select Authorized Auditor</option>
+
+                    {% for user in auditors | default([]) %}
+                    <option value="{{ user.id }}">
+                        {{ user.full_name | default(user.username | default('Unknown User')) }}
+                    </option>
+                    {% endfor %}
+
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="assignment_role">Assignment Responsibility</label>
+
+                <select id="assignment_role" name="assignment_role">
+                    <option value="Lead Auditor">Lead Auditor</option>
+                    <option value="Audit Team Member">Audit Team Member</option>
+                    <option value="Reviewer">Reviewer</option>
+                    <option value="Specialist">Specialist</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="due_date">Assignment Due Date</label>
+                <input type="date" id="due_date" name="due_date">
+            </div>
+
+            <div class="form-group">
+                <label for="remarks">Assignment Remarks</label>
+                <textarea
+                    id="remarks"
+                    name="remarks"
+                    rows="3"
+                    placeholder="Enter responsibilities or instructions"
+                ></textarea>
+            </div>
+
+            <div class="stock-actions">
+                <button type="submit" class="btn btn-sm">
+                    Assign Auditor
+                </button>
+            </div>
+
+        </form>
+
+    </div>
+
+
+    <!-- ASSIGNMENT LIST -->
+
+    <div class="dash-panel hr-table-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Auditor Assignment Records</h2>
+                <p>Review assigned auditors and their audit responsibilities.</p>
+            </div>
+
+            <span class="status-badge neutral">
+                {{ assignments | length }} Records
+            </span>
+        </div>
+
+        <div class="table-scroll">
+
+            <table class="report-table">
+
+                <thead>
+                    <tr>
+                        <th>Audit Plan</th>
+                        <th>Auditor</th>
+                        <th>Responsibility</th>
+                        <th>Assigned Date</th>
+                        <th>Due Date</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for assignment in assignments | default([]) %}
+
+                    <tr>
+
+                        <td>
+                            <strong>
+                                {{ assignment.plan_title
+                                   | default(assignment.plan_number
+                                   | default('Audit Plan')) }}
+                            </strong>
+                        </td>
+
+                        <td>
+                            {{ assignment.auditor_name
+                               | default(assignment.user_name
+                               | default('—')) }}
+                        </td>
+
+                        <td>
+                            {{ assignment.assignment_role
+                               | default(assignment.role
+                               | default('Audit Team Member')) }}
+                        </td>
+
+                        <td>
+                            {{ assignment.assigned_at | default('—') }}
+                        </td>
+
+                        <td>
+                            {{ assignment.due_date | default('—') }}
+                        </td>
+
+                        <td>
+                            {% set status = assignment.status | default('Assigned') %}
+
+                            <span class="status-badge
+                                {{ 'active' if status == 'Completed'
+                                else 'neutral' }}">
+                                {{ status }}
+                            </span>
+                        </td>
+
+                        <td>
+                            {% if assignment.plan_id %}
+                            <a class="btn btn-outline btn-sm"
+                               href="{{ url_for(
+                                   'audit.audit_plan_detail',
+                                   plan_id=assignment.plan_id
+                               ) }}">
+                                View Plan
+                            </a>
+                            {% else %}
+                            <span>—</span>
+                            {% endif %}
+                        </td>
+
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="7" class="report-empty">
+                            No auditor assignments have been created yet.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</section>
+
+{% endblock %}

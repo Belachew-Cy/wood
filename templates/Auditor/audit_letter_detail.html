@@ -1,0 +1,301 @@
+
+{% extends "base.html" %}
+
+{% block title %}Correspondence Details | Audit Management{% endblock %}
+
+{% block content %}
+
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Audit Management / Correspondence Details</span>
+            <h1>{{ letter.letter_number | default('Letter Details') }}</h1>
+            <p>
+                Review official correspondence, approval decisions
+                and delivery history.
+            </p>
+        </div>
+
+        <div class="stock-actions">
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.auditor_letters') }}">
+                Back to Correspondence
+            </a>
+
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.dashboard') }}">
+                Dashboard
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="container finance-page">
+
+    <!-- LETTER STATUS -->
+
+    <div class="hr-stats">
+
+        <div class="dash-panel">
+            <span class="eyebrow">Letter Status</span>
+            <h2>{{ letter.status | default('Unknown') }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Letter Type</span>
+            <h2>{{ letter.letter_type | default('—') }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Department</span>
+            <h2>{{ letter.department | default('—') }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Letter Date</span>
+            <h2>{{ letter.letter_date | default('—') }}</h2>
+        </div>
+
+    </div>
+
+
+    <!-- LETTER INFORMATION -->
+
+    <div class="dash-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Letter Information</h2>
+                <p>Official correspondence information from Letter Management.</p>
+            </div>
+
+            <span class="status-badge neutral">
+                {{ letter.status | default('Unknown') }}
+            </span>
+        </div>
+
+        <div class="form-grid">
+
+            <div class="form-group">
+                <label>Letter Reference</label>
+                <p>
+                    {{ letter.letter_number
+                       | default(letter.reference_number | default('—')) }}
+                </p>
+            </div>
+
+            <div class="form-group">
+                <label>Letter Type</label>
+                <p>{{ letter.letter_type | default('—') }}</p>
+            </div>
+
+            <div class="form-group">
+                <label>Department</label>
+                <p>{{ letter.department | default('—') }}</p>
+            </div>
+
+            <div class="form-group">
+                <label>Letter Date</label>
+                <p>{{ letter.letter_date | default('—') }}</p>
+            </div>
+
+            <div class="form-group">
+                <label>Sender</label>
+                <p>{{ letter.sender_name | default('—') }}</p>
+            </div>
+
+            <div class="form-group">
+                <label>Recipient</label>
+                <p>{{ letter.recipient_name | default('—') }}</p>
+            </div>
+
+            <div class="form-group">
+                <label>Created By</label>
+                <p>{{ letter.created_by_name | default('—') }}</p>
+            </div>
+
+            <div class="form-group">
+                <label>Created At</label>
+                <p>{{ letter.created_at | default('—') }}</p>
+            </div>
+
+            <div class="form-group form-full">
+                <label>Subject</label>
+                <p>{{ letter.subject | default('—') }}</p>
+            </div>
+
+            <div class="form-group form-full">
+                <label>Letter Description</label>
+                <p>{{ letter.description | default('No description available.') }}</p>
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- LETTER CONTENT -->
+
+    <div class="dash-panel">
+
+        <h2>Letter Content</h2>
+
+        {% if letter.content_html %}
+            <div class="letter-content">
+                {{ letter.content_html | safe }}
+            </div>
+        {% elif letter.content %}
+            <div class="letter-content">
+                {{ letter.content }}
+            </div>
+        {% else %}
+            <p>
+                Letter content is not available to this audit account.
+            </p>
+        {% endif %}
+
+    </div>
+
+
+    <!-- APPROVAL HISTORY -->
+
+    <div class="dash-panel hr-table-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Approval History</h2>
+                <p>Review recorded approval workflow decisions.</p>
+            </div>
+        </div>
+
+        <div class="table-scroll">
+
+            <table class="report-table">
+
+                <thead>
+                    <tr>
+                        <th>Approver</th>
+                        <th>Position</th>
+                        <th>Decision</th>
+                        <th>Comments</th>
+                        <th>Decision Date</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for approval in approvals | default([]) %}
+
+                    <tr>
+                        <td>{{ approval.approver_name | default('—') }}</td>
+
+                        <td>{{ approval.position | default('—') }}</td>
+
+                        <td>{{ approval.decision | default(approval.status | default('—')) }}</td>
+
+                        <td>{{ approval.comments | default('—') }}</td>
+
+                        <td>{{ approval.created_at | default('—') }}</td>
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="5" class="report-empty">
+                            No approval history is available.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <!-- DELIVERY HISTORY -->
+
+    <div class="dash-panel hr-table-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Delivery History</h2>
+                <p>Track recorded correspondence delivery and receipt events.</p>
+            </div>
+        </div>
+
+        <div class="table-scroll">
+
+            <table class="report-table">
+
+                <thead>
+                    <tr>
+                        <th>Recipient</th>
+                        <th>Delivery Method</th>
+                        <th>Delivery Status</th>
+                        <th>Delivered Date</th>
+                        <th>Received Date</th>
+                        <th>Remarks</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for delivery in deliveries | default([]) %}
+
+                    <tr>
+                        <td>{{ delivery.recipient_name | default('—') }}</td>
+
+                        <td>{{ delivery.delivery_method | default('—') }}</td>
+
+                        <td>{{ delivery.status | default('—') }}</td>
+
+                        <td>{{ delivery.delivered_at | default('—') }}</td>
+
+                        <td>{{ delivery.received_at | default('—') }}</td>
+
+                        <td>{{ delivery.remarks | default('—') }}</td>
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="6" class="report-empty">
+                            No delivery history is available.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <!-- AUDIT ACCESS NOTICE -->
+
+    <div class="dash-panel">
+
+        <h2>Audit Access and Confidentiality</h2>
+
+        <ul>
+            <li>This page provides read-only access to the original letter record.</li>
+            <li>Approval and delivery information must come from the existing Letter Management database.</li>
+            <li>Only authorized users may view confidential letter content and attachments.</li>
+            <li>Access to sensitive correspondence should be recorded in the existing audit logs.</li>
+            <li>Changes to letters and approval decisions must be performed in the Letter Management module.</li>
+        </ul>
+
+    </div>
+
+</section>
+
+{% endblock %}

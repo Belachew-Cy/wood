@@ -15,7 +15,7 @@ from services.notifications import deliver_notification
 
 
 @route("/admin/hr/reports", methods=["GET"])
-@perm("hr")
+@perm("hr_reports")
 def hr_reports():
     db = get_db()
 
@@ -168,7 +168,7 @@ def hr_reports():
 
 
 @route("/admin/hr/leave", methods=["GET", "POST"])
-@perm("hr")
+@perm("hr_leave")
 def leave_management():
     db = get_db()
 
@@ -288,7 +288,7 @@ def leave_management():
     "/admin/hr/leave/<int:leave_id>/review",
     methods=["POST"]
 )
-@perm("hr")
+@perm("hr_leave")
 def review_leave_request(leave_id):
     status = request.form.get("status", "").strip()
     comment = request.form.get("review_comment", "").strip()
@@ -355,7 +355,7 @@ def review_leave_request(leave_id):
     "/admin/hr/training-performance",
     methods=["GET", "POST"]
 )
-@perm("hr")
+@perm("hr_reports")
 def training_performance():
     db = get_db()
 

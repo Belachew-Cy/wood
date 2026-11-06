@@ -1,0 +1,368 @@
+
+{% extends "base.html" %}
+
+{% block title %}Quotation Management | Dereje Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Procurement / Quotations</span>
+            <h1>Quotation Management</h1>
+            <p>Manage supplier quotations and commercial offers.</p>
+        </div>
+
+        <nav class="stock-actions">
+            <a href="{{ url_for('procurement.rfq_management') }}"
+               class="btn btn-outline btn-sm">
+                RFQ Management
+            </a>
+
+            {% if can_manage_quotations %}
+            <a href="#quotation-form"
+               class="btn btn-primary btn-sm">
+                Record Quotation
+            </a>
+            {% endif %}
+        </nav>
+    </div>
+</section>
+
+<section class="container finance-page">
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+            <div class="finance-alert {{ category }}">{{ message }}</div>
+        {% endfor %}
+    {% endwith %}
+
+    {% if not can_manage_quotations %}
+    <div class="finance-alert info">
+        You have read-only access to quotation records.
+    </div>
+    {% endif %}
+
+    <!-- Statistics -->
+    <div class="hr-stats">
+        {{ kpi('Total quotations', stats.total) }}
+        {{ kpi('Under review', stats.under_review) }}
+        {{ kpi('Accepted', stats.accepted) }}
+        {{ kpi('Rejected', stats.rejected) }}
+    </div>
+
+    <!-- Record Quotation -->
+    {% if can_manage_quotations %}
+    <div class="finance-panel" id="quotation-form">
+
+        <h2>Record Supplier Quotation</h2>
+
+        <form method="post"
+              action="{{ url_for('procurement.add_quotation') }}"
+              enctype="multipart/form-data"
+              class="finance-form">
+
+            {{ csrf_field() }}
+
+            <div class="finance-grid">
+
+                <div>
+                    <label for="rfq_id">RFQ *</label>
+                    <select name="rfq_id" id="rfq_id" required>
+                        <option value="">Select open RFQ</option>
+                        {% for rfq in open_rfqs %}
+                        <option value="{{ rfq.id }}">
+                            {{ rfq.rfq_number }} - {{ rfq.title }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label for="supplier_id">Supplier *</label>
+                    <select name="supplier_id" id="supplier_id" required>
+                        <option value="">Select invited supplier</option>
+                        {% for supplier in suppliers %}
+                        <option value="{{ supplier.id }}">
+                            {{ supplier.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label for="quotation_reference">
+                        Supplier quotation reference *
+                    </label>
+                    <input type="text"
+                           name="quotation_reference"
+                           id="quotation_reference"
+                           maxlength="100"
+                           required>
+                </div>
+
+                <div>
+                    <label for="quotation_date">Quotation date *</label>
+                    <input type="date"
+                           name="quotation_date"
+                           id="quotation_date"
+                           required>
+                </div>
+
+                <div>
+                    <label for="valid_until">Valid until *</label>
+                    <input type="date"
+                           name="valid_until"
+                           id="valid_until"
+                           required>
+                </div>
+
+                <div>
+                    <label for="currency">Currency *</label>
+                    <select name="currency" id="currency" required>
+                        <option value="ETB">ETB</option>
+                        <option value="USD">USD</option>
+                        <option value="EUR">EUR</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="subtotal">Subtotal *</label>
+                    <input type="number"
+                           name="subtotal"
+                           id="subtotal"
+                           min="0"
+                           step="0.01"
+                           required>
+                </div>
+
+                <div>
+                    <label for="tax_amount">Tax amount</label>
+                    <input type="number"
+                           name="tax_amount"
+                           id="tax_amount"
+                           min="0"
+                           step="0.01"
+                           value="0">
+                </div>
+
+                <div>
+                    <label for="delivery_cost">Delivery cost</label>
+                    <input type="number"
+                           name="delivery_cost"
+                           id="delivery_cost"
+                           min="0"
+                           step="0.01"
+                           value="0">
+                </div>
+
+                <div>
+                    <label for="discount_amount">Discount</label>
+                    <input type="number"
+                           name="discount_amount"
+                           id="discount_amount"
+                           min="0"
+                           step="0.01"
+                           value="0">
+                </div>
+
+                <div>
+                    <label for="delivery_days">Delivery time (days)</label>
+                    <input type="number"
+                           name="delivery_days"
+                           id="delivery_days"
+                           min="1"
+                           max="365">
+                </div>
+
+                <div>
+                    <label for="payment_terms">Payment terms</label>
+                    <input type="text"
+                           name="payment_terms"
+                           id="payment_terms"
+                           maxlength="200">
+                </div>
+
+                <div class="full">
+                    <label for="quotation_document">
+                        Quotation document
+                    </label>
+                    <input type="file"
+                           name="quotation_document"
+                           id="quotation_document"
+                           accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
+                    <small>Upload a supplier quotation document.</small>
+                </div>
+
+                <div class="full">
+                    <label for="notes">Additional notes</label>
+                    <textarea name="notes"
+                              id="notes"
+                              rows="3"
+                              maxlength="2000"></textarea>
+                </div>
+
+            </div>
+
+            <div class="finance-form-actions">
+                <button type="submit" class="finance-btn primary">
+                    Save Quotation
+                </button>
+            </div>
+
+        </form>
+    </div>
+    {% endif %}
+
+    <!-- Filters -->
+    <div class="dash-panel">
+        <h2>Search Quotations</h2>
+
+        <form method="get"
+              action="{{ url_for('procurement.quotation_management') }}"
+              class="finance-form">
+
+            <div class="finance-grid">
+
+                <div>
+                    <label for="search">Quotation reference</label>
+                    <input type="search"
+                           name="search"
+                           id="search"
+                           value="{{ filters.search }}"
+                           placeholder="Search quotation">
+                </div>
+
+                <div>
+                    <label for="filter_rfq">RFQ</label>
+                    <select name="rfq_id" id="filter_rfq">
+                        <option value="">All RFQs</option>
+                        {% for rfq in all_rfqs %}
+                        <option value="{{ rfq.id }}"
+                            {% if filters.rfq_id|string == rfq.id|string %}
+                            selected
+                            {% endif %}>
+                            {{ rfq.rfq_number }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label for="filter_status">Status</label>
+                    <select name="status" id="filter_status">
+                        <option value="">All statuses</option>
+                        {% for status in quotation_statuses %}
+                        <option value="{{ status }}"
+                            {% if filters.status == status %}selected{% endif %}>
+                            {{ status }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+            </div>
+
+            <div class="finance-form-actions">
+                <button type="submit" class="finance-btn primary">
+                    Apply Filters
+                </button>
+                <a href="{{ url_for('procurement.quotation_management') }}"
+                   class="finance-btn secondary">
+                    Clear
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Quotations Table -->
+    <div class="dash-panel hr-table-panel">
+
+        <h2>Supplier Quotations</h2>
+
+        <div class="hr-table-wrap table-scroll">
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Quotation Ref.</th>
+                        <th>RFQ</th>
+                        <th>Supplier</th>
+                        <th>Quotation Date</th>
+                        <th>Valid Until</th>
+                        <th>Total Amount</th>
+                        <th>Currency</th>
+                        <th>Delivery Days</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for quotation in quotations %}
+                    <tr>
+
+                        <td>{{ quotation.quotation_reference }}</td>
+                        <td>{{ quotation.rfq_number }}</td>
+                        <td>{{ quotation.supplier_name }}</td>
+                        <td>{{ quotation.quotation_date }}</td>
+                        <td>{{ quotation.valid_until }}</td>
+
+                        <td>
+                            {{ "{:,.2f}".format(
+                                quotation.total_amount | float
+                            ) }}
+                        </td>
+
+                        <td>{{ quotation.currency }}</td>
+                        <td>{{ quotation.delivery_days or '—' }}</td>
+
+                        <td>
+                            <span class="status-badge neutral">
+                                {{ quotation.status }}
+                            </span>
+                        </td>
+
+                        <td>
+                            <div class="stock-actions">
+
+                                <a href="{{ url_for(
+                                    'procurement.quotation_details',
+                                    quotation_id=quotation.id
+                                ) }}"
+                                   class="finance-btn secondary">
+                                    View
+                                </a>
+
+                                {% if can_manage_quotations
+                                      and quotation.status == 'Submitted' %}
+                                <a href="{{ url_for(
+                                    'procurement.quotation_review',
+                                    quotation_id=quotation.id
+                                ) }}"
+                                   class="finance-btn primary">
+                                    Review
+                                </a>
+                                {% endif %}
+
+                            </div>
+                        </td>
+
+                    </tr>
+
+                    {% else %}
+                    <tr>
+                        <td colspan="10" class="employee-empty">
+                            No supplier quotations recorded.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+        </div>
+    </div>
+
+</section>
+
+{% endblock %}

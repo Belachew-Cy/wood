@@ -38,7 +38,7 @@
         {% endfor %}
         {% set shelf_rows = [
           {'label': 'Healthy', 'value': ns.ok, 'display': ns.ok},
-          {'label': 'At or below minimum', 'value': ns.low, 'display': ns.low},
+          {'label': 'Below minimum', 'value': ns.low, 'display': ns.low},
           {'label': 'Out of stock', 'value': ns.out, 'display': ns.out}
         ] %}
         {% set cat_rows = [] %}
@@ -131,6 +131,8 @@
               </td>
               <td class="row-actions">
                 <a class="btn" href="{{ url_for('inventory.edit_item', item_id=item['id']) }}">Edit</a>
+                <a class="btn btn-outline"
+                   href="{{ url_for('inventory.item_label', item_id=item['id']) }}">Label</a>
                 <form method="POST" action="{{ url_for('inventory.deactivate_item', item_id=item['id']) }}"
                       onsubmit="return confirm('Deactivate {{ item['name'] }}?');">
                   {{ csrf_field() }}

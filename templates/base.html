@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{{ url_for('static', filename='CSS/style.css') }}?v=20261029b" />
+<link rel="stylesheet" href="{{ url_for('static', filename='CSS/style.css') }}?v=20261105a" />
 {% block extra_css %}{% endblock %}
 <script>
   /* Applied before first paint so a saved dark theme never flashes light first.
@@ -457,21 +457,40 @@
     <span class="dash-sidebar-role">{{ role_label }} access</span>
   </div>
 
-  <button class="dash-sidebar-toggle" type="button" aria-expanded="false" aria-controls="dash-sidebar-nav">Modules</button>
+  <button class="dash-sidebar-toggle" type="button" aria-expanded="false" aria-controls="dash-sidebar-nav">
+    <span>Modules</span>
+    <svg class="dash-sidebar-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+  </button>
 
-  <nav class="dash-sidebar-nav" id="dash-sidebar-nav">
+  <nav class="dash-sidebar-nav" id="dash-sidebar-nav" aria-label="Module groups">
     {% for group in sidebar_groups %}
-    <section class="dash-nav-group">
-      {% if group.label %}<h2 class="dash-nav-title">{{ group.label }}</h2>{% endif %}
-      <ul>
-        {% for link in group.links %}
-        <li>
-          <a class="dash-nav-link{% if link.active %} active{% endif %}"
-             href="{{ link.href }}"
-             {% if link.active %}aria-current="page"{% endif %}>{{ link.label }}</a>
-        </li>
-        {% endfor %}
-      </ul>
+    {% set group_active = group.links | selectattr('active') | list %}
+    <section class="dash-nav-group{% if group_active %} has-active{% endif %}" data-nav-group="{{ group.label or 'dashboard' }}">
+      {% if group.label %}
+      <h2 class="dash-nav-title">
+        <button class="dash-nav-toggle" type="button" aria-expanded="true"
+                aria-controls="dash-nav-group-{{ loop.index }}">
+          {% if group.icon %}<span class="dash-nav-icon" aria-hidden="true">{{ dash_icon(group.icon) }}</span>{% endif %}
+          <span class="dash-nav-label">{{ group.label }}</span>
+          <svg class="dash-nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+      </h2>
+      {% endif %}
+      <div class="dash-nav-collapse">
+        <ul class="dash-nav-list"{% if group.label %} id="dash-nav-group-{{ loop.index }}"{% endif %}>
+          {% for link in group.links %}
+          <li>
+            <a class="dash-nav-link{% if link.active %} active{% endif %}"
+               href="{{ link.href }}"
+               title="{{ link.label }}"
+               {% if link.active %}aria-current="page"{% endif %}>
+              {% if link.icon %}<span class="dash-nav-icon" aria-hidden="true">{{ dash_icon(link.icon) }}</span>{% endif %}
+              <span class="dash-nav-text">{{ link.label }}</span>
+            </a>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
     </section>
     {% endfor %}
   </nav>
@@ -502,7 +521,7 @@
     <script id="flashes" type="application/json">{{ messages | tojson }}</script>
   {% endif %}
 {% endwith %}
-<script src="{{ url_for('static', filename='js/js.js') }}?v=20261023e"></script>
+<script src="{{ url_for('static', filename='js/js.js') }}?v=20261103b"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

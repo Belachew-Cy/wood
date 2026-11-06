@@ -1,0 +1,76 @@
+
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container-fluid py-4">
+
+    <h3>Material Request Approvals</h3>
+
+    <p class="text-muted">
+        Review production material requests awaiting approval.
+    </p>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-body table-responsive">
+
+            <table class="table table-hover align-middle">
+
+                <thead>
+                    <tr>
+                        <th>Request Number</th>
+                        <th>Department</th>
+                        <th>Purpose</th>
+                        <th>Requested Date</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                {% for item in requests %}
+
+                    <tr>
+                        <td>{{ item.request_number }}</td>
+                        <td>{{ item.department_id }}</td>
+                        <td>{{ item.purpose }}</td>
+                        <td>{{ item.created_at.strftime('%Y-%m-%d') }}</td>
+
+                        <td>
+                            <span class="badge bg-warning text-dark">
+                                {{ item.status }}
+                            </span>
+                        </td>
+
+                        <td>
+                            <a href="{{ url_for(
+                                'inventory.material_request_details',
+                                request_id=item.id
+                            ) }}"
+                            class="btn btn-sm btn-outline-success">
+                                Review
+                            </a>
+                        </td>
+                    </tr>
+
+                {% else %}
+
+                    <tr>
+                        <td colspan="6" class="text-center text-muted">
+                            No pending approval requests.
+                        </td>
+                    </tr>
+
+                {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}

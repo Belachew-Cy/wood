@@ -1,0 +1,394 @@
+
+{% extends "base.html" %}
+
+{% block title %}Compliance Record Details | Audit Management{% endblock %}
+
+{% block content %}
+
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Audit Management / Compliance</span>
+            <h1>
+                {{ record.reference_number
+                   | default(record.id | default('Compliance Details')) }}
+            </h1>
+            <p>
+                Review compliance requirements, assessment results,
+                supporting evidence and corrective measures.
+            </p>
+        </div>
+
+        <div class="stock-actions">
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.compliance_records') }}">
+                Back to Compliance
+            </a>
+
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.dashboard') }}">
+                Dashboard
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="container finance-page">
+
+    <!-- COMPLIANCE SUMMARY -->
+
+    <div class="hr-stats">
+
+        <div class="dash-panel">
+            <span class="eyebrow">Compliance Status</span>
+            <h2>{{ record.status | default('Not Assessed') }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Department</span>
+            <h2>{{ record.department | default('—') }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Compliance Category</span>
+            <h2>{{ record.category | default('—') }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Last Review</span>
+            <h2>{{ record.review_date | default('—') }}</h2>
+        </div>
+
+    </div>
+
+
+    <!-- REQUIREMENT INFORMATION -->
+
+    <div class="dash-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Compliance Requirement</h2>
+                <p>Details of the requirement being monitored.</p>
+            </div>
+
+            <span class="status-badge neutral">
+                {{ record.status | default('Not Assessed') }}
+            </span>
+        </div>
+
+        <div class="form-grid">
+
+            <div class="form-group">
+                <label>Reference Number</label>
+                <p>{{ record.reference_number | default(record.id | default('—')) }}</p>
+            </div>
+
+            <div class="form-group">
+                <label>Requirement Title</label>
+                <p>{{ record.title | default(record.requirement | default('—')) }}</p>
+            </div>
+
+            <div class="form-group">
+                <label>Department</label>
+                <p>{{ record.department | default('—') }}</p>
+            </div>
+
+            <div class="form-group">
+                <label>Category</label>
+                <p>{{ record.category | default('—') }}</p>
+            </div>
+
+            <div class="form-group">
+                <label>Review Date</label>
+                <p>{{ record.review_date | default('—') }}</p>
+            </div>
+
+            <div class="form-group">
+                <label>Next Review Date</label>
+                <p>{{ record.next_review_date | default('—') }}</p>
+            </div>
+
+            <div class="form-group">
+                <label>Responsible Person</label>
+                <p>{{ record.responsible_person | default('—') }}</p>
+            </div>
+
+            <div class="form-group">
+                <label>Reviewing Officer</label>
+                <p>{{ record.reviewed_by | default('—') }}</p>
+            </div>
+
+            <div class="form-group form-full">
+                <label>Requirement Description</label>
+                <p>{{ record.description | default('No description available.') }}</p>
+            </div>
+
+            <div class="form-group form-full">
+                <label>Applicable Standard or Policy</label>
+                <p>{{ record.standard_reference | default('—') }}</p>
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- ASSESSMENT RESULTS -->
+
+    <div class="dash-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Compliance Assessment Results</h2>
+                <p>Recorded results from the compliance review.</p>
+            </div>
+        </div>
+
+        <div class="form-grid">
+
+            <div class="form-group">
+                <label>Assessment Outcome</label>
+                <p>{{ record.assessment_result | default(record.status | default('Not Available')) }}</p>
+            </div>
+
+            <div class="form-group">
+                <label>Assessment Date</label>
+                <p>{{ record.assessment_date | default(record.review_date | default('—')) }}</p>
+            </div>
+
+            <div class="form-group form-full">
+                <label>Assessment Findings</label>
+                <p>{{ record.assessment_findings | default('No assessment findings recorded.') }}</p>
+            </div>
+
+            <div class="form-group form-full">
+                <label>Reviewer Comments</label>
+                <p>{{ record.review_comments | default('No reviewer comments available.') }}</p>
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- EVIDENCE REGISTER -->
+
+    <div class="dash-panel hr-table-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Supporting Evidence</h2>
+                <p>Evidence associated with this compliance requirement.</p>
+            </div>
+
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.audit_evidence') }}">
+                Evidence Register
+            </a>
+        </div>
+
+        <div class="table-scroll">
+
+            <table class="report-table">
+
+                <thead>
+                    <tr>
+                        <th>Evidence Reference</th>
+                        <th>Description</th>
+                        <th>Evidence Type</th>
+                        <th>Uploaded By</th>
+                        <th>Upload Date</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for evidence in evidence_records | default([]) %}
+
+                    <tr>
+                        <td>
+                            {{ evidence.evidence_number
+                               | default(evidence.id | default('—')) }}
+                        </td>
+
+                        <td>{{ evidence.description | default('—') }}</td>
+
+                        <td>{{ evidence.evidence_type | default('—') }}</td>
+
+                        <td>{{ evidence.uploaded_by | default('—') }}</td>
+
+                        <td>{{ evidence.created_at | default('—') }}</td>
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="5" class="report-empty">
+                            No supporting evidence is linked to this record.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <!-- CORRECTIVE MEASURES -->
+
+    <div class="dash-panel hr-table-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Corrective Measures</h2>
+                <p>Actions associated with compliance gaps and findings.</p>
+            </div>
+
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.corrective_actions') }}">
+                All Corrective Actions
+            </a>
+        </div>
+
+        <div class="table-scroll">
+
+            <table class="report-table">
+
+                <thead>
+                    <tr>
+                        <th>Action Reference</th>
+                        <th>Corrective Measure</th>
+                        <th>Responsible Person</th>
+                        <th>Due Date</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for action in corrective_actions | default([]) %}
+
+                    <tr>
+                        <td>
+                            {{ action.action_number
+                               | default(action.id | default('—')) }}
+                        </td>
+
+                        <td>
+                            {{ action.title
+                               | default(action.description | default('—')) }}
+                        </td>
+
+                        <td>{{ action.responsible_person | default('—') }}</td>
+
+                        <td>{{ action.due_date | default('—') }}</td>
+
+                        <td>
+                            <span class="status-badge neutral">
+                                {{ action.status | default('Pending') }}
+                            </span>
+                        </td>
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="5" class="report-empty">
+                            No corrective measures are linked to this record.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <!-- REVIEW HISTORY -->
+
+    <div class="dash-panel hr-table-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Compliance Review History</h2>
+                <p>Historical assessment and monitoring activities.</p>
+            </div>
+        </div>
+
+        <div class="table-scroll">
+
+            <table class="report-table">
+
+                <thead>
+                    <tr>
+                        <th>Review Date</th>
+                        <th>Reviewed By</th>
+                        <th>Assessment Result</th>
+                        <th>Comments</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for entry in review_history | default([]) %}
+
+                    <tr>
+                        <td>{{ entry.review_date | default('—') }}</td>
+
+                        <td>{{ entry.reviewed_by | default('—') }}</td>
+
+                        <td>{{ entry.assessment_result | default('—') }}</td>
+
+                        <td>{{ entry.comments | default('—') }}</td>
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="4" class="report-empty">
+                            No previous compliance reviews are available.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <!-- READ-ONLY NOTICE -->
+
+    <div class="dash-panel">
+
+        <h2>Audit Access and Data Integrity</h2>
+
+        <ul>
+            <li>This page provides read-only access to the original compliance record.</li>
+            <li>Source information must come from the existing departmental database.</li>
+            <li>Do not update departmental compliance transactions from Audit Management.</li>
+            <li>Corrective measures must retain their links to the original audit findings.</li>
+            <li>Record access to confidential compliance information in the existing audit logs.</li>
+            <li>Display unavailable source information separately from genuine zero or empty results.</li>
+        </ul>
+
+    </div>
+
+</section>
+
+{% endblock %}

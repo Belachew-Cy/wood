@@ -19,7 +19,6 @@ from core.config import MAIL_TIMEOUT_SECONDS
 from core.config import MAIL_USERNAME
 from core.config import RESET_TOKEN_MINUTES
 from core.config import STEP_LABEL
-from core.db import DB_PATH
 from core.db import connect_db
 from datetime import datetime
 from datetime import timedelta
@@ -115,7 +114,7 @@ def _now():
 
 
 def _log_connection():
-    return connect_db(DB_PATH)
+    return connect_db()
 
 
 def _record_delivery(user_id, recipient, subject, category, event_key, status,

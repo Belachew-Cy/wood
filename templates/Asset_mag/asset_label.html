@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container py-4">
+
+    <div class="d-flex justify-content-between mb-4">
+        <h3>Asset Identification Label</h3>
+
+        <button onclick="window.print()"
+                class="btn btn-success">
+            <i class="fas fa-print"></i> Print Label
+        </button>
+    </div>
+
+    <div class="asset-label">
+
+        <h4>Dereje Wood & Kitchen Cabinet</h4>
+
+        <hr>
+
+        <h5>{{ asset.name }}</h5>
+
+        <p>
+            <strong>Asset Code:</strong>
+            {{ asset.asset_code }}
+        </p>
+
+        <p>
+            <strong>Barcode Number:</strong>
+            {{ asset.barcode }}
+        </p>
+
+        <div class="text-center mt-3">
+
+            <img
+                src="{{ url_for(
+                    'asset_management.asset_label_image',
+                    filename=barcode_filename
+                ) }}"
+                alt="Asset Barcode"
+                class="img-fluid"
+                style="max-width: 300px;"
+            >
+
+            <br>
+
+            <img
+                src="{{ url_for(
+                    'asset_management.asset_label_image',
+                    filename=qr_filename
+                ) }}"
+                alt="Asset QR Code"
+                width="140"
+                height="140"
+            >
+
+        </div>
+
+        <p class="text-center mt-2">
+            Scan to identify this asset.
+        </p>
+
+    </div>
+
+</div>
+
+<style>
+.asset-label {
+    max-width: 420px;
+    margin: auto;
+    padding: 25px;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    text-align: center;
+}
+
+@media print {
+    body * {
+        visibility: hidden;
+    }
+
+    .asset-label,
+    .asset-label * {
+        visibility: visible;
+    }
+
+    .asset-label {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        border: 1px solid black;
+        box-shadow: none;
+    }
+
+    button {
+        display: none !important;
+    }
+}
+</style>
+
+{% endblock %}

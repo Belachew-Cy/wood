@@ -21,7 +21,8 @@ import io
 import sqlite3
 
 GROUP_ORDER = ("My reports", "Workforce", "My team", "Administration",
-               "Finance", "Budget", "Purchasing", "Inventory", "Payroll")
+               "Finance", "Budget", "Procurement Management", "Inventory",
+               "Payroll")
 
 ROW_LIMIT = 500
 EXPORT_LIMIT = 20000
@@ -632,6 +633,7 @@ REPORT_SPECS = (
     # -------- workforce --------
     {
         "key": "employee_register",
+        "permission": "hr_employees",
         "label": "Employee register",
         "group": "Workforce",
         "description": "The staff register with role, employment status and line manager.",
@@ -656,6 +658,7 @@ REPORT_SPECS = (
     },
     {
         "key": "attendance_register",
+        "permission": "hr_attendance",
         "label": "Attendance register",
         "group": "Workforce",
         "description": "Daily attendance marks by employee, with check-in and check-out times.",
@@ -677,6 +680,7 @@ REPORT_SPECS = (
     },
     {
         "key": "leave_register",
+        "permission": "hr_leave",
         "label": "Leave requests",
         "group": "Workforce",
         "description": "Leave applications across the team or department, with their decisions.",
@@ -699,6 +703,7 @@ REPORT_SPECS = (
     },
     {
         "key": "leave_summary",
+        "permission": "hr_leave",
         "label": "Leave balances",
         "group": "Workforce",
         "description": "Leave days requested, approved, pending and rejected for each employee in a period.",
@@ -722,6 +727,7 @@ REPORT_SPECS = (
     },
     {
         "key": "performance_register",
+        "permission": "hr_reports",
         "label": "Employee performance",
         "group": "Workforce",
         "description": "Appraisal ratings, reviewers and the development notes behind them.",
@@ -883,6 +889,7 @@ REPORT_SPECS = (
     # -------- administration --------
     {
         "key": "user_accounts",
+        "permission": "admin_users",
         "label": "User accounts",
         "group": "Administration",
         "description": "Every sign-in account with its primary role, department and status.",
@@ -915,6 +922,7 @@ REPORT_SPECS = (
     },
     {
         "key": "role_permissions",
+        "permission": "admin_roles",
         "label": "Roles and permissions",
         "group": "Administration",
         "description": "Each role's landing screen, modules and how many accounts carry it.",
@@ -943,6 +951,7 @@ REPORT_SPECS = (
     },
     {
         "key": "activity_logs",
+        "permission": "admin_logs",
         "label": "Activity logs",
         "group": "Administration",
         "description": "Every recorded action, its module, actor and outcome.",
@@ -968,6 +977,7 @@ REPORT_SPECS = (
     },
     {
         "key": "system_usage",
+        "permission": "admin_logs",
         "label": "System activities",
         "group": "Administration",
         "description": "Actions grouped by module, with event counts, accounts and refusals.",
@@ -990,6 +1000,7 @@ REPORT_SPECS = (
     },
     {
         "key": "audit_trail",
+        "permission": "admin_logs",
         "label": "Audit trail",
         "group": "Administration",
         "description": "Refused and failed actions, plus sign-in activity, for review.",
@@ -1017,6 +1028,7 @@ REPORT_SPECS = (
     # -------- finance --------
     {
         "key": "finance_transactions",
+        "permission": "module_finance",
         "label": "Income and expenses",
         "group": "Finance",
         "description": "Every money movement booked in the Finance module.",
@@ -1044,6 +1056,7 @@ REPORT_SPECS = (
     },
     {
         "key": "finance_income",
+        "permission": "module_finance",
         "label": "Income",
         "group": "Finance",
         "description": "Income booked in the Finance module, with the total for the period.",
@@ -1071,6 +1084,7 @@ REPORT_SPECS = (
     },
     {
         "key": "finance_expense",
+        "permission": "module_finance",
         "label": "Expenses",
         "group": "Finance",
         "description": "Expenses booked in the Finance module, with the total for the period.",
@@ -1098,6 +1112,7 @@ REPORT_SPECS = (
     },
     {
         "key": "finance_monthly",
+        "permission": "module_finance",
         "label": "Monthly income and expenses",
         "group": "Finance",
         "description": "Income, expenses and the net result for each calendar month.",
@@ -1119,6 +1134,7 @@ REPORT_SPECS = (
     },
     {
         "key": "finance_invoices",
+        "permission": "module_finance",
         "label": "Invoices",
         "group": "Finance",
         "description": "Customer and supplier invoices with due dates and payment status.",
@@ -1144,6 +1160,7 @@ REPORT_SPECS = (
     },
     {
         "key": "finance_payments",
+        "permission": "module_finance",
         "label": "Payments",
         "group": "Finance",
         "description": "Money released against invoices, with the method and reference.",
@@ -1171,6 +1188,7 @@ REPORT_SPECS = (
     # -------- budget --------
     {
         "key": "budget_allocations",
+        "permission": "budget_allocation",
         "label": "Budget allocations",
         "group": "Budget",
         "description": "Allocations, what has been drawn against them and what remains.",
@@ -1195,6 +1213,7 @@ REPORT_SPECS = (
     },
     {
         "key": "budget_expenditures",
+        "permission": "budget_monitoring",
         "label": "Budget expenditures",
         "group": "Budget",
         "description": "Every expenditure booked against an allocation.",
@@ -1219,8 +1238,9 @@ REPORT_SPECS = (
     # -------- purchasing --------
     {
         "key": "procurement_requests",
+        "permission": "procurement_reports",
         "label": "Purchase requisitions",
-        "group": "Purchasing",
+        "group": "Procurement Management",
         "description": "Requisitions raised, their cost and where they stand.",
         "modules": ("procurement",),
         "scope": "department",
@@ -1241,8 +1261,9 @@ REPORT_SPECS = (
     },
     {
         "key": "procurement_orders",
+        "permission": "procurement_reports",
         "label": "Purchase orders",
-        "group": "Purchasing",
+        "group": "Procurement Management",
         "description": "Orders placed with suppliers, their value and expected delivery.",
         "modules": ("procurement",),
         "scope": "all",
@@ -1272,6 +1293,7 @@ REPORT_SPECS = (
     # -------- inventory --------
     {
         "key": "inventory_stock",
+        "permission": "module_inventory",
         "label": "Stock on hand",
         "group": "Inventory",
         "description": "Items, quantities, minimum levels and the value they carry.",
@@ -1301,6 +1323,7 @@ REPORT_SPECS = (
     },
     {
         "key": "stock_movements",
+        "permission": "module_inventory",
         "label": "Stock movements",
         "group": "Inventory",
         "description": "Stock in, stock out and adjustments with their reference.",
@@ -1328,6 +1351,7 @@ REPORT_SPECS = (
     # -------- payroll --------
     {
         "key": "payroll_register",
+        "permission": "payroll_reports",
         "label": "Payroll register",
         "group": "Payroll",
         "description": "Monthly pay records by employee, with deductions and payment status.",
@@ -1543,6 +1567,12 @@ def catalogue(ctx, granted, present):
             continue
         if spec.get("modules") and not (set(spec["modules"]) & set(granted)):
             continue
+        if spec.get("permission"):
+            # A report follows the permission that owns it, so narrowing a desk in
+            # Role Management hides its reports from the screen and the export alike.
+            from core.access import has_permission
+            if not has_permission(spec["permission"]):
+                continue
         if spec.get("manager_only") and not ctx["is_manager"]:
             continue
         scope = resolve_scope(spec, ctx)
@@ -1707,11 +1737,6 @@ def display(spec, key, value):
     if isinstance(value, float):
         return "{:,.2f}".format(value)
     return str(value)
-
-
-def display_rows(spec, rows):
-    return [[display(spec, key, row[key]) for key, _label in spec["columns"]]
-            for row in rows]
 
 
 def csv_bytes(spec, rows, meta):

@@ -27,7 +27,7 @@
   <div class="container">
     {% if grouped %}
       {% for group in grouped %}
-      <div class="report-panel">
+      <div class="report-panel" id="reports-{{ group.label | lower | replace(' ', '-') }}">
         <div class="section-head">
           <div>
             <span class="eyebrow">{{ group.reports | length }} report{{ '' if group.reports | length == 1 else 's' }}</span>

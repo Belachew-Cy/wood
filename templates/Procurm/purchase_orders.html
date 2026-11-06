@@ -1,0 +1,352 @@
+
+{% extends "base.html" %}
+
+{% block title %}Purchase Order Management | Dereje Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Procurement / Purchase Orders</span>
+            <h1>Purchase Order Management</h1>
+            <p>Create, approve, monitor, and manage supplier purchase orders.</p>
+        </div>
+
+        <div class="stock-actions">
+            <a href="{{ url_for('procurement.quotation_management') }}"
+               class="btn btn-outline btn-sm">
+                Quotations
+            </a>
+
+            {% if can_create_po %}
+            <a href="#create-po"
+               class="btn btn-primary btn-sm">
+                Create Purchase Order
+            </a>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+<section class="container finance-page">
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+            <div class="finance-alert {{ category }}">{{ message }}</div>
+        {% endfor %}
+    {% endwith %}
+
+    {% if not can_create_po %}
+    <div class="finance-alert info">
+        You have read-only access to Purchase Orders.
+    </div>
+    {% endif %}
+
+    <!-- Statistics -->
+    <div class="hr-stats">
+        {{ kpi('Total POs', stats.total) }}
+        {{ kpi('Pending Approval', stats.pending) }}
+        {{ kpi('Approved', stats.approved) }}
+        {{ kpi('Completed', stats.completed) }}
+    </div>
+
+    <!-- Create PO -->
+    {% if can_create_po %}
+    <div class="finance-panel" id="create-po">
+
+        <h2>Create Purchase Order</h2>
+
+        <form method="post"
+              action="{{ url_for('procurement.create_purchase_order') }}"
+              class="finance-form">
+
+            {{ csrf_field() }}
+
+            <div class="finance-grid">
+
+                <div>
+                    <label for="quotation_id">
+                        Approved Supplier Quotation *
+                    </label>
+
+                    <select name="quotation_id"
+                            id="quotation_id"
+                            required>
+                        <option value="">Select approved quotation</option>
+
+                        {% for quotation in approved_quotations %}
+                        <option value="{{ quotation.id }}">
+                            {{ quotation.quotation_reference }} -
+                            {{ quotation.supplier_name }} -
+                            {{ quotation.currency }}
+                            {{ "{:,.2f}".format(
+                                quotation.total_amount | float
+                            ) }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label for="supplier_id">Supplier</label>
+                    <select name="supplier_id"
+                            id="supplier_id"
+                            disabled>
+                        <option value="">Automatically determined from quotation</option>
+                    </select>
+                    <small>
+                        The backend must determine the supplier from the
+                        selected quotation, not trust a submitted supplier ID.
+                    </small>
+                </div>
+
+                <div>
+                    <label for="order_date">Purchase Order Date *</label>
+                    <input type="date"
+                           name="order_date"
+                           id="order_date"
+                           required>
+                </div>
+
+                <div>
+                    <label for="expected_delivery_date">
+                        Expected Delivery Date *
+                    </label>
+                    <input type="date"
+                           name="expected_delivery_date"
+                           id="expected_delivery_date"
+                           required>
+                </div>
+
+                <div>
+                    <label for="delivery_location">Delivery Location *</label>
+                    <input type="text"
+                           name="delivery_location"
+                           id="delivery_location"
+                           maxlength="250"
+                           required>
+                </div>
+
+                <div>
+                    <label for="payment_terms">Payment Terms</label>
+                    <input type="text"
+                           name="payment_terms"
+                           id="payment_terms"
+                           maxlength="250">
+                </div>
+
+                <div>
+                    <label for="budget_allocation_id">
+                        Budget Allocation
+                    </label>
+                    <select name="budget_allocation_id"
+                            id="budget_allocation_id">
+                        <option value="">Select budget allocation</option>
+
+                        {% for budget in available_budgets %}
+                        <option value="{{ budget.id }}">
+                            {{ budget.name }} - {{ budget.currency }}
+                            {{ "{:,.2f}".format(budget.available_amount | float) }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label for="delivery_method">Delivery Method</label>
+                    <select name="delivery_method"
+                            id="delivery_method">
+                        <option value="Supplier Delivery">Supplier Delivery</option>
+                        <option value="Company Collection">Company Collection</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+
+                <div class="full">
+                    <label for="po_notes">Additional Instructions</label>
+                    <textarea name="notes"
+                              id="po_notes"
+                              rows="3"
+                              maxlength="2000"></textarea>
+                </div>
+
+            </div>
+
+            <div class="finance-form-actions">
+                <button type="submit" class="finance-btn primary">
+                    Create Purchase Order
+                </button>
+            </div>
+
+        </form>
+    </div>
+    {% endif %}
+
+    <!-- Filters -->
+    <div class="dash-panel">
+        <h2>Search Purchase Orders</h2>
+
+        <form method="get"
+              action="{{ url_for('procurement.purchase_orders') }}"
+              class="finance-form">
+
+            <div class="finance-grid">
+
+                <div>
+                    <label for="search">PO Number / Supplier</label>
+                    <input type="search"
+                           name="search"
+                           id="search"
+                           value="{{ filters.search }}"
+                           placeholder="Search purchase orders">
+                </div>
+
+                <div>
+                    <label for="status">PO Status</label>
+                    <select name="status" id="status">
+                        <option value="">All statuses</option>
+                        {% for status in po_statuses %}
+                        <option value="{{ status }}"
+                            {% if filters.status == status %}selected{% endif %}>
+                            {{ status }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label for="supplier_filter">Supplier</label>
+                    <select name="supplier_id" id="supplier_filter">
+                        <option value="">All suppliers</option>
+                        {% for supplier in suppliers %}
+                        <option value="{{ supplier.id }}"
+                            {% if filters.supplier_id|string == supplier.id|string %}
+                            selected
+                            {% endif %}>
+                            {{ supplier.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+            </div>
+
+            <div class="finance-form-actions">
+                <button type="submit" class="finance-btn primary">
+                    Filter
+                </button>
+
+                <a href="{{ url_for('procurement.purchase_orders') }}"
+                   class="finance-btn secondary">
+                    Clear
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- PO List -->
+    <div class="dash-panel hr-table-panel">
+
+        <h2>Purchase Order Register</h2>
+
+        <div class="hr-table-wrap table-scroll">
+            <table>
+                <thead>
+                    <tr>
+                        <th>PO Number</th>
+                        <th>Supplier</th>
+                        <th>Quotation Ref.</th>
+                        <th>Order Date</th>
+                        <th>Expected Delivery</th>
+                        <th>Total Amount</th>
+                        <th>Received Amount</th>
+                        <th>Status</th>
+                        <th>Approval</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for po in purchase_orders %}
+                    <tr>
+                        <td>{{ po.po_number }}</td>
+                        <td>{{ po.supplier_name }}</td>
+                        <td>{{ po.quotation_reference or '—' }}</td>
+                        <td>{{ po.order_date }}</td>
+                        <td>{{ po.expected_delivery_date }}</td>
+
+                        <td>
+                            {{ po.currency }}
+                            {{ "{:,.2f}".format(po.total_amount | float) }}
+                        </td>
+
+                        <td>
+                            {{ po.currency }}
+                            {{ "{:,.2f}".format(
+                                po.received_amount | float
+                            ) }}
+                        </td>
+
+                        <td>
+                            <span class="status-badge neutral">
+                                {{ po.status }}
+                            </span>
+                        </td>
+
+                        <td>{{ po.approval_status }}</td>
+
+                        <td>
+                            <div class="stock-actions">
+                                <a href="{{ url_for(
+                                    'procurement.purchase_order_details',
+                                    po_id=po.id
+                                ) }}"
+                                   class="finance-btn secondary">
+                                    View
+                                </a>
+
+                                {% if can_manage_po
+                                      and po.status == 'Draft' %}
+                                <a href="{{ url_for(
+                                    'procurement.edit_purchase_order',
+                                    po_id=po.id
+                                ) }}"
+                                   class="finance-btn secondary">
+                                    Edit
+                                </a>
+                                {% endif %}
+
+                                {% if can_submit_po
+                                      and po.status == 'Draft' %}
+                                <form method="post"
+                                      action="{{ url_for(
+                                          'procurement.submit_purchase_order',
+                                          po_id=po.id
+                                      ) }}">
+                                    {{ csrf_field() }}
+                                    <button type="submit"
+                                            class="finance-btn primary">
+                                        Submit
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+
+                    {% else %}
+                    <tr>
+                        <td colspan="10" class="employee-empty">
+                            No purchase orders found.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</section>
+
+{% endblock %}

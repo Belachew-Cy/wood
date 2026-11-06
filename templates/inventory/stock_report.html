@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi with context %}
+
+{% block title %}Stock on hand | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">INVENTORY MANAGEMENT · REPORTS</span>
+      <h1>Stock on hand</h1>
+      <p>Every active item, its shelf balance, its minimum and what the balance
+        is worth.</p>
+    </div>
+    <a class="btn btn-outline btn-sm" href="{{ url_for('inventory.reports') }}">
+      ← All reports
+    </a>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <form method="GET" action="{{ url_for('inventory.stock_report') }}"
+          class="stock-search">
+      <label for="q">Search</label>
+      <input id="q" name="q" value="{{ search }}"
+             placeholder="SKU, item name or category" />
+      <label for="category">Category</label>
+      <select id="category" name="category">
+        <option value="">Every category</option>
+        {% for name in categories %}
+        <option value="{{ name }}" {% if category == name %}selected{% endif %}>
+          {{ name }}
+        </option>
+        {% endfor %}
+      </select>
+      <label for="state">Shelf</label>
+      <select id="state" name="state">
+        {% for key, label in states.items() %}
+        <option value="{{ key }}" {% if state == key %}selected{% endif %}>
+          {{ label }}
+        </option>
+        {% endfor %}
+      </select>
+      <button class="btn btn-sm" type="submit">Apply</button>
+      <a class="btn btn-outline btn-sm" href="{{ url_for('inventory.stock_report') }}">
+        Reset
+      </a>
+      <a class="btn btn-outline btn-sm"
+         href="{{ url_for('inventory.stock_report_export', q=search,
+                          category=category, state=state) }}">
+        Export CSV
+      </a>
+    </form>
+
+    <div class="hr-stats">
+      {{ kpi('Items', totals["items"], 'matching the filter') }}
+      {{ kpi('Units', "{:,.2f}".format(totals["quantity"]), 'summed on hand') }}
+      {{ kpi('Value (ETB)', "{:,.2f}".format(totals["value"]), 'at unit cost') }}
+      {{ kpi('Low or empty', totals["low"] + totals["out"],
+             '{} out of stock'.format(totals["out"]),
+             'down' if totals["low"] + totals["out"] else 'flat') }}
+    </div>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>{{ totals["items"] }} line{{ '' if totals["items"] == 1 else 's' }}</h2>
+      <div class="hr-table-wrap table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>SKU</th><th>Item</th><th>Category</th><th>On hand</th>
+              <th>Minimum</th><th>Reorder at</th><th>Unit cost</th>
+              <th>Stock value</th><th>Location</th><th>Shelf</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in items %}
+            <tr>
+              <td>{{ item["sku"] }}</td>
+              <td>{{ item["name"] }}</td>
+              <td>{{ item["category"] }}</td>
+              <td>{{ item["quantity"] }} {{ item["unit"] }}</td>
+              <td>{{ item["min_stock"] }} {{ item["unit"] }}</td>
+              <td>
+                {% if item["reorder_qty"] %}
+                  {{ item["reorder_qty"] }} {{ item["unit"] }}
+                {% else %}
+                  <span class="feed-meta">shortfall</span>
+                {% endif %}
+              </td>
+              <td>{{ "{:,.2f}".format(item["unit_cost"]) }}</td>
+              <td>{{ "{:,.2f}".format(item["quantity"] * item["unit_cost"]) }}</td>
+              <td>{{ item["location"] or '—' }}</td>
+              <td>
+                {% if item["quantity"] <= 0 %}
+                  <span class="status-badge off">Out of stock</span>
+                {% elif item["quantity"] <= item["min_stock"] %}
+                  <span class="status-badge medium">Below minimum</span>
+                {% else %}
+                  <span class="status-badge active">In stock</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="10">No item matches these filters.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

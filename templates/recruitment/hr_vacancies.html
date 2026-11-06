@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi with context %}
+
+{% block title %}Vacancies &amp; requests{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Recruitment desk</span>
+      <h1>Vacancies &amp; requests</h1>
+      <p>
+        {% if scope.level == 'manage' %}
+        Every post in the company: the drafts waiting to be submitted, the ones published
+        and the ones closed.
+        {% elif scope.level == 'audit' %}
+        Read-only register of every post, its approval route and its pipeline.
+        {% elif scope.level == 'department' %}
+        The posts in {{ scope.department or 'your department' }} and the ones you raised.
+        {% else %}
+        The posts your budget desk is asked to sign.
+        {% endif %}
+      </p>
+    </div>
+    <nav class="stock-actions" aria-label="Vacancy actions">
+      {% if scope.can_request %}
+      <a class="btn btn-sm" href="{{ url_for('recruitment.create_vacancy') }}">
+        {{ 'Open a vacancy' if scope.can_manage else 'Raise a request' }}
+      </a>
+      {% endif %}
+      <a class="btn btn-outline btn-sm" href="{{ url_for('recruitment.hr_applicants') }}">
+        Applicants
+      </a>
+      <a class="btn btn-outline btn-sm" href="{{ url_for('recruitment.hr_reports') }}">
+        Reports
+      </a>
+    </nav>
+  </div>
+</section>
+
+<section class="container finance-page">
+  <div class="hr-stats">
+    {{ kpi('Posts in reach', total_posts, scope.department or 'the whole company', 'flat', 'briefcase',
+           href=url_for('recruitment.hr_vacancies')) }}
+    {{ kpi('Open', open_posts, 'accepting applications', 'up', 'check') }}
+    {{ kpi('Drafts', draft_posts, 'not yet submitted', 'down' if draft_posts else 'flat', 'file') }}
+    {{ kpi('Closed', closed_posts, 'hiring settled', 'flat', 'clipboard') }}
+    {{ kpi('Applicants', stages.applications, 'across these posts', 'flat', 'users',
+           href=url_for('recruitment.hr_applicants')) }}
+    {{ kpi('Hired', stages.hired, 'the pipeline that ended in a person', 'up', 'user') }}
+  </div>
+
+  <div class="dash-panel">
+    <h2>Filter the register</h2>
+    <form method="GET" action="{{ url_for('recruitment.hr_vacancies') }}" class="filter-form">
+      <select name="status" aria-label="Post status">
+        <option value="">Every status</option>
+        {% for status in vacancy_statuses %}
+        <option value="{{ status }}" {% if selected_status == status %}selected{% endif %}>
+          {{ status }}
+        </option>
+        {% endfor %}
+      </select>
+      <select name="department" aria-label="Department">
+        <option value="">Every department in reach</option>
+        {% for department in departments %}
+        <option value="{{ department.id }}"
+          {% if selected_department == department.id | string %}selected{% endif %}>
+          {{ department.name }}
+        </option>
+        {% endfor %}
+      </select>
+      <button class="btn btn-sm" type="submit">Apply filters</button>
+      {% if selected_status or selected_department %}
+      <a class="btn btn-outline btn-sm" href="{{ url_for('recruitment.hr_vacancies') }}">Clear</a>
+      {% endif %}
+    </form>
+    {% if scope.read_only %}
+    <p class="panel-note">An audit seat reads every record and changes none: the status,
+      pipeline and approval actions are answered by the desks that own them.</p>
+    {% endif %}
+  </div>
+
+  <div class="dash-panel hr-table-panel">
+    <h2>{{ vacancies | length }} {{ 'post' if vacancies | length == 1 else 'posts' }}
+      {% if selected_status %}marked {{ selected_status | lower }}{% endif %}</h2>
+    <div class="hr-table-wrap table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Reference</th>
+            <th>Post</th>
+            <th>Department</th>
+            <th>Openings</th>
+            <th>Applicants</th>
+            <th>Estimated cost (ETB)</th>
+            <th>Closes</th>
+            <th>Post</th>
+            <th>Approval</th>
+            <th aria-label="Actions"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for vacancy in vacancies %}
+          <tr>
+            <td class="nowrap">{{ vacancy.reference or '#' ~ vacancy.id }}</td>
+            <td class="wrap-cell">
+              <strong>{{ vacancy.job_title }}</strong>
+              <span class="cell-note">{{ vacancy.job_type }}
+                {%- if vacancy.location %} · {{ vacancy.location }}{% endif %}
+                {%- if vacancy.internal_only %} · staff only{% endif %}</span>
+            </td>
+            <td>{{ vacancy.registered_department or vacancy.department }}</td>
+            <td class="nowrap">{{ vacancy.openings }} ·
+              <span class="cell-note">{{ vacancy.filled_count }} filled</span></td>
+            <td class="nowrap">{{ vacancy.applicant_count }}</td>
+            <td>{{ "{:,.2f}".format(vacancy.estimated_cost | float) }}</td>
+            <td class="nowrap">
+              {{ vacancy.closing_date | friendly_date if vacancy.closing_date else 'No date' }}
+            </td>
+            <td>
+              <span class="status-badge {{ 'active' if vacancy.status == 'Open'
+                                            else 'off' if vacancy.status == 'Closed'
+                                            else 'neutral' }}">{{ vacancy.status }}</span>
+            </td>
+            <td class="nowrap">
+              {% if vacancy.approval_status %}
+              <span class="status-badge {{ 'active' if vacancy.approval_status == 'Approved'
+                                            else 'off' if vacancy.approval_status in ('Rejected', 'Returned')
+                                            else 'neutral' }}">{{ vacancy.approval_status }}</span>
+              {% if vacancy.approval_status == 'Pending' and vacancy.approval_step %}
+              <span class="cell-note">at {{ step_label.get(vacancy.approval_step, vacancy.approval_step) }}</span>
+              {% endif %}
+              {% else %}
+              <span class="cell-note">Not submitted</span>
+              {% endif %}
+            </td>
+            <td class="nowrap">
+              <a class="btn btn-outline btn-sm"
+                 href="{{ url_for('recruitment.vacancy_detail', vacancy_id=vacancy.id) }}">Open</a>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="10" class="employee-empty">
+              No post matches this filter inside your reach.
+              {% if scope.can_request %}
+              <a href="{{ url_for('recruitment.create_vacancy') }}">Raise one</a>.
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+{% endblock %}

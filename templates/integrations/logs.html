@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi with context %}
+{% from "integrations/_module_nav.html" import module_tabs with context %}
+
+{% block title %}Integration Activity | Dereje Belay Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">System Integration</span>
+      <h1>Integration activity</h1>
+      <p>Every step taken on this desk, read from the same activity log the audit console uses.
+        Credential values are never part of it.</p>
+    </div>
+    <nav class="stock-actions" aria-label="Integration actions">
+      <a class="btn btn-outline btn-sm" href="{{ url_for('audit.audit_dashboard') }}">Full audit trail</a>
+    </nav>
+    {{ module_tabs('logs') }}
+  </div>
+</section>
+
+<section class="section bg-white">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="hr-stats">
+      {{ kpi('Steps listed', rows | length,
+             'The newest {} of this desk'.format(limit), icon='file') }}
+      {{ kpi('Refused', rows | selectattr('outcome', 'equalto', 'DENIED') | list | length,
+             'Attempts this account or role could not make',
+             tone='down' if rows | selectattr('outcome', 'equalto', 'DENIED') | list | length
+             else 'flat', icon='lock') }}
+      {{ kpi('Failed', rows | selectattr('outcome', 'equalto', 'FAILED') | list | length,
+             'A test or a run that did not complete',
+             tone='down' if rows | selectattr('outcome', 'equalto', 'FAILED') | list | length
+             else 'flat', icon='warn') }}
+    </div>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>Activity log</h2>
+
+      <div class="filter-form">
+        <input type="search" id="activity-search" placeholder="Search account or detail"
+               aria-label="Search activity" />
+        <select id="activity-action" aria-label="Action">
+          <option value="">All actions</option>
+          {% for action in rows | map(attribute='action') | unique | sort %}
+          <option value="{{ action }}">{{ action }}</option>
+          {% endfor %}
+        </select>
+        <select id="activity-outcome" aria-label="Result">
+          <option value="">All results</option>
+          {% for outcome in rows | map(attribute='outcome') | unique | sort %}
+          <option value="{{ outcome }}">{{ outcome }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="hr-table-wrap table-scroll">
+        <table id="activity-table">
+          <thead>
+            <tr>
+              <th>When</th><th>Account</th><th>Role</th><th>Action</th>
+              <th>Detail</th><th>Result</th><th>Connection</th><th>From</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+            <tr data-search="{{ (row.username ~ ' ' ~ row.description) | lower }}"
+                data-action="{{ row.action }}" data-outcome="{{ row.outcome }}">
+              <td class="nowrap">{{ row.occurred_at | audit_time }}</td>
+              <td>{{ row.username or 'system' }}</td>
+              <td>{{ row.role or '-' }}</td>
+              <td class="nowrap">{{ row.action }}</td>
+              <td class="wrap-cell">{{ row.description }}</td>
+              <td>
+                <span class="status-badge {{ 'active' if row.outcome == 'SUCCESS'
+                                              else ('off' if row.outcome in ('FAILED', 'DENIED', 'FAILURE')
+                                              else 'neutral') }}">{{ row.outcome | lower }}</span>
+              </td>
+              <td>
+                {% if row.record_id %}
+                <a href="{{ url_for('integrations.edit', integration_id=row.record_id) }}">
+                  {{ row.record_id }}</a>
+                {% else %}
+                <span class="cell-note">-</span>
+                {% endif %}
+              </td>
+              <td class="cell-note nowrap">{{ row.ip_address or '-' }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="8" class="cell-note">
+              Nothing has been done on this desk yet.
+            </td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <p class="panel-note">The connection column links to the registry row the step was about;
+        a deleted connection keeps its log rows but the link no longer opens, which is the point of
+        an activity log. Entries older than the newest {{ limit }} are not listed here - the audit
+        console reads the whole table.</p>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    var table = document.getElementById('activity-table');
+    if (!table) return;
+    var search = document.getElementById('activity-search');
+    var action = document.getElementById('activity-action');
+    var outcome = document.getElementById('activity-outcome');
+    var rows = Array.prototype.slice.call(table.querySelectorAll('tbody tr[data-search]'));
+
+    function apply() {
+      var term = search.value.trim().toLowerCase();
+      rows.forEach(function (row) {
+        row.hidden = !!term && row.dataset.search.indexOf(term) === -1
+          || !!action.value && row.dataset.action !== action.value
+          || !!outcome.value && row.dataset.outcome !== outcome.value;
+      });
+    }
+
+    [search, action, outcome].forEach(function (field) {
+      field.addEventListener('input', apply);
+      field.addEventListener('change', apply);
+    });
+  })();
+</script>
+{% endblock %}

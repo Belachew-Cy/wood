@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi with context %}
+
+{% block title %}Interview panels{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Recruitment desk</span>
+      <h1>Interview panels</h1>
+      <p>What this desk scheduled and every panel it was asked to score, the soonest
+        sitting first.</p>
+    </div>
+    <nav class="stock-actions" aria-label="Interview actions">
+      <a class="btn btn-outline btn-sm" href="{{ url_for('recruitment.hr_applicants') }}">
+        Applicants
+      </a>
+      <a class="btn btn-outline btn-sm" href="{{ url_for('recruitment.hr_vacancies') }}">
+        Vacancy register
+      </a>
+      <a class="btn btn-outline btn-sm" href="{{ url_for('recruitment.hr_reports') }}">
+        Reports
+      </a>
+    </nav>
+  </div>
+</section>
+
+<section class="container finance-page">
+  <div class="hr-stats">
+    {{ kpi('Interviews', interviews | length, 'in reach or on a panel', 'flat', 'handshake') }}
+    {{ kpi('Scheduled', interviews | selectattr('status', 'equalto', 'Scheduled') | list | length,
+           'not yet held', 'down' if interviews | selectattr('status', 'equalto', 'Scheduled') | list else 'flat', 'calendar') }}
+    {{ kpi('Held', interviews | selectattr('status', 'equalto', 'Held') | list | length,
+           'the panel has met', 'flat', 'check') }}
+    {% set live = interviews | rejectattr('status', 'equalto', 'Cancelled') | list %}
+    {{ kpi('Awaiting a score', live | length,
+           'panels still open - the desk closes each one', 'down' if live else 'flat', 'user') }}
+    {{ kpi('Passed', interviews | selectattr('outcome', 'equalto', 'Passed') | list | length,
+           'the desk said yes', 'up', 'target') }}
+  </div>
+
+  <div class="dash-panel hr-table-panel">
+    <h2>The calendar</h2>
+    <div class="hr-table-wrap table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Candidate</th>
+            <th>Post</th>
+            <th>Scheduled</th>
+            <th>Location</th>
+            <th>Panel</th>
+            <th>Scores</th>
+            <th>Average</th>
+            <th>Status</th>
+            <th>Outcome</th>
+            <th aria-label="Actions"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for interview in interviews %}
+          <tr>
+            <td class="wrap-cell">
+              <strong>{{ interview.candidate_name }}</strong>
+              <span class="cell-note">
+                {{ interview.candidate_reference or '#' ~ interview.application_id }}
+                {%- if interview.candidate_email %} · {{ interview.candidate_email }}{% endif %}
+              </span>
+            </td>
+            <td class="wrap-cell">
+              <a href="{{ url_for('recruitment.vacancy_detail', vacancy_id=interview.vacancy_id) }}">
+                {{ interview.job_title }}</a>
+              <span class="cell-note">{{ interview.vacancy_department }}</span>
+            </td>
+            <td class="nowrap">
+              {{ (interview.scheduled_at or '')[:16] or 'No time set' }}
+            </td>
+            <td>{{ interview.location or '—' }}</td>
+            <td class="nowrap">
+              {{ interview.panel_size }} seated
+            </td>
+            <td class="nowrap">{{ interview.scored_count }} of {{ interview.panel_size }}</td>
+            <td class="nowrap">
+              {% if interview.scored_count %}
+              {{ '%g' | format(interview.average_score | float) }} /
+              {{ interview_score_max | round(1) }}
+              {% else %}—{% endif %}
+            </td>
+            <td>
+              <span class="status-badge {{ 'active' if interview.status == 'Held'
+                                            else 'off' if interview.status == 'Cancelled'
+                                            else 'neutral' }}">{{ interview.status }}</span>
+            </td>
+            <td>
+              <span class="status-badge {{ 'active' if interview.outcome == 'Passed'
+                                            else 'off' if interview.outcome in ('Failed', 'Withdrew')
+                                            else 'neutral' }}">{{ interview.outcome }}</span>
+            </td>
+            <td class="nowrap">
+              <a class="btn btn-outline btn-sm"
+                 href="{{ url_for('recruitment.interview_detail', interview_id=interview.id) }}">
+                {% if interview.status != 'Cancelled' and interview.scored_count < interview.panel_size %}
+                Score{% else %}Open{% endif %}
+              </a>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="10" class="employee-empty">
+              No interview has been booked inside your reach yet. The HR desk schedules a
+              panel from a shortlisted candidate&rsquo;s page.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="panel-note">An invitation to a panel is itself a right to read that
+      interview and score it, even when the post sits in another department - it is not a
+      right to move the candidate or rebuild the panel.</p>
+  </div>
+</section>
+{% endblock %}

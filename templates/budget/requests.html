@@ -519,10 +519,12 @@
                 ← Dashboard
             </a>
 
+            {% if 'budget_planning' in granted_permissions %}
             <a class="requests-btn requests-btn-primary"
                href="{{ url_for('budget.create_request') }}">
                 + New Request
             </a>
+            {% endif %}
         </div>
     </header>
 
@@ -654,7 +656,7 @@
 
                         <td>
                             <div class="request-actions">
-                                {% if state == 'pending' %}
+                                {% if state == 'pending' and 'budget_approval' in granted_permissions %}
                                 <button
                                     class="request-review-btn request-approve"
                                     type="button"

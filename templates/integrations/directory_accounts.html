@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi with context %}
+{% from "integrations/_directory_page.html" import directory_head, directory_flash with context %}
+
+{% block title %}Managed accounts | Dereje Belay Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+{{ directory_head('Managed accounts',
+     'Accounts linked to a directory connection. Releasing one cuts the link and leaves it entirely local again.',
+     tab='accounts') }}
+
+<section class="section bg-white">
+  <div class="container">
+    {{ directory_flash() }}
+
+    <div class="hr-stats">
+      {{ kpi('Under directory management', health.managed,
+             'Sign-in and status follow the domain', icon='users') }}
+      {{ kpi('Domain-only passwords', counts.domain_only,
+             'No local password; sign-in needs the directory', tone='good', icon='lock') }}
+      {{ kpi('Departed', counts.departed,
+             'Disabled because the directory dropped them', tone='bad', icon='warn') }}
+      {{ kpi('Disabled here', counts.disabled,
+             'Status in this system, whatever the directory says', tone='flat', icon='check') }}
+    </div>
+
+    <div class="emp-panel" style="margin-top: 1.5rem;">
+      <div class="account-card">
+        <header class="account-head">
+          <div>
+            <h3 class="account-name">Accounts</h3>
+            <span class="cell-note">Counts above follow the filter. Releasing an account keeps
+              the person and their history; it only removes the directory link.</span>
+          </div>
+          <form method="GET" class="row-actions">
+            <label for="connection_id" class="cell-note">Connection</label>
+            <select id="connection_id" name="connection_id" onchange="this.form.submit()">
+              <option value="">All connections</option>
+              {% for row in connections %}
+              <option value="{{ row.id }}" {% if selected == row.id %}selected{% endif %}>
+                {{ row.name }}</option>
+              {% endfor %}
+            </select>
+            <noscript><button class="btn btn-outline-dark btn-sm" type="submit">Filter</button></noscript>
+          </form>
+        </header>
+
+        <div class="dash-table-wrap">
+          <table>
+            <thead>
+              <tr><th>Account</th><th>Connection</th><th>Directory identity</th><th>Role</th>
+                  <th>Sign-in</th><th>State</th><th>Last sync</th><th></th></tr>
+            </thead>
+            <tbody>
+              {% for row in accounts %}
+              {% set domain_only = (row.password_hash or '').startswith('!') %}
+              <tr class="{{ 'is-disabled' if row.status != 'Active' }}">
+                <td>
+                  {{ row.full_name or row.username }}
+                  <p class="cell-note">{{ row.email }}{% if row.username %} · {{ row.username }}{% endif %}</p>
+                </td>
+                <td>
+                  {{ row.connection_name or 'Missing connection' }}
+                  <p class="cell-note">{{ kind_label.get(row.connection_kind, row.connection_kind) }}</p>
+                </td>
+                <td>
+                  {{ row.directory_upn or '—' }}
+                  <p class="cell-note">{{ row.directory_object_id or 'No object id' }}</p>
+                </td>
+                <td>{{ row.role }}</td>
+                <td>
+                  <span class="status-badge {{ 'neutral' if domain_only else 'active' }}">
+                    {{ 'Domain only' if domain_only else 'Local password' }}</span>
+                  {% if not row.connection_allow_signin %}
+                  <p class="cell-note">Directory sign-in is off on this connection.</p>
+                  {% endif %}
+                </td>
+                <td>
+                  <span class="status-badge {{ 'active' if row.status == 'Active' else 'off' }}">
+                    {{ row.status }}</span>
+                  {% if row.directory_departed %}
+                  <span class="status-badge off">departed</span>
+                  {% endif %}
+                  {% if row.must_change_password %}
+                  <p class="cell-note">must change password</p>
+                  {% endif %}
+                </td>
+                <td class="cell-note">{{ row.directory_synced_at | audit_time or 'never' }}</td>
+                <td>
+                  <form method="POST"
+                        onsubmit="return confirm('Release this account from directory management? The person and their history are kept.');">
+                    {{ csrf_field() }}
+                    <input type="hidden" name="user_id" value="{{ row.id }}" />
+                    <label class="dir-check-line">
+                      <input type="checkbox" name="reset" value="1" />
+                      New local password
+                    </label>
+                    <button class="btn-danger btn-sm" type="submit">Release</button>
+                  </form>
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="8" class="cell-note">No account is managed by a directory
+                  {{ 'connection' if not selected else 'connection under this filter' }}. Run a
+                  synchronization from a connection screen to link or create one.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <p class="perm-note">Tick “New local password” to issue one at release; it is shown once
+          after releasing and is not stored anywhere readable.</p>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

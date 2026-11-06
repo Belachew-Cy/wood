@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi, dash_icon with context %}
+
+{% block title %}My applications{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Careers</span>
+      <h1>My applications</h1>
+      <p>Every post you applied for while signed in, with the stage it reached and the
+        examination result attached to it.</p>
+    </div>
+    <nav class="stock-actions" aria-label="Career actions">
+      <a class="btn btn-outline btn-sm" href="{{ url_for('recruitment.vacancies') }}">
+        Browse vacancies
+      </a>
+      {% if rec_scope and rec_scope.level != 'board' %}
+      <a class="btn btn-outline btn-sm" href="{{ url_for('recruitment.my_requests') }}">
+        My recruitment requests
+      </a>
+      {% endif %}
+    </nav>
+  </div>
+</section>
+
+<section class="container finance-page">
+  <div class="hr-stats">
+    {{ kpi('Applications', applications | length, 'against open and past posts', 'flat', 'user') }}
+    {{ kpi('In progress', applications | selectattr('status', 'in', ['Applied', 'Shortlisted', 'Interview']) | list | length,
+           'not yet decided', 'down' if applications else 'flat', 'clock') }}
+    {{ kpi('Selected or hired', applications | selectattr('status', 'in', ['Selected', 'Hired']) | list | length,
+           'the company answered yes', 'up', 'check') }}
+  </div>
+
+  <div class="dash-panel hr-table-panel">
+    <h2>Each application</h2>
+    <div class="hr-table-wrap table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Reference</th>
+            <th>Post</th>
+            <th>Department</th>
+            <th>Applied</th>
+            <th>Stage</th>
+            <th>Examination</th>
+            <th>Notes</th>
+            <th aria-label="Actions"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for application in applications %}
+          <tr>
+            <td class="nowrap">{{ application.reference or '#' ~ application.id }}</td>
+            <td class="wrap-cell">
+              <strong>{{ application.job_title }}</strong>
+              <span class="cell-note">{{ application.job_type }}
+                {%- if application.location %} · {{ application.location }}{% endif %}</span>
+            </td>
+            <td>{{ application.department }}</td>
+            <td class="nowrap">{{ application.applied_at | friendly_date }}</td>
+            <td>
+              <span class="status-badge {{ 'active' if application.status in ('Selected', 'Hired')
+                                            else 'off' if application.status == 'Rejected'
+                                            else 'neutral' }}">
+                {{ application.status }}
+              </span>
+            </td>
+            <td class="nowrap">
+              {% if application.exam_id %}
+                {% if application.attempt_status == 'Submitted' %}
+                {{ '%g' | format(application.exam_score | float) }} /
+                {{ '%g' | format(application.total_marks | float) }}
+                <span class="cell-note">
+                  {{ 'Pass' if application.exam_score | float >= application.pass_mark | float else 'Below pass mark' }}
+                </span>
+                {% elif application.exam_status == 'Published' %}
+                {{ application.attempt_status }}
+                {% else %}
+                {{ application.exam_status }}
+                {% endif %}
+              {% else %}—{% endif %}
+            </td>
+            <td class="wrap-cell">
+              {% if application.decision_note %}
+              <span class="cell-note">{{ application.decision_note }}</span>
+              {% if application.screened_by_name %}
+              <span class="cell-note">— {{ application.screened_by_name }}</span>
+              {% endif %}
+              {% else %}—{% endif %}
+            </td>
+            <td class="nowrap">
+              {% if application.exam_id and application.exam_status == 'Published'
+                    and application.attempt_status != 'Submitted' %}
+              <a class="btn btn-outline btn-sm"
+                 href="{{ url_for('recruitment.my_exam', exam_id=application.exam_id) }}">
+                {% if application.attempt_status == 'In Progress' %}Resume paper{% else %}Sit paper{% endif %}
+              </a>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="8" class="employee-empty">
+              You have not applied for a post from this account yet.
+              <a href="{{ url_for('recruitment.vacancies') }}">See what is open</a>.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="panel-note">Applications sent without signing in - by the public board or at
+      the HR desk - are not listed here. Quote your reference to the HR desk and they can
+      tell you where it stands.</p>
+  </div>
+</section>
+{% endblock %}

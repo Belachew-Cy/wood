@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container-fluid py-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3>Physical Asset Verification</h3>
+            <p class="text-muted">
+                Manage physical asset inspections and stocktaking campaigns.
+            </p>
+        </div>
+
+        <a href="{{ url_for(
+            'asset_management.create_verification_campaign'
+        ) }}" class="btn btn-success">
+            <i class="fas fa-plus"></i> New Campaign
+        </a>
+    </div>
+
+    <div class="row g-3">
+
+        {% for label, value in [
+            ('Total Campaigns', total_campaigns),
+            ('Active Campaigns', active_campaigns),
+            ('Total Records', total_records),
+            ('Verified Assets', verified_records),
+            ('Missing Assets', missing_records)
+        ] %}
+
+        <div class="col-xl-4 col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <p class="text-muted">{{ label }}</p>
+                    <h3>{{ value }}</h3>
+                </div>
+            </div>
+        </div>
+
+        {% endfor %}
+
+    </div>
+
+    <div class="card border-0 shadow-sm mt-4">
+        <div class="card-body">
+
+            <h5>Verification Campaigns</h5>
+
+            <div class="table-responsive">
+
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Campaign Code</th>
+                            <th>Title</th>
+                            <th>Start Date</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {% for campaign in campaigns %}
+                        <tr>
+                            <td>{{ campaign.campaign_code }}</td>
+                            <td>{{ campaign.title }}</td>
+                            <td>{{ campaign.start_date }}</td>
+                            <td>{{ campaign.status }}</td>
+                            <td>
+                                <a href="{{ url_for(
+                                    'asset_management.verification_campaign',
+                                    campaign_id=campaign.id
+                                ) }}" class="btn btn-sm btn-outline-success">
+                                    Open
+                                </a>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center">
+                                No verification campaigns found.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}

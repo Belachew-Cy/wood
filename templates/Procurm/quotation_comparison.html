@@ -1,0 +1,319 @@
+
+{% extends "base.html" %}
+
+{% block title %}Quotation Comparison | Dereje Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Procurement / Supplier Selection</span>
+            <h1>Quotation Comparison</h1>
+            <p>Evaluate supplier offers and document the selection decision.</p>
+        </div>
+
+        <div class="stock-actions">
+            <a href="{{ url_for('procurement.quotation_management') }}"
+               class="btn btn-outline btn-sm">
+                Back to Quotations
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="container finance-page">
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+            <div class="finance-alert {{ category }}">{{ message }}</div>
+        {% endfor %}
+    {% endwith %}
+
+    <!-- RFQ Information -->
+    <div class="dash-panel">
+        <h2>RFQ Information</h2>
+
+        <div class="finance-grid">
+            <div>
+                <label>RFQ Reference</label>
+                <strong>{{ rfq.rfq_number }}</strong>
+            </div>
+
+            <div>
+                <label>RFQ Title</label>
+                <strong>{{ rfq.title }}</strong>
+            </div>
+
+            <div>
+                <label>Submission Deadline</label>
+                <strong>{{ rfq.submission_deadline }}</strong>
+            </div>
+
+            <div>
+                <label>RFQ Status</label>
+                <strong>{{ rfq.status }}</strong>
+            </div>
+        </div>
+    </div>
+
+    <!-- Comparison Summary -->
+    <div class="hr-stats">
+        {{ kpi('Received quotations', stats.total_quotations) }}
+        {{ kpi('Eligible quotations', stats.eligible_quotations) }}
+        {{ kpi('Suppliers evaluated', stats.evaluated_suppliers) }}
+        {{ kpi('Lowest quotation', stats.lowest_total) }}
+    </div>
+
+    <!-- Comparison Table -->
+    <div class="dash-panel hr-table-panel">
+        <h2>Supplier Quotation Comparison</h2>
+
+        <div class="hr-table-wrap table-scroll">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Supplier</th>
+                        <th>Quotation Ref.</th>
+                        <th>Subtotal</th>
+                        <th>Tax</th>
+                        <th>Delivery</th>
+                        <th>Discount</th>
+                        <th>Total</th>
+                        <th>Delivery Days</th>
+                        <th>Valid Until</th>
+                        <th>Supplier Score</th>
+                        <th>Status</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for quotation in quotations %}
+                    <tr>
+                        <td>{{ quotation.supplier_name }}</td>
+                        <td>{{ quotation.quotation_reference }}</td>
+                        <td>{{ "{:,.2f}".format(quotation.subtotal | float) }}</td>
+                        <td>{{ "{:,.2f}".format(quotation.tax_amount | float) }}</td>
+                        <td>{{ "{:,.2f}".format(quotation.delivery_cost | float) }}</td>
+                        <td>{{ "{:,.2f}".format(quotation.discount_amount | float) }}</td>
+
+                        <td>
+                            <strong>
+                                {{ quotation.currency }}
+                                {{ "{:,.2f}".format(quotation.total_amount | float) }}
+                            </strong>
+                        </td>
+
+                        <td>{{ quotation.delivery_days or '—' }}</td>
+                        <td>{{ quotation.valid_until }}</td>
+
+                        <td>
+                            {% if quotation.supplier_score is not none %}
+                                {{ quotation.supplier_score }}/5
+                            {% else %}
+                                Not evaluated
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            <span class="status-badge neutral">
+                                {{ quotation.status }}
+                            </span>
+                        </td>
+
+                        <td>
+                            <a href="{{ url_for(
+                                'procurement.quotation_details',
+                                quotation_id=quotation.id
+                            ) }}"
+                               class="finance-btn secondary">
+                                View
+                            </a>
+                        </td>
+                    </tr>
+
+                    {% else %}
+                    <tr>
+                        <td colspan="12" class="employee-empty">
+                            No quotations are available for comparison.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <p class="form-help">
+            Compare quotations in the same currency. Do not rank offers
+            in different currencies without an approved exchange-rate basis.
+        </p>
+    </div>
+
+    <!-- Evaluation Criteria -->
+    <div class="dash-panel">
+        <h2>Evaluation Criteria</h2>
+
+        <div class="finance-grid">
+            <div>
+                <label>Price</label>
+                <strong>{{ criteria.price_weight }}%</strong>
+            </div>
+
+            <div>
+                <label>Quality</label>
+                <strong>{{ criteria.quality_weight }}%</strong>
+            </div>
+
+            <div>
+                <label>Delivery</label>
+                <strong>{{ criteria.delivery_weight }}%</strong>
+            </div>
+
+            <div>
+                <label>Payment Terms</label>
+                <strong>{{ criteria.payment_weight }}%</strong>
+            </div>
+        </div>
+
+        <p class="form-help">
+            Evaluation weights must total 100%. Scores and weights should
+            be configured and validated by authorized personnel.
+        </p>
+    </div>
+
+    <!-- Supplier Selection -->
+    {% if can_select_supplier and quotations %}
+    <div class="finance-panel">
+        <h2>Supplier Selection Recommendation</h2>
+
+        <form method="post"
+              action="{{ url_for(
+                  'procurement.save_supplier_selection',
+                  rfq_id=rfq.id
+              ) }}"
+              class="finance-form">
+
+            {{ csrf_field() }}
+
+            <div class="finance-grid">
+
+                <div>
+                    <label for="quotation_id">Recommended quotation *</label>
+
+                    <select name="quotation_id"
+                            id="quotation_id"
+                            required>
+
+                        <option value="">Select eligible quotation</option>
+
+                        {% for quotation in quotations %}
+                            {% if quotation.status in ['Submitted', 'Under Review'] %}
+                            <option value="{{ quotation.id }}">
+                                {{ quotation.supplier_name }} -
+                                {{ quotation.currency }}
+                                {{ "{:,.2f}".format(
+                                    quotation.total_amount | float
+                                ) }}
+                            </option>
+                            {% endif %}
+                        {% endfor %}
+
+                    </select>
+                </div>
+
+                <div>
+                    <label for="selection_type">Decision type *</label>
+                    <select name="selection_type"
+                            id="selection_type"
+                            required>
+                        <option value="Recommended">Recommend for approval</option>
+                        <option value="Selected">Select supplier</option>
+                    </select>
+                </div>
+
+                <div class="full">
+                    <label for="selection_justification">
+                        Selection justification *
+                    </label>
+
+                    <textarea name="selection_justification"
+                              id="selection_justification"
+                              rows="4"
+                              minlength="20"
+                              maxlength="3000"
+                              required
+                              placeholder="Explain the commercial and technical reasons for selecting this supplier."></textarea>
+                </div>
+
+                <div class="full">
+                    <label for="evaluation_notes">
+                        Evaluation notes
+                    </label>
+
+                    <textarea name="evaluation_notes"
+                              id="evaluation_notes"
+                              rows="3"
+                              maxlength="2000"></textarea>
+                </div>
+
+            </div>
+
+            <div class="finance-form-actions">
+                <button type="submit" class="finance-btn primary">
+                    Save Selection Decision
+                </button>
+            </div>
+
+        </form>
+    </div>
+
+    {% elif not can_select_supplier %}
+    <div class="finance-alert info">
+        You have read-only access. Supplier selection is restricted to
+        authorized Procurement personnel.
+    </div>
+    {% endif %}
+
+    <!-- Selection History -->
+    <div class="dash-panel">
+        <h2>Supplier Selection History</h2>
+
+        <div class="hr-table-wrap table-scroll">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Supplier</th>
+                        <th>Quotation Ref.</th>
+                        <th>Decision</th>
+                        <th>Justification</th>
+                        <th>Selected By</th>
+                        <th>Decision Date</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for decision in selection_history %}
+                    <tr>
+                        <td>{{ decision.supplier_name }}</td>
+                        <td>{{ decision.quotation_reference }}</td>
+                        <td>{{ decision.selection_type }}</td>
+                        <td>{{ decision.justification }}</td>
+                        <td>{{ decision.selected_by }}</td>
+                        <td>{{ decision.created_at }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="employee-empty">
+                            No supplier selection decisions recorded.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</section>
+
+{% endblock %}

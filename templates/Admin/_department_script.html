@@ -1,0 +1,134 @@
+<script>
+  (function () {
+      const template = document.getElementById("deptMatrixTemplate");
+
+      function slice(list) {
+      return Array.prototype.slice.call(list);
+    }
+
+    function refresh(matrix) {
+        const total = Number(matrix.dataset.deptTotal) || 0;
+        const count = matrix.querySelector("[data-dept-count]");
+        const master = matrix.querySelector("[data-dept-all]");
+        const boxes = slice(matrix.querySelectorAll('input[name="department_action"]'));
+        const open = boxes.filter(function (box) {
+            return !box.disabled;
+        });
+        const checked = boxes.filter(function (box) {
+            return box.checked;
+        });
+        if (count) {
+        count.textContent = checked.length + " of " + total + " actions open";
+      }
+      if (master) {
+        master.checked = open.length > 0 && checked.length === open.length;
+        master.indeterminate = checked.length > 0 && checked.length < open.length;
+      }
+      slice(matrix.querySelectorAll("[data-dept-row]")).forEach(function (row) {
+          const button = row.querySelector("[data-dept-row-all]");
+          if (!button) return;
+          const boxes = slice(row.querySelectorAll(
+              'input[name="department_action"]:not(:disabled)'));
+          const all = boxes.length > 0 && boxes.every(function (box) {
+              return box.checked;
+          });
+          button.textContent = all ? "Clear" : "All";
+        button.setAttribute("aria-pressed", all ? "true" : "false");
+      });
+    }
+
+    function wire(matrix) {
+        const master = matrix.querySelector("[data-dept-all]");
+        const filter = matrix.querySelector("[data-dept-filter]");
+
+        matrix.addEventListener("change", function (event) {
+        if (event.target === matrix ||
+            event.target.matches('input[name="department_action"]')) {
+          refresh(matrix);
+        }
+      });
+
+      if (master) {
+        master.addEventListener("change", function () {
+          slice(matrix.querySelectorAll(
+            'input[name="department_action"]:not(:disabled)')).forEach(
+              function (box) { box.checked = master.checked; });
+          refresh(matrix);
+        });
+      }
+
+      slice(matrix.querySelectorAll("[data-dept-row]")).forEach(function (row) {
+        var button = row.querySelector("[data-dept-row-all]");
+        if (!button) return;
+        button.addEventListener("click", function () {
+          var boxes = slice(row.querySelectorAll(
+            'input[name="department_action"]:not(:disabled)'));
+          var all = boxes.every(function (box) { return box.checked; });
+          boxes.forEach(function (box) { box.checked = !all; });
+          refresh(matrix);
+        });
+      });
+
+      if (filter) {
+        filter.addEventListener("input", function () {
+          var query = filter.value.trim().toLowerCase();
+          slice(matrix.querySelectorAll("[data-dept-row]")).forEach(function (row) {
+            row.hidden = query !== "" &&
+              row.textContent.toLowerCase().indexOf(query) === -1;
+          });
+        });
+      }
+
+      refresh(matrix);
+    }
+
+    function mount(matrix) {
+      if (!matrix || matrix.dataset.mounted === "1") return;
+      var grid = matrix.querySelector("[data-dept-grid]");
+      if (!template || !grid) return;
+      grid.innerHTML = "";
+      grid.appendChild(template.content.cloneNode(true));
+
+      var selected = [];
+      var data = matrix.querySelector("[data-dept-selected]");
+      if (data) {
+        try {
+          selected = JSON.parse(data.textContent || "[]");
+        } catch (error) {
+          selected = [];
+        }
+      }
+      var boxes = slice(matrix.querySelectorAll('input[name="department_action"]'));
+      boxes.forEach(function (box) {
+        box.checked = selected.indexOf(box.value) !== -1;
+      });
+      if (matrix.dataset.deptReadonly === "1") {
+        boxes.forEach(function (box) { box.disabled = true; });
+      } else {
+        // The marker is added only once the grid exists, so a no-script save
+        // posts no grid at all and the stored matrix is left untouched.
+        var marker = document.createElement("input");
+        marker.type = "hidden";
+        marker.name = "dept_matrix";
+        marker.value = "1";
+        matrix.appendChild(marker);
+      }
+      matrix.dataset.mounted = "1";
+      wire(matrix);
+    }
+
+    // Standalone grids (the account editor) mount at once; grids inside a dialog
+    // wait until the dialog opens, so only one copy of the table is ever built.
+    slice(document.querySelectorAll("[data-dept-matrix]")).forEach(function (matrix) {
+      if (!matrix.closest("dialog")) mount(matrix);
+    });
+
+    document.addEventListener("click", function (event) {
+      var button = event.target.closest
+        ? event.target.closest("[data-open-dialog]") : null;
+      if (!button) return;
+      var dialog = document.getElementById(button.dataset.openDialog);
+      if (dialog) mount(dialog.querySelector("[data-dept-matrix]"));
+    }, true);
+  })();
+</script>

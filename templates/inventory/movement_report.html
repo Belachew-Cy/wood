@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi with context %}
+
+{% block title %}Movement report | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">INVENTORY MANAGEMENT · REPORTS</span>
+      <h1>Movement report</h1>
+      <p>Every receipt and issue in a date range, up to the latest 1,000
+        entries.</p>
+    </div>
+    <a class="btn btn-outline btn-sm" href="{{ url_for('inventory.reports') }}">
+      ← All reports
+    </a>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <form method="GET" action="{{ url_for('inventory.movement_report') }}"
+          class="stock-search">
+      <label for="start">From</label>
+      <input id="start" name="start" type="date" value="{{ start }}" />
+      <label for="end">To</label>
+      <input id="end" name="end" type="date" value="{{ end }}" />
+      <label for="movement_type">Direction</label>
+      <select id="movement_type" name="movement_type">
+        <option value="">In and out</option>
+        <option value="IN" {% if movement_type == 'IN' %}selected{% endif %}>
+          Stock in
+        </option>
+        <option value="OUT" {% if movement_type == 'OUT' %}selected{% endif %}>
+          Stock out
+        </option>
+      </select>
+      <label for="reference">Module</label>
+      <select id="reference" name="reference">
+        <option value="">Every module</option>
+        {% for name in references %}
+        <option value="{{ name }}" {% if reference == name %}selected{% endif %}>
+          {{ name }}
+        </option>
+        {% endfor %}
+      </select>
+      <button class="btn btn-sm" type="submit">Apply</button>
+      <a class="btn btn-outline btn-sm" href="{{ url_for('inventory.movement_report') }}">
+        Reset
+      </a>
+      <a class="btn btn-outline btn-sm"
+         href="{{ url_for('inventory.movement_report_export', start=start,
+                          end=end, movement_type=movement_type,
+                          reference=reference) }}">
+        Export CSV
+      </a>
+    </form>
+
+    <div class="hr-stats">
+      {{ kpi('Received', "{:,.2f}".format(received), 'stock in', 'up') }}
+      {{ kpi('Issued', "{:,.2f}".format(issued), 'stock out', 'down') }}
+      {{ kpi('Net change', "{:,.2f}".format(received - issued),
+             'received minus issued') }}
+      {{ kpi('Movements', movements | length,
+             '{} to {}'.format(start, end)) }}
+    </div>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>Ledger entries</h2>
+      <div class="hr-table-wrap table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>When</th><th>SKU</th><th>Item</th><th>Movement</th>
+              <th>Quantity</th><th>Module</th><th>Reference</th>
+              <th>Notes</th><th>Recorded by</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for move in movements %}
+            <tr>
+              <td class="nowrap">{{ move["created_at"] | audit_time }}</td>
+              <td>{{ move["sku"] }}</td>
+              <td>{{ move["name"] }}</td>
+              <td>
+                <span class="status-badge {{ 'active' if move['movement_type'] == 'IN' else 'medium' }}">
+                  {{ 'Stock in' if move["movement_type"] == "IN" else 'Stock out' }}
+                </span>
+              </td>
+              <td>{{ move["quantity"] }} {{ move["unit"] }}</td>
+              <td>{{ move["reference_type"] }}</td>
+              <td>{{ move["reference_no"] or '—' }}</td>
+              <td>{{ move["notes"] or '—' }}</td>
+              <td>{{ move["created_by"] }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="9">No movement in this range.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

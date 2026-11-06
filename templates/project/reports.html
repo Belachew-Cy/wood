@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi, bars, donut, feed with context %}
+
+{% block title %}Project Reports | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+{% set counts = summary["counts"] %}
+{% set done = counts["Completed"] %}
+{% set upcoming_rows = [] %}
+{% for row in upcoming %}
+  {% set _ = upcoming_rows.append({
+    'icon': 'warn' if row["due_date"] < today else 'calendar',
+    'tone': 'bad' if row["due_date"] < today else 'warn',
+    'title': '{} · {}'.format(row["project_code"], row["milestone_name"]),
+    'meta': '{} · due {}'.format(row["project_name"], row["due_date"]),
+    'time': '',
+    'href': url_for('project.project_detail', project_id=row["project_id"])
+  }) %}
+{% endfor %}
+
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">PROJECT MANAGEMENT</span>
+      <h1>Project Reports</h1>
+      <p>What the register holds, what it has reserved and what the site still owes.</p>
+    </div>
+    <div class="row-actions">
+      <a class="btn btn-outline" href="{{ url_for('project.dashboard') }}">
+        ← Project desk
+      </a>
+      <a class="btn" href="#" onclick="window.print(); return false;">Print</a>
+    </div>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="hr-stats">
+      {{ kpi('Projects on the register', summary["total"], 'archived jobs out',
+             'flat', 'briefcase', url_for('project.projects')) }}
+      {{ kpi('Awaiting a decision', summary["awaiting"],
+             "{:,.2f} ETB pending".format(summary["pending_value"] | float),
+             'warn' if summary["awaiting"] else 'flat', 'file',
+             url_for('project.projects', status='Pending')) }}
+      {{ kpi('Live jobs', summary["live"], 'in progress or on hold',
+             'up' if summary["live"] else 'flat', 'target',
+             url_for('project.projects', status='In Progress')) }}
+      {{ kpi('Drafts not submitted', summary["drafts"], 'still being written',
+             'flat', 'chart', url_for('project.projects', status='Draft')) }}
+      {{ kpi('Completed', done, 'signed off on site',
+             'up' if done else 'flat', 'check',
+             url_for('project.projects', status='Completed')) }}
+      {{ kpi('Open tasks', summary["open_tasks"], 'not completed yet',
+             'flat', 'clipboard', url_for('project.tasks', mine='0')) }}
+      {{ kpi('Tasks past due', summary["overdue_tasks"], 'open and overdue',
+             'down' if summary["overdue_tasks"] else 'flat', 'clock',
+             url_for('project.tasks', mine='0', overdue='1')) }}
+      {{ kpi('Milestones past due', summary["overdue_milestones"],
+             'dates the site did not hold',
+             'down' if summary["overdue_milestones"] else 'flat', 'warn',
+             url_for('project.milestones')) }}
+    </div>
+
+    {% set status_rows = [] %}
+    {% for row in breakdown %}
+      {% set _ = status_rows.append({
+        'label': row["status"], 'value': row["total"] | int,
+        'display': '{:,.0f} ETB budget'.format(row["budget"] | float)
+      }) %}
+    {% endfor %}
+
+    {% set workload_rows = [] %}
+    {% for row in workload %}
+      {% set _ = workload_rows.append({
+        'label': row["full_name"] or row["username"],
+        'value': row["job_count"] | int,
+        'display': '{} job{} · {} open'.format(
+          row["job_count"], '' if row["job_count"] == 1 else 's',
+          row["open_tasks"])
+      }) %}
+    {% endfor %}
+
+    <div class="chart-grid">
+      {{ bars('Projects by status', status_rows, 'budget carried') }}
+      {{ bars('What each manager holds', workload_rows, 'jobs · open tasks') }}
+      {{ donut('Register completed', (done / summary["total"])
+               if summary["total"] else 0,
+               '{} of {}'.format(done, summary["total"]),
+               [{'label': 'Completed', 'color': 'var(--walnut)', 'value': done},
+                {'label': 'Still running', 'color': 'var(--ivory-2)',
+                 'value': summary["total"] - done}], 'the whole register') }}
+      {{ feed('Dates the site owes', upcoming_rows[:8], 'next 60 days',
+              {'href': url_for('project.milestones'), 'label': 'Open milestones'}) }}
+    </div>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>The register behind the figures</h2>
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Project</th><th>Client</th><th>Manager</th><th>Window</th>
+              <th>Budget</th><th>Reserved</th><th>Progress</th><th>Work</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for project in projects %}
+            <tr>
+              <td>
+                <a href="{{ url_for('project.project_detail', project_id=project['id']) }}">
+                  {{ project["project_code"] }}
+                </a>
+                <br><span class="feed-meta">{{ project["project_name"] }}
+                  {% if project["is_archived"] %}· archived{% endif %}</span>
+              </td>
+              <td>{{ project["client_name"] or '—' }}</td>
+              <td>{{ project["manager_name"] or 'Unassigned' }}</td>
+              <td class="nowrap">
+                {{ project["start_date"] or '—' }}
+                <br><span class="feed-meta">to {{ project["end_date"] or '—' }}</span>
+              </td>
+              <td class="nowrap">
+                {{ "{:,.2f}".format(project["budget"] | float) }}
+                <span class="feed-meta">{{ project["currency"] }}</span>
+              </td>
+              <td class="nowrap">
+                {{ "{:,.2f}".format(project["committed"] | float) }}
+                <br><span class="feed-meta">
+                  {{ project["open_milestones"] }} open date{{ ''
+                     if project["open_milestones"] == 1 else 's' }}</span>
+              </td>
+              <td style="min-width: 120px;">
+                <div class="bar-track">
+                  <div class="bar-fill"
+                       style="width: {{ project['progress'] | int }}%"></div>
+                </div>
+                <span class="feed-meta">{{ project["progress"] | int }}%</span>
+              </td>
+              <td>{{ project["open_tasks"] }} open of {{ project["task_count"] }}</td>
+              <td>
+                <span class="status-badge {{ 'active' if project['status'] == 'Completed'
+                      else 'off' if project['status'] == 'Cancelled' else 'neutral' }}">
+                  {{ project["status"] }}
+                </span>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="9">The register is empty.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="panel-note">Reserved is read from the Budget commitments the
+        allocation screen keeps, so the two desks quote one figure. A project only
+        reserves its allocation once the approval desk signs it.</p>
+    </div>
+
+    <div class="dash-panel">
+      <h2>Exports</h2>
+      <p class="panel-note">Each file carries the register behind the figure and
+        writes one audit line. A signed-off file still has to be raised by a seat
+        that holds that desk, so the CSV is not a side door around a boundary.</p>
+      <div class="row-actions">
+        {% if 'project_register' in granted_permissions %}
+        <a class="btn btn-outline"
+           href="{{ url_for('project.export', kind='projects') }}">
+          Projects CSV
+        </a>
+        {% endif %}
+        {% if 'project_milestones' in granted_permissions %}
+        <a class="btn btn-outline"
+           href="{{ url_for('project.export', kind='milestones') }}">
+          Milestones CSV
+        </a>
+        {% endif %}
+        {% if 'project_tasks' in granted_permissions %}
+        <a class="btn btn-outline"
+           href="{{ url_for('project.export', kind='tasks') }}">
+          Tasks CSV
+        </a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

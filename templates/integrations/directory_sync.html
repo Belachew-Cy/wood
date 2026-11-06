@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+{% from "integrations/_directory_page.html" import directory_head, directory_flash with context %}
+
+{% block title %}Synchronization · {{ connection.name }} | Dereje Belay Wood &amp; Kitchen{% endblock %}
+
+{% set can_apply = run and run.mode == 'preview' and run.status == 'preview' %}
+
+{% block content %}
+{{ directory_head('Synchronization',
+     connection.name ~ ' · ' ~ kind_label ~ ' is read only; this system never writes an object back to the directory.',
+     connection) }}
+
+<section class="section bg-white">
+  <div class="container">
+    {{ directory_flash(notes) }}
+
+    <div class="hr-stats">
+      <div class="stat"><strong>{{ summary.accounts }}</strong><span>Managed accounts</span></div>
+      <div class="stat"><strong>{{ summary.departed }}</strong><span>Departed</span></div>
+      <div class="stat"><strong>{{ summary.disabled }}</strong><span>Disabled</span></div>
+      <div class="stat"><strong>{{ 'Every {} min'.format(connection.interval_minutes)
+                                   if connection.interval_minutes else 'Manual' }}</strong>
+        <span>Schedule</span></div>
+    </div>
+
+    <div class="emp-panel" style="margin-top: 1.5rem;">
+      <div class="account-card">
+        <header class="account-head">
+          <div>
+            <h3 class="account-name">Run a synchronization</h3>
+            <span class="cell-note">A preview reads the directory and stores what it would do
+              without touching an account. An apply works from that preview and changes local
+              accounts only.</span>
+          </div>
+          <form method="POST">
+            {{ csrf_field() }}
+            <input type="hidden" name="action" value="preview" />
+            <button class="btn {{ 'btn-outline-dark' if can_apply else '' }}" type="submit">
+              Preview now <span class="arrow">→</span></button>
+          </form>
+        </header>
+
+        {% if can_apply %}
+        <form method="POST"
+              onsubmit="return confirm('Apply this preview? Accounts will be created, linked, updated or disabled as the items below say.');">
+          {{ csrf_field() }}
+          <input type="hidden" name="action" value="apply" />
+          <input type="hidden" name="run_id" value="{{ run.id }}" />
+          <p class="dir-form-note">Run #{{ run.id }} is a preview that has not been applied.
+            Applying it uses exactly the items listed below.</p>
+          <div class="finance-form-actions">
+            <button class="btn" type="submit">Apply this preview <span class="arrow">→</span></button>
+          </div>
+        </form>
+        {% endif %}
+      </div>
+
+      {% if run %}
+      <div class="account-card">
+        <header class="account-head">
+          <div>
+            <h3 class="account-name">Run #{{ run.id }}</h3>
+            <span class="cell-note">{{ 'Apply' if run.mode == 'apply' else 'Preview' }} ·
+              {{ run.trigger }} · started {{ run.started_at | audit_time }}
+              {%- if run.finished_at %} · finished {{ run.finished_at | audit_time }}{% endif %}</span>
+          </div>
+          <span class="status-badge {{ 'active' if run.status in ('success', 'preview')
+                                      else ('off' if run.status in ('failed', 'partial')
+                                      else 'neutral') }}">{{ run.status }}</span>
+        </header>
+
+        {% if run.error %}
+        <div class="dir-form-note warn">{{ run.error }}</div>
+        {% endif %}
+
+        <ul class="rule-list">
+          <li><span class="rule-label">Accounts seen</span><span class="rule-value">{{ run.seen }}</span></li>
+          <li><span class="rule-label">Created</span><span class="rule-value">{{ run.created }}</span></li>
+          <li><span class="rule-label">Linked to an existing account</span>
+            <span class="rule-value">{{ run.linked }}</span></li>
+          <li><span class="rule-label">Updated</span><span class="rule-value">{{ run.updated }}</span></li>
+          <li><span class="rule-label">Roles granted</span><span class="rule-value">{{ run.granted }}</span></li>
+          <li><span class="rule-label">Disabled</span><span class="rule-value">{{ run.disabled }}</span></li>
+          <li><span class="rule-label">Restored</span><span class="rule-value">{{ run.restored }}</span></li>
+          <li><span class="rule-label">Skipped</span><span class="rule-value">{{ run.skipped }}</span></li>
+          <li><span class="rule-label">Errors</span><span class="rule-value">{{ run.errors }}</span></li>
+        </ul>
+      </div>
+
+      <div class="account-card">
+        <header class="account-head">
+          <div>
+            <h3 class="account-name">Items</h3>
+            <span class="cell-note">What this run would do, account by account.</span>
+          </div>
+          <span class="cell-note">{{ items | length }} item{{ '' if items | length == 1 else 's' }}</span>
+        </header>
+
+        <div class="dash-table-wrap">
+          <table>
+            <thead>
+              <tr><th>Account</th><th>Action</th><th>Detail</th><th>Linked account</th>
+                  <th>Role</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              {% for item in items %}
+              <tr>
+                <td>
+                  {{ item.display_name or item.email or item.object_id }}
+                  {% if item.email %}<p class="cell-note">{{ item.email }}</p>{% endif %}
+                </td>
+                <td>
+                  <span class="status-badge {{ 'active' if item.action in ('create', 'link', 'roles', 'restore')
+                                               else ('off' if item.action in ('disable', 'error')
+                                               else 'neutral') }}">{{ item.action }}</span>
+                </td>
+                <td class="cell-note">{{ item.detail or '—' }}</td>
+                <td>{{ item.username or '—' }}</td>
+                <td>{{ item.role or '—' }}</td>
+                <td>{{ item.status or '—' }}</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="6" class="cell-note">This run stored no per-account items.
+                Preview again after checking the connection's search base.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="account-card">
+        <header class="account-head">
+          <div>
+            <h3 class="account-name">Run history</h3>
+            <span class="cell-note">The most recent runs on this connection.</span>
+          </div>
+        </header>
+        <div class="dash-table-wrap">
+          <table>
+            <thead>
+              <tr><th>Started</th><th>Mode</th><th>Status</th><th>Seen</th><th>Created</th>
+                  <th>Linked</th><th>Disabled</th><th>Errors</th><th></th></tr>
+            </thead>
+            <tbody>
+              {% for row in runs %}
+              <tr>
+                <td class="cell-note">{{ row.started_at | audit_time }}</td>
+                <td>{{ 'Apply' if row.mode == 'apply' else 'Preview' }}</td>
+                <td>
+                  <span class="status-badge {{ 'active' if row.status in ('success', 'preview')
+                                               else ('off' if row.status in ('failed', 'partial')
+                                               else 'neutral') }}">{{ row.status }}</span>
+                </td>
+                <td>{{ row.seen }}</td>
+                <td>{{ row.created }}</td>
+                <td>{{ row.linked }}</td>
+                <td>{{ row.disabled }}</td>
+                <td>{{ row.errors }}</td>
+                <td>
+                  <a class="btn btn-outline-dark btn-sm"
+                     href="{{ url_for('integrations.directory_sync', run_id=row.id) }}">Open</a>
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="9" class="cell-note">Nothing has been read from this directory
+                yet. Start with a preview.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <p class="perm-note">Every preview and apply is written to the activity log under module
+          <strong>integrations</strong>, including the account that ran it.</p>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

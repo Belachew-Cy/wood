@@ -1,0 +1,475 @@
+
+{% extends "base.html" %}
+
+{% block title %}Payroll Allowances{% endblock %}
+
+{% block content %}
+<div class="container-fluid payroll-page">
+
+    <!-- Header -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1">Allowance Management</h2>
+            <p class="text-muted mb-0">
+                Configure and manage employee salary allowances.
+            </p>
+        </div>
+
+        {% if has_payroll_permission('payroll_allowance_create') %}
+        <button class="btn btn-primary"
+                type="button"
+                data-bs-toggle="modal"
+                data-bs-target="#addAllowanceModal">
+            <i class="fas fa-plus"></i> Add Allowance
+        </button>
+        {% endif %}
+    </div>
+
+    <!-- Summary -->
+    <div class="row g-3 mb-4">
+
+        <div class="col-md-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Total Allowance Types</div>
+                    <h3 class="mb-0">{{ allowances|length }}</h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Active Allowances</div>
+                    <h3 class="mb-0">
+                        {{ allowances|selectattr('status', 'equalto', 'Active')|list|length }}
+                    </h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Inactive Allowances</div>
+                    <h3 class="mb-0">
+                        {{ allowances|selectattr('status', 'equalto', 'Inactive')|list|length }}
+                    </h3>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Allowance Table -->
+    <div class="card shadow-sm">
+
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Allowance Types</h5>
+
+            <span class="badge bg-secondary">
+                {{ allowances|length }} Records
+            </span>
+        </div>
+
+        <div class="card-body p-0">
+            <div class="table-responsive">
+
+                <table class="table table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Allowance Code</th>
+                            <th>Allowance Name</th>
+                            <th>Calculation Type</th>
+                            <th>Default Amount</th>
+                            <th>Taxable</th>
+                            <th>Status</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {% for allowance in allowances %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+
+                            <td>{{ allowance.allowance_code or '-' }}</td>
+
+                            <td>
+                                <strong>{{ allowance.allowance_name }}</strong>
+                            </td>
+
+                            <td>
+                                {{ allowance.calculation_type or 'Fixed' }}
+                            </td>
+
+                            <td>
+                                {% if allowance.default_amount is not none %}
+                                    {{ "{:,.2f}".format(allowance.default_amount|float) }}
+                                    ETB
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {% if allowance.is_taxable %}
+                                    <span class="badge bg-warning text-dark">
+                                        Taxable
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-success">
+                                        Non-taxable
+                                    </span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {% if allowance.status == 'Active' %}
+                                    <span class="badge bg-success">Active</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">
+                                        {{ allowance.status or 'Inactive' }}
+                                    </span>
+                                {% endif %}
+                            </td>
+
+                            <td class="text-end">
+
+                                {% if has_payroll_permission('payroll_allowance_edit') %}
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-primary"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#editAllowance{{ allowance.id }}"
+                                        title="Edit Allowance">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                {% endif %}
+
+                                {% if has_payroll_permission('payroll_allowance_delete') %}
+                                <form method="POST"
+                                      action="{{ url_for(
+                                          'payroll.toggle_allowance',
+                                          allowance_id=allowance.id
+                                      ) }}"
+                                      class="d-inline">
+                {{ csrf_field() }}
+
+                                    <button type="submit"
+                                            class="btn btn-sm btn-outline-warning"
+                                            onclick="return confirm('Change this allowance status?')"
+                                            title="Activate or Deactivate">
+                                        <i class="fas fa-power-off"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+
+                            </td>
+                        </tr>
+
+                        {% else %}
+                        <tr>
+                            <td colspan="8" class="text-center py-5">
+                                <i class="fas fa-hand-holding-usd fa-2x text-muted mb-3"></i>
+                                <p class="mb-1">No allowance types found.</p>
+                                <small class="text-muted">
+                                    Create an allowance type to get started.
+                                </small>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+
+                </table>
+
+            </div>
+        </div>
+    </div>
+
+</div>
+
+
+<!-- Add Allowance Modal -->
+{% if has_payroll_permission('payroll_allowance_create') %}
+<div class="modal fade"
+     id="addAllowanceModal"
+     tabindex="-1"
+     aria-labelledby="addAllowanceModalLabel"
+     aria-hidden="true">
+
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+
+            <form method="POST"
+                  action="{{ url_for('payroll.allowances') }}">
+                {{ csrf_field() }}
+
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addAllowanceModalLabel">
+                        Create Allowance
+                    </h5>
+
+                    <button type="button"
+                            class="btn-close"
+                            data-bs-dismiss="modal"
+                            aria-label="Close"></button>
+                </div>
+
+                <div class="modal-body">
+
+                    <div class="row g-3">
+
+                        <div class="col-md-6">
+                            <label class="form-label" for="allowance_code">
+                                Allowance Code
+                            </label>
+
+                            <input type="text"
+                                   class="form-control"
+                                   id="allowance_code"
+                                   name="allowance_code"
+                                   placeholder="Example: ALW-001"
+                                   required>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label" for="allowance_name">
+                                Allowance Name
+                            </label>
+
+                            <input type="text"
+                                   class="form-control"
+                                   id="allowance_name"
+                                   name="allowance_name"
+                                   placeholder="Example: Transport Allowance"
+                                   required>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label" for="calculation_type">
+                                Calculation Type
+                            </label>
+
+                            <select class="form-select"
+                                    id="calculation_type"
+                                    name="calculation_type"
+                                    required>
+
+                                <option value="Fixed">Fixed Amount</option>
+                                <option value="Percentage">Percentage</option>
+
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label" for="default_amount">
+                                Default Amount / Percentage
+                            </label>
+
+                            <input type="number"
+                                   class="form-control"
+                                   id="default_amount"
+                                   name="default_amount"
+                                   min="0"
+                                   step="0.01"
+                                   required>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label" for="is_taxable">
+                                Tax Treatment
+                            </label>
+
+                            <select class="form-select"
+                                    id="is_taxable"
+                                    name="is_taxable"
+                                    required>
+
+                                <option value="1">Taxable</option>
+                                <option value="0">Non-taxable</option>
+
+                            </select>
+
+                            <small class="text-muted">
+                                Configure according to applicable Ethiopian tax rules.
+                            </small>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label" for="description">
+                                Description
+                            </label>
+
+                            <input type="text"
+                                   class="form-control"
+                                   id="description"
+                                   name="description"
+                                   placeholder="Allowance description">
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <div class="modal-footer">
+
+                    <button type="button"
+                            class="btn btn-outline-secondary"
+                            data-bs-dismiss="modal">
+                        Cancel
+                    </button>
+
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Save Allowance
+                    </button>
+
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+</div>
+{% endif %}
+
+
+<!-- Edit Allowance Modals -->
+{% for allowance in allowances %}
+{% if has_payroll_permission('payroll_allowance_edit') %}
+<div class="modal fade"
+     id="editAllowance{{ allowance.id }}"
+     tabindex="-1"
+     aria-hidden="true">
+
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+
+            <form method="POST"
+                  action="{{ url_for(
+                      'payroll.update_allowance',
+                      allowance_id=allowance.id
+                  ) }}">
+                {{ csrf_field() }}
+
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Allowance</h5>
+
+                    <button type="button"
+                            class="btn-close"
+                            data-bs-dismiss="modal"
+                            aria-label="Close"></button>
+                </div>
+
+                <div class="modal-body">
+
+                    <div class="row g-3">
+
+                        <div class="col-md-6">
+                            <label class="form-label">Allowance Code</label>
+
+                            <input type="text"
+                                   class="form-control"
+                                   name="allowance_code"
+                                   value="{{ allowance.allowance_code }}"
+                                   required>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Allowance Name</label>
+
+                            <input type="text"
+                                   class="form-control"
+                                   name="allowance_name"
+                                   value="{{ allowance.allowance_name }}"
+                                   required>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Calculation Type</label>
+
+                            <select class="form-select"
+                                    name="calculation_type"
+                                    required>
+
+                                <option value="Fixed"
+                                    {% if allowance.calculation_type == 'Fixed' %}selected{% endif %}>
+                                    Fixed Amount
+                                </option>
+
+                                <option value="Percentage"
+                                    {% if allowance.calculation_type == 'Percentage' %}selected{% endif %}>
+                                    Percentage
+                                </option>
+
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Default Amount / Percentage</label>
+
+                            <input type="number"
+                                   class="form-control"
+                                   name="default_amount"
+                                   min="0"
+                                   step="0.01"
+                                   value="{{ allowance.default_amount }}"
+                                   required>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Tax Treatment</label>
+
+                            <select class="form-select"
+                                    name="is_taxable"
+                                    required>
+
+                                <option value="1"
+                                    {% if allowance.is_taxable %}selected{% endif %}>
+                                    Taxable
+                                </option>
+
+                                <option value="0"
+                                    {% if not allowance.is_taxable %}selected{% endif %}>
+                                    Non-taxable
+                                </option>
+
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Description</label>
+
+                            <input type="text"
+                                   class="form-control"
+                                   name="description"
+                                   value="{{ allowance.description or '' }}">
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <div class="modal-footer">
+
+                    <button type="button"
+                            class="btn btn-outline-secondary"
+                            data-bs-dismiss="modal">
+                        Cancel
+                    </button>
+
+                    <button type="submit" class="btn btn-primary">
+                        Update Allowance
+                    </button>
+
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endfor %}
+
+{% endblock %}

@@ -27,6 +27,10 @@
 
       <form method="POST" class="dash-form stock-grid">
         {{ csrf_field() }}
+        {% if draft['procurement_order_id'] %}
+        <input type="hidden" name="procurement_order_id"
+               value="{{ draft['procurement_order_id'] }}" />
+        {% endif %}
         <div>
           <label for="item_id">Inventory item *</label>
           <select id="item_id" name="item_id" required>
@@ -43,8 +47,8 @@
         <div>
           <label for="movement_type">Movement *</label>
           <select id="movement_type" name="movement_type" required>
-            <option value="IN">Stock in — receive material</option>
-            <option value="OUT">Stock out — issue material</option>
+            <option value="IN" {% if draft['movement_type'] == 'IN' %}selected{% endif %}>Stock in — receive material</option>
+            <option value="OUT" {% if draft['movement_type'] == 'OUT' %}selected{% endif %}>Stock out — issue material</option>
           </select>
         </div>
 
@@ -58,7 +62,8 @@
           <label for="reference_type">Related module *</label>
           <select id="reference_type" name="reference_type" required>
             {% for option in references %}
-            <option value="{{ option }}">
+            <option value="{{ option }}"
+              {% if draft['reference_type'] == option %}selected{% endif %}>
               {{ {
                 'Purchasing': 'Purchasing / goods receipt',
                 'Production': 'Production material issue',
@@ -74,13 +79,14 @@
         <div>
           <label for="reference_no">Reference number</label>
           <input id="reference_no" name="reference_no" maxlength="60"
+                 value="{{ draft['reference_no'] }}"
                  placeholder="e.g. PO-0001 or PROD-0001" />
         </div>
 
         <div class="stock-notes">
           <label for="notes">Notes</label>
           <textarea id="notes" name="notes" rows="3"
-                    placeholder="Reason, supplier, production order or remarks"></textarea>
+                    placeholder="Reason, supplier, production order or remarks">{{ draft['notes'] }}</textarea>
         </div>
 
         <div class="stock-form-actions">

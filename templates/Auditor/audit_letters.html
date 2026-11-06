@@ -1,0 +1,284 @@
+
+{% extends "base.html" %}
+
+{% block title %}Audit Correspondence | Audit Management{% endblock %}
+
+{% block content %}
+
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Audit Management / Correspondence</span>
+            <h1>Audit Correspondence</h1>
+            <p>
+                Monitor official correspondence relevant to audit activities
+                through the existing Letter Management module.
+            </p>
+        </div>
+
+        <div class="stock-actions">
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.dashboard') }}">
+                Dashboard
+            </a>
+
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.audit_reports') }}">
+                Audit Reports
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="container finance-page">
+
+    <!-- SUMMARY -->
+
+    <div class="hr-stats">
+
+        <div class="dash-panel">
+            <span class="eyebrow">Total Correspondence</span>
+            <h2>{{ stats.total | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Incoming Letters</span>
+            <h2>{{ stats.incoming | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Outgoing Letters</span>
+            <h2>{{ stats.outgoing | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Pending Approval</span>
+            <h2>{{ stats.pending | default(0) }}</h2>
+        </div>
+
+    </div>
+
+
+    <!-- FILTERS -->
+
+    <div class="dash-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Search Correspondence</h2>
+                <p>Filter official letters by type, department and status.</p>
+            </div>
+        </div>
+
+        <form method="GET"
+              action="{{ url_for('audit.auditor_letters') }}">
+
+            <div class="form-grid">
+
+                <div class="form-group">
+                    <label for="search">Search</label>
+                    <input type="search"
+                           id="search"
+                           name="search"
+                           value="{{ filters.search | default('') }}"
+                           placeholder="Letter number, subject or reference">
+                </div>
+
+                <div class="form-group">
+                    <label for="letter_type">Letter Type</label>
+
+                    <select id="letter_type" name="letter_type">
+                        <option value="">All Types</option>
+
+                        <option value="Incoming"
+                            {% if filters.letter_type | default('') == 'Incoming' %}selected{% endif %}>
+                            Incoming
+                        </option>
+
+                        <option value="Outgoing"
+                            {% if filters.letter_type | default('') == 'Outgoing' %}selected{% endif %}>
+                            Outgoing
+                        </option>
+
+                        <option value="Internal"
+                            {% if filters.letter_type | default('') == 'Internal' %}selected{% endif %}>
+                            Internal
+                        </option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="department">Department</label>
+
+                    <select id="department" name="department">
+                        <option value="">All Departments</option>
+
+                        {% for department in departments | default([]) %}
+                        <option value="{{ department.name }}"
+                            {% if filters.department | default('') == department.name %}selected{% endif %}>
+                            {{ department.name }}
+                        </option>
+                        {% endfor %}
+
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="status">Status</label>
+
+                    <select id="status" name="status">
+                        <option value="">All Statuses</option>
+
+                        {% for status in ['Draft', 'Submitted', 'Pending Approval', 'Approved', 'Rejected', 'Delivered', 'Received', 'Archived'] %}
+                        <option value="{{ status }}"
+                            {% if filters.status | default('') == status %}selected{% endif %}>
+                            {{ status }}
+                        </option>
+                        {% endfor %}
+
+                    </select>
+                </div>
+
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    Search
+                </button>
+
+                <a href="{{ url_for('audit.auditor_letters') }}"
+                   class="btn btn-outline">
+                    Reset
+                </a>
+            </div>
+
+        </form>
+
+    </div>
+
+
+    <!-- CORRESPONDENCE REGISTER -->
+
+    <div class="dash-panel hr-table-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Correspondence Register</h2>
+                <p>
+                    Official letters accessible to authorized audit users.
+                </p>
+            </div>
+
+            <span class="status-badge neutral">
+                {{ letters | length }} Records
+            </span>
+        </div>
+
+        <div class="table-scroll">
+
+            <table class="report-table">
+
+                <thead>
+                    <tr>
+                        <th>Letter Reference</th>
+                        <th>Subject</th>
+                        <th>Type</th>
+                        <th>Department</th>
+                        <th>Sender</th>
+                        <th>Recipient</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for letter in letters | default([]) %}
+
+                    <tr>
+
+                        <td>
+                            {{ letter.letter_number
+                               | default(letter.reference_number | default('—')) }}
+                        </td>
+
+                        <td>{{ letter.subject | default('—') }}</td>
+
+                        <td>{{ letter.letter_type | default('—') }}</td>
+
+                        <td>{{ letter.department | default('—') }}</td>
+
+                        <td>{{ letter.sender_name | default('—') }}</td>
+
+                        <td>{{ letter.recipient_name | default('—') }}</td>
+
+                        <td>
+                            {{ letter.created_at
+                               | default(letter.letter_date | default('—')) }}
+                        </td>
+
+                        <td>
+                            {% set status = letter.status | default('Draft') %}
+
+                            <span class="status-badge
+                                {{ 'active' if status in ['Approved', 'Delivered', 'Received']
+                                else ('off' if status == 'Rejected'
+                                else 'neutral') }}">
+                                {{ status }}
+                            </span>
+                        </td>
+
+                        <td>
+                            {% if letter.detail_url %}
+                                <a class="btn btn-outline btn-sm"
+                                   href="{{ letter.detail_url }}">
+                                    View
+                                </a>
+                            {% else %}
+                                <span class="eyebrow">Unavailable</span>
+                            {% endif %}
+                        </td>
+
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="9" class="report-empty">
+                            No correspondence records are available.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <!-- AUDIT CORRESPONDENCE GUIDELINES -->
+
+    <div class="dash-panel">
+
+        <h2>Correspondence Audit Controls</h2>
+
+        <ul>
+            <li>Retrieve official letters from the existing Letter Management database.</li>
+            <li>Keep original letters and departmental correspondence records read-only.</li>
+            <li>Verify user permissions before displaying confidential correspondence.</li>
+            <li>Preserve letter references, approval history and delivery information.</li>
+            <li>Link relevant letters to audit plans, findings or corrective actions where supported.</li>
+            <li>Record audit access to sensitive correspondence using the existing audit logging system.</li>
+            <li>Do not modify letter approval workflows from the Audit Management module.</li>
+        </ul>
+
+    </div>
+
+</section>
+
+{% endblock %}

@@ -1,0 +1,206 @@
+
+{% extends "base.html" %}
+
+{% block title %}Supplier Details | Dereje Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Procurement / Suppliers</span>
+            <h1>{{ supplier.name }}</h1>
+            <p>Supplier profile, purchase history and performance overview.</p>
+        </div>
+
+        <nav class="stock-actions">
+            <a href="{{ url_for('procurement.suppliers') }}"
+               class="btn btn-outline btn-sm">
+                Back to Suppliers
+            </a>
+
+            {% if can_manage_suppliers %}
+            <a href="{{ url_for('procurement.edit_supplier',
+                                supplier_id=supplier.id) }}"
+               class="btn btn-primary btn-sm">
+                Edit Supplier
+            </a>
+            {% endif %}
+        </nav>
+    </div>
+</section>
+
+<section class="container finance-page">
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+            <div class="finance-alert {{ category }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endwith %}
+
+    <!-- Supplier Status -->
+    <div class="finance-panel">
+        <div class="supplier-profile-heading">
+            <div>
+                <h2>{{ supplier.name }}</h2>
+                <span class="status-badge
+                    {{ 'active' if supplier.status == 'Active' else 'off' }}">
+                    {{ supplier.status }}
+                </span>
+            </div>
+        </div>
+
+        <div class="finance-grid">
+
+            <div>
+                <label>Contact person</label>
+                <p>{{ supplier.contact_person or '—' }}</p>
+            </div>
+
+            <div>
+                <label>Phone number</label>
+                <p>{{ supplier.phone or '—' }}</p>
+            </div>
+
+            <div>
+                <label>Email address</label>
+                <p>{{ supplier.email or '—' }}</p>
+            </div>
+
+            <div>
+                <label>Tax identification number</label>
+                <p>{{ supplier.tax_number or '—' }}</p>
+            </div>
+
+            <div>
+                <label>Supplier category</label>
+                <p>{{ supplier.supplier_type or 'Other' }}</p>
+            </div>
+
+            <div>
+                <label>Registration date</label>
+                <p>
+                    {{ supplier.created_at[:10]
+                       if supplier.created_at else '—' }}
+                </p>
+            </div>
+
+            <div class="full">
+                <label>Address</label>
+                <p>{{ supplier.address or '—' }}</p>
+            </div>
+
+            <div class="full">
+                <label>Additional notes</label>
+                <p>{{ supplier.notes or 'No additional notes.' }}</p>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Supplier Statistics -->
+    <div class="hr-stats">
+        {{ kpi('Total orders', stats.total_orders) }}
+        {{ kpi('Open orders', stats.open_orders) }}
+        {{ kpi('Received orders', stats.received_orders) }}
+        {{ kpi('Total ordered value',
+               "{:,.2f}".format(stats.total_value | float), 'ETB') }}
+    </div>
+
+    <!-- Supplier Performance -->
+    <div class="dash-panel">
+        <h2>Supplier Performance</h2>
+
+        <div class="finance-grid">
+
+            <div>
+                <label>On-time deliveries</label>
+                <h3>{{ performance.on_time_deliveries }}%</h3>
+            </div>
+
+            <div>
+                <label>Quality rating</label>
+                <h3>{{ performance.quality_rating }}/5</h3>
+            </div>
+
+            <div>
+                <label>Average delivery time</label>
+                <h3>{{ performance.average_delivery_days }} days</h3>
+            </div>
+
+            <div>
+                <label>Overall rating</label>
+                <h3>{{ performance.overall_rating }}/5</h3>
+            </div>
+
+        </div>
+
+        {% if can_manage_suppliers %}
+        <div class="finance-form-actions">
+            <a class="finance-btn primary"
+               href="{{ url_for('procurement.supplier_evaluation',
+                                supplier_id=supplier.id) }}">
+                Evaluate Supplier
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Purchase History -->
+    <div class="dash-panel hr-table-panel">
+        <h2>Purchase Order History</h2>
+
+        <div class="hr-table-wrap table-scroll">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Order reference</th>
+                        <th>Item</th>
+                        <th>Quantity</th>
+                        <th>Total (ETB)</th>
+                        <th>Expected delivery</th>
+                        <th>Status</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for order in orders %}
+                    <tr>
+                        <td>{{ order.order_number }}</td>
+                        <td>{{ order.item_name }}</td>
+                        <td>{{ order.quantity }} {{ order.unit }}</td>
+                        <td>
+                            {{ "{:,.2f}".format(order.total_cost | float) }}
+                        </td>
+                        <td>{{ order.expected_date or '—' }}</td>
+                        <td>
+                            <span class="status-badge neutral">
+                                {{ order.status }}
+                            </span>
+                        </td>
+                        <td>
+                            <a class="finance-btn secondary"
+                               href="{{ url_for('procurement.order_detail',
+                                                order_id=order.id) }}">
+                                View Order
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="employee-empty">
+                            No purchase orders found for this supplier.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</section>
+
+{% endblock %}

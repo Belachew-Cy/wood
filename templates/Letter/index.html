@@ -14,7 +14,7 @@
     <nav class="letter-actions">
       <a class="btn btn-outline" href="{{ url_for('letters.inbox') }}">Inbox{% if unread %} · {{ unread }} new{% endif %}</a>
       <a class="btn btn-outline" href="{{ url_for('letters.outbox') }}">Outbox</a>
-      {% if can_create %}
+      {% if can_create and letter_types %}
       <a class="btn" href="{{ url_for('letters.create') }}">Create letter →</a>
       {% endif %}
     </nav>
@@ -40,7 +40,7 @@
     </div>
 
     {% if awaiting_signature %}
-    <div class="dash-panel">
+    <div class="dash-panel" id="awaiting-signature">
       <h2>Waiting for your signature · {{ awaiting_signature | length }}</h2>
       <div class="hr-table-wrap">
         <table>
@@ -151,7 +151,7 @@
             {% else %}
             <tr>
               <td colspan="7">
-                No letters found. {% if can_create %}Create a letter or adjust the search.{% else %}Adjust the search.{% endif %}
+                No letters found. {% if can_compose %}Create a letter or adjust the search.{% else %}Adjust the search.{% endif %}
               </td>
             </tr>
             {% endfor %}

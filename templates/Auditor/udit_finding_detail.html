@@ -1,0 +1,400 @@
+
+{% extends "base.html" %}
+
+{% block title %}Audit Finding Details | Audit Management{% endblock %}
+
+{% block content %}
+
+{% set current_finding = finding | default({}, true) %}
+
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Audit Management / Findings</span>
+            <h1>{{ current_finding.title | default('Finding Details') }}</h1>
+            <p>
+                Reference:
+                {{ current_finding.finding_number
+                   | default(current_finding.reference | default('Not assigned')) }}
+            </p>
+        </div>
+
+        <div class="stock-actions">
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.audit_findings') }}">
+                Back to Findings
+            </a>
+
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.corrective_actions') }}">
+                Corrective Actions
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="container finance-page">
+
+    <!-- FINDING SUMMARY -->
+
+    <div class="hr-stats">
+
+        <div class="dash-panel">
+            <span class="eyebrow">Department</span>
+            <h2>{{ current_finding.department | default('—') }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Severity</span>
+            <h2>{{ current_finding.severity | default('Medium') }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Status</span>
+            <h2>{{ current_finding.status | default('Open') }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Target Resolution</span>
+            <h2>{{ current_finding.target_date | default('—') }}</h2>
+        </div>
+
+    </div>
+
+
+    <!-- GENERAL INFORMATION -->
+
+    <div class="dash-panel">
+
+        <h2>Finding Information</h2>
+
+        <div class="table-scroll">
+            <table class="report-table">
+                <tbody>
+
+                    <tr>
+                        <th>Finding Reference</th>
+                        <td>
+                            {{ current_finding.finding_number
+                               | default(current_finding.reference | default('—')) }}
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th>Finding Title</th>
+                        <td>{{ current_finding.title | default('—') }}</td>
+                    </tr>
+
+                    <tr>
+                        <th>Department</th>
+                        <td>{{ current_finding.department | default('—') }}</td>
+                    </tr>
+
+                    <tr>
+                        <th>Category</th>
+                        <td>{{ current_finding.finding_category | default('—') }}</td>
+                    </tr>
+
+                    <tr>
+                        <th>Severity</th>
+                        <td>{{ current_finding.severity | default('Medium') }}</td>
+                    </tr>
+
+                    <tr>
+                        <th>Identified Date</th>
+                        <td>{{ current_finding.identified_date | default('—') }}</td>
+                    </tr>
+
+                    <tr>
+                        <th>Target Resolution Date</th>
+                        <td>{{ current_finding.target_date | default('—') }}</td>
+                    </tr>
+
+                    <tr>
+                        <th>Responsible Department</th>
+                        <td>{{ current_finding.responsible_department | default('—') }}</td>
+                    </tr>
+
+                    <tr>
+                        <th>Audit Plan</th>
+                        <td>
+                            {{ current_finding.plan_title
+                               | default(current_finding.plan_number | default('—')) }}
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th>Current Status</th>
+                        <td>{{ current_finding.status | default('Open') }}</td>
+                    </tr>
+
+                    <tr>
+                        <th>Created At</th>
+                        <td>{{ current_finding.created_at | default('—') }}</td>
+                    </tr>
+
+                    <tr>
+                        <th>Last Updated</th>
+                        <td>{{ current_finding.updated_at | default('—') }}</td>
+                    </tr>
+
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+
+    <!-- AUDIT OBSERVATION -->
+
+    <div class="dash-panel">
+        <h2>Condition / Audit Observation</h2>
+        <p>
+            {{ current_finding.condition
+               | default('No audit observation recorded.') }}
+        </p>
+    </div>
+
+
+    <!-- CRITERIA -->
+
+    <div class="dash-panel">
+        <h2>Audit Criteria</h2>
+        <p>
+            {{ current_finding.criteria
+               | default('No audit criteria recorded.') }}
+        </p>
+    </div>
+
+
+    <!-- ROOT CAUSE -->
+
+    <div class="dash-panel">
+        <h2>Root Cause</h2>
+        <p>
+            {{ current_finding.cause
+               | default('No root cause analysis recorded.') }}
+        </p>
+    </div>
+
+
+    <!-- IMPACT -->
+
+    <div class="dash-panel">
+        <h2>Potential Impact</h2>
+        <p>
+            {{ current_finding.impact
+               | default('No impact assessment recorded.') }}
+        </p>
+    </div>
+
+
+    <!-- RECOMMENDATION -->
+
+    <div class="dash-panel">
+        <h2>Audit Recommendation</h2>
+        <p>
+            {{ current_finding.recommendation
+               | default('No recommendation recorded.') }}
+        </p>
+    </div>
+
+
+    <!-- MANAGEMENT RESPONSE -->
+
+    <div class="dash-panel">
+        <h2>Management Response</h2>
+        <p>
+            {{ current_finding.management_response
+               | default('Management response has not yet been recorded.') }}
+        </p>
+    </div>
+
+
+    <!-- CORRECTIVE ACTIONS -->
+
+    <div class="dash-panel hr-table-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Related Corrective Actions</h2>
+                <p>
+                    Monitor actions intended to address this finding.
+                </p>
+            </div>
+
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.corrective_actions') }}">
+                View All Actions
+            </a>
+        </div>
+
+        <div class="table-scroll">
+
+            <table class="report-table">
+
+                <thead>
+                    <tr>
+                        <th>Action</th>
+                        <th>Responsible Person</th>
+                        <th>Due Date</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for action in corrective_actions | default([]) %}
+
+                    <tr>
+                        <td>
+                            {{ action.title
+                               | default(action.description | default('—')) }}
+                        </td>
+
+                        <td>
+                            {{ action.responsible_person | default('—') }}
+                        </td>
+
+                        <td>
+                            {{ action.due_date | default('—') }}
+                        </td>
+
+                        <td>
+                            {{ action.status | default('Pending') }}
+                        </td>
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="4" class="report-empty">
+                            No corrective actions are linked to this finding.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <!-- EVIDENCE -->
+
+    <div class="dash-panel hr-table-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Supporting Audit Evidence</h2>
+                <p>
+                    Evidence associated with the finding.
+                </p>
+            </div>
+
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.audit_evidence') }}">
+                Evidence Register
+            </a>
+        </div>
+
+        <div class="table-scroll">
+
+            <table class="report-table">
+
+                <thead>
+                    <tr>
+                        <th>Evidence Reference</th>
+                        <th>Description</th>
+                        <th>Uploaded By</th>
+                        <th>Uploaded Date</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for evidence in evidence_records | default([]) %}
+
+                    <tr>
+                        <td>
+                            {{ evidence.evidence_number
+                               | default(evidence.reference | default('—')) }}
+                        </td>
+
+                        <td>
+                            {{ evidence.description | default('—') }}
+                        </td>
+
+                        <td>
+                            {{ evidence.uploaded_by_name | default('—') }}
+                        </td>
+
+                        <td>
+                            {{ evidence.created_at | default('—') }}
+                        </td>
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="4" class="report-empty">
+                            No supporting evidence has been linked.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <!-- ACTIVITY HISTORY -->
+
+    <div class="dash-panel">
+
+        <h2>Finding Activity History</h2>
+
+        <div class="feed-list">
+
+            {% for activity in activities | default([]) %}
+
+            <div class="feed-item">
+                <div>
+                    <strong>
+                        {{ activity.action | default('Finding updated') }}
+                    </strong>
+
+                    <p>
+                        {{ activity.description | default('Audit finding activity recorded.') }}
+                    </p>
+
+                    <span class="feed-meta">
+                        {{ activity.user_name | default('System') }}
+                        ·
+                        {{ activity.created_at | default('—') }}
+                    </span>
+                </div>
+            </div>
+
+            {% else %}
+
+            <p>No activity history is available.</p>
+
+            {% endfor %}
+
+        </div>
+
+    </div>
+
+</section>
+
+{% endblock %}

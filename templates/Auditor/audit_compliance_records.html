@@ -1,0 +1,224 @@
+
+{% extends "base.html" %}
+
+{% block title %}Compliance Records | Audit Management{% endblock %}
+
+{% block content %}
+
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Audit Management</span>
+            <h1>Compliance Records</h1>
+            <p>
+                Monitor organizational compliance with applicable
+                policies, procedures, regulations and control requirements.
+            </p>
+        </div>
+
+        <div class="stock-actions">
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.dashboard') }}">
+                Dashboard
+            </a>
+
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.audit_findings') }}">
+                Audit Findings
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="container finance-page">
+
+    <!-- COMPLIANCE SUMMARY -->
+
+    <div class="hr-stats">
+
+        <div class="dash-panel">
+            <span class="eyebrow">Total Records</span>
+            <h2>{{ stats.total | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Compliant</span>
+            <h2>{{ stats.compliant | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Partially Compliant</span>
+            <h2>{{ stats.partial | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Non-Compliant</span>
+            <h2>{{ stats.non_compliant | default(0) }}</h2>
+        </div>
+
+    </div>
+
+
+    <!-- COMPLIANCE REGISTER -->
+
+    <div class="dash-panel hr-table-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Compliance Register</h2>
+                <p>
+                    Review compliance requirements and departmental status.
+                </p>
+            </div>
+
+            <span class="status-badge neutral">
+                {{ records | length }} Records
+            </span>
+        </div>
+
+        <div class="table-scroll">
+
+            <table class="report-table">
+
+                <thead>
+                    <tr>
+                        <th>Reference</th>
+                        <th>Requirement</th>
+                        <th>Department</th>
+                        <th>Category</th>
+                        <th>Compliance Status</th>
+                        <th>Review Date</th>
+                        <th>Next Review</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for record in records | default([]) %}
+
+                    <tr>
+
+                        <td>
+                            {{ record.reference_number
+                               | default(record.reference | default('—')) }}
+                        </td>
+
+                        <td>
+                            <strong>
+                                {{ record.requirement
+                                   | default(record.title | default('Untitled Requirement')) }}
+                            </strong>
+                        </td>
+
+                        <td>
+                            {{ record.department | default('—') }}
+                        </td>
+
+                        <td>
+                            {{ record.category | default('General') }}
+                        </td>
+
+                        <td>
+                            {% set status = record.status | default('Not Reviewed') %}
+
+                            <span class="status-badge
+                                {{ 'active' if status == 'Compliant'
+                                else ('off' if status == 'Non-Compliant'
+                                else 'neutral') }}">
+                                {{ status }}
+                            </span>
+                        </td>
+
+                        <td>
+                            {{ record.review_date | default('—') }}
+                        </td>
+
+                        <td>
+                            {{ record.next_review_date | default('—') }}
+                        </td>
+
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="7" class="report-empty">
+                            No compliance records are currently available.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <!-- COMPLIANCE CATEGORIES -->
+
+    <div class="dash-panel">
+
+        <h2>Compliance Monitoring Areas</h2>
+
+        <div class="hr-stats">
+
+            <div>
+                <strong>Financial Compliance</strong>
+                <p>Financial controls, accounting procedures and financial reporting.</p>
+            </div>
+
+            <div>
+                <strong>Procurement Compliance</strong>
+                <p>Procurement procedures, approvals and purchasing controls.</p>
+            </div>
+
+            <div>
+                <strong>Human Resources Compliance</strong>
+                <p>HR policies, employee records and administrative procedures.</p>
+            </div>
+
+            <div>
+                <strong>Information Security</strong>
+                <p>Access controls, information protection and security procedures.</p>
+            </div>
+
+            <div>
+                <strong>Asset Compliance</strong>
+                <p>Asset registration, allocation, custody and verification.</p>
+            </div>
+
+            <div>
+                <strong>Operational Compliance</strong>
+                <p>Departmental procedures, responsibilities and operational controls.</p>
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- COMPLIANCE GUIDANCE -->
+
+    <div class="dash-panel">
+
+        <h2>Compliance Review Guidelines</h2>
+
+        <ul>
+            <li>Record the applicable policy, regulation or internal control requirement.</li>
+            <li>Identify the department responsible for compliance.</li>
+            <li>Maintain supporting evidence for each compliance assessment.</li>
+            <li>Document exceptions and link significant non-compliance to audit findings.</li>
+            <li>Schedule periodic reviews and retain assessment history.</li>
+            <li>Restrict changes to authorized audit personnel.</li>
+        </ul>
+
+    </div>
+
+</section>
+
+{% endblock %}
+

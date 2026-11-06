@@ -1,0 +1,361 @@
+
+{% extends "base.html" %}
+
+{% block title %}Purchase Returns | Dereje Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Procurement / Purchase Returns</span>
+            <h1>Purchase Returns Management</h1>
+            <p>Manage supplier returns, damaged goods, and replacement requests.</p>
+        </div>
+
+        <nav class="stock-actions">
+            <a href="{{ url_for('procurement.dashboard') }}"
+               class="btn btn-outline btn-sm">
+                Back to Procurement
+            </a>
+
+            <a href="{{ url_for('procurement.goods_receipts') }}"
+               class="btn btn-outline btn-sm">
+                Goods Receipts
+            </a>
+
+            {% if can_create_return %}
+            <a href="#return-form"
+               class="btn btn-primary btn-sm">
+                Create Return
+            </a>
+            {% endif %}
+        </nav>
+    </div>
+</section>
+
+<section class="container finance-page">
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+            <div class="finance-alert {{ category }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endwith %}
+
+    {% if not can_view_returns %}
+    <div class="finance-alert info">
+        You do not have permission to view purchase returns.
+    </div>
+    {% else %}
+
+    <!-- RETURN STATISTICS -->
+    <div class="hr-stats">
+        {{ kpi('Total Returns', stats.total) }}
+        {{ kpi('Pending Approval', stats.pending) }}
+        {{ kpi('Approved', stats.approved) }}
+        {{ kpi('Completed', stats.completed) }}
+    </div>
+
+    <!-- CREATE RETURN -->
+    {% if can_create_return %}
+    <div class="finance-panel" id="return-form">
+
+        <h2>Create Supplier Return</h2>
+
+        <form method="post"
+              action="{{ url_for('procurement.create_purchase_return') }}"
+              class="finance-form">
+
+            {{ csrf_field() }}
+
+            <div class="finance-grid">
+
+                <div>
+                    <label for="order_id">Purchase Order *</label>
+                    <select name="order_id"
+                            id="order_id"
+                            required>
+                        <option value="">Select eligible purchase order</option>
+
+                        {% for order in eligible_orders %}
+                        <option value="{{ order.id }}">
+                            {{ order.order_number }} -
+                            {{ order.supplier_name }} -
+                            {{ order.item_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label for="delivery_id">Original Delivery *</label>
+                    <select name="delivery_id"
+                            id="delivery_id"
+                            required>
+                        <option value="">Select delivery record</option>
+
+                        {% for delivery in eligible_deliveries %}
+                        <option value="{{ delivery.id }}">
+                            {{ delivery.order_number }} -
+                            {{ delivery.delivery_date }} -
+                            {{ delivery.item_name }} -
+                            {{ delivery.quantity }} {{ delivery.unit }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label for="return_date">Return Date *</label>
+                    <input type="date"
+                           name="return_date"
+                           id="return_date"
+                           value="{{ today }}"
+                           required>
+                </div>
+
+                <div>
+                    <label for="return_quantity">Return Quantity *</label>
+                    <input type="number"
+                           name="return_quantity"
+                           id="return_quantity"
+                           min="0.01"
+                           step="0.01"
+                           required>
+                </div>
+
+                <div>
+                    <label for="return_reason">Return Reason *</label>
+                    <select name="return_reason"
+                            id="return_reason"
+                            required>
+                        <option value="">Select reason</option>
+                        <option value="Damaged Goods">Damaged Goods</option>
+                        <option value="Incorrect Item">Incorrect Item</option>
+                        <option value="Poor Quality">Poor Quality</option>
+                        <option value="Excess Quantity">Excess Quantity</option>
+                        <option value="Expired Goods">Expired Goods</option>
+                        <option value="Specification Mismatch">Specification Mismatch</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="return_type">Requested Resolution *</label>
+                    <select name="return_type"
+                            id="return_type"
+                            required>
+                        <option value="Replacement">Replacement</option>
+                        <option value="Credit Note">Credit Note</option>
+                        <option value="Refund">Refund</option>
+                        <option value="Repair">Repair</option>
+                    </select>
+                </div>
+
+                <div class="full">
+                    <label for="return_description">Description *</label>
+                    <textarea name="description"
+                              id="return_description"
+                              rows="4"
+                              minlength="10"
+                              maxlength="2000"
+                              required
+                              placeholder="Describe the problem and condition of the returned goods."></textarea>
+                </div>
+
+                <div class="full">
+                    <label for="return_notes">Additional Notes</label>
+                    <textarea name="notes"
+                              id="return_notes"
+                              rows="3"
+                              maxlength="1000"></textarea>
+                </div>
+
+            </div>
+
+            <div class="finance-form-actions">
+                <button type="submit" class="finance-btn primary">
+                    Submit Return Request
+                </button>
+            </div>
+
+        </form>
+    </div>
+    {% endif %}
+
+    <!-- FILTERS -->
+    <div class="dash-panel">
+
+        <h2>Search Purchase Returns</h2>
+
+        <form method="get"
+              action="{{ url_for('procurement.purchase_returns') }}"
+              class="finance-form">
+
+            <div class="finance-grid">
+
+                <div>
+                    <label for="search">Return / PO Number</label>
+                    <input type="search"
+                           name="search"
+                           id="search"
+                           value="{{ filters.search }}"
+                           placeholder="Search return records">
+                </div>
+
+                <div>
+                    <label for="status">Return Status</label>
+                    <select name="status" id="status">
+                        <option value="">All statuses</option>
+
+                        {% for status in return_statuses %}
+                        <option value="{{ status }}"
+                            {% if filters.status == status %}selected{% endif %}>
+                            {{ status }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label for="reason">Return Reason</label>
+                    <select name="reason" id="reason">
+                        <option value="">All reasons</option>
+
+                        {% for reason in return_reasons %}
+                        <option value="{{ reason }}"
+                            {% if filters.reason == reason %}selected{% endif %}>
+                            {{ reason }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+            </div>
+
+            <div class="finance-form-actions">
+                <button type="submit" class="finance-btn primary">
+                    Apply Filters
+                </button>
+
+                <a href="{{ url_for('procurement.purchase_returns') }}"
+                   class="finance-btn secondary">
+                    Clear
+                </a>
+            </div>
+
+        </form>
+    </div>
+
+    <!-- RETURNS REGISTER -->
+    <div class="dash-panel hr-table-panel">
+
+        <h2>Purchase Returns Register</h2>
+
+        <div class="hr-table-wrap table-scroll">
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Return Number</th>
+                        <th>PO Number</th>
+                        <th>Supplier</th>
+                        <th>Item</th>
+                        <th>Quantity</th>
+                        <th>Reason</th>
+                        <th>Resolution</th>
+                        <th>Return Date</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for item in returns %}
+                    <tr>
+
+                        <td>{{ item.return_number }}</td>
+
+                        <td>{{ item.order_number }}</td>
+
+                        <td>{{ item.supplier_name }}</td>
+
+                        <td class="wrap-cell">
+                            {{ item.item_name }}
+                        </td>
+
+                        <td>
+                            {{ "{:g}".format(item.return_quantity | float) }}
+                            {{ item.unit }}
+                        </td>
+
+                        <td>{{ item.return_reason }}</td>
+
+                        <td>{{ item.return_type }}</td>
+
+                        <td class="nowrap">{{ item.return_date }}</td>
+
+                        <td>
+                            <span class="status-badge neutral">
+                                {{ item.status }}
+                            </span>
+                        </td>
+
+                        <td>
+                            <div class="stock-actions">
+
+                                <a href="{{ url_for(
+                                    'procurement.purchase_return_details',
+                                    return_id=item.id
+                                ) }}"
+                                   class="finance-btn secondary">
+                                    View
+                                </a>
+
+                            </div>
+                        </td>
+
+                    </tr>
+
+                    {% else %}
+                    <tr>
+                        <td colspan="10" class="employee-empty">
+                            No purchase returns found.
+                        </td>
+                    </tr>
+                    {% endfor %}
+
+                </tbody>
+            </table>
+
+        </div>
+    </div>
+
+    <!-- INVENTORY AND FINANCE INTEGRATION -->
+    <div class="dash-panel">
+
+        <h2>Inventory and Finance Integration</h2>
+
+        <p class="panel-note">
+            An approved return must be reflected in the appropriate
+            Inventory stock movement. Refunds and supplier credit notes
+            must be processed through the existing Finance workflow.
+        </p>
+
+        <ul>
+            <li>Inventory records the physical stock leaving the warehouse.</li>
+            <li>Procurement maintains the supplier return reference.</li>
+            <li>Finance records approved refunds or supplier credit notes.</li>
+            <li>Asset Management handles fixed-asset return adjustments where applicable.</li>
+        </ul>
+
+    </div>
+
+    {% endif %}
+
+</section>
+
+{% endblock %}

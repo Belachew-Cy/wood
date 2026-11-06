@@ -124,8 +124,10 @@ def _letter_details(letter_type, reference_no, subject, sender=None,
 
 def _letter_flags():
     """The action ticks the current account holds, for the templates."""
+    can_create = has_letter_permission("letters_create")
     return {
-        "can_create": has_letter_permission("letters_create"),
+        "can_create": can_create,
+        "can_compose": can_create and bool(letter_allowed_types(current_user())),
         "can_edit": has_letter_permission("letters_edit"),
         "can_send": has_letter_permission("letters_send"),
         "can_approve": has_letter_permission("letters_approve"),

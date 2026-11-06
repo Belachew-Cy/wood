@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi with context %}
+
+{% block title %}Asset Register | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+{% set ns = namespace(available=0, assigned=0, maintenance=0, value=0.0) %}
+{% for item in assets %}
+  {% if item["status"] == "Available" %}{% set ns.available = ns.available + 1 %}{% endif %}
+  {% if item["status"] == "Assigned" %}{% set ns.assigned = ns.assigned + 1 %}{% endif %}
+  {% if item["status"] == "Maintenance" %}{% set ns.maintenance = ns.maintenance + 1 %}{% endif %}
+  {% if item["status"] != "Inactive" %}
+    {% set ns.value = ns.value + (item["purchase_cost"] | float) %}
+  {% endif %}
+{% endfor %}
+
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">ASSET MANAGEMENT</span>
+      <h1>Asset Register</h1>
+      <p>Every unit the company owns, the category it belongs to and where it
+        sits today.</p>
+    </div>
+    <div class="row-actions">
+      <a class="btn btn-outline" href="{{ url_for('asset.dashboard') }}">
+        ← Asset desk
+      </a>
+      {% if can_register %}
+      <a class="btn" href="{{ url_for('asset.create_asset') }}">Register asset →</a>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="hr-stats">
+      {{ kpi('Units listed', assets | length, 'matching this filter') }}
+      {{ kpi('Available', ns.available, 'ready to allocate') }}
+      {{ kpi('Allocated', ns.assigned, 'with a department or custodian') }}
+      {{ kpi('In maintenance', ns.maintenance, 'off the shelf') }}
+      {{ kpi('Listed value', "{:,.2f}".format(ns.value), 'ETB at purchase cost') }}
+    </div>
+
+    <form method="GET" class="stock-search">
+      <label for="search">Search</label>
+      <input id="search" name="search" value="{{ search }}"
+             placeholder="Code, asset, serial, model or place" />
+      <label for="status">Status</label>
+      <select id="status" name="status">
+        <option value="">All statuses</option>
+        {% for value in asset_statuses %}
+        <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ value }}</option>
+        {% endfor %}
+      </select>
+      <label for="category">Category</label>
+      <select id="category" name="category">
+        <option value="">Every category</option>
+        {% for row in categories %}
+        <option value="{{ row['id'] }}"
+          {% if category == row['id'] | string %}selected{% endif %}>
+          {{ row["name"] }}{% if row["status"] != "Active" %} (inactive){% endif %}
+        </option>
+        {% endfor %}
+      </select>
+      <label for="department">Department</label>
+      <select id="department" name="department">
+        <option value="">Every department</option>
+        {% for row in departments %}
+        <option value="{{ row['id'] }}"
+          {% if department == row['id'] | string %}selected{% endif %}>
+          {{ row["name"] }}
+        </option>
+        {% endfor %}
+      </select>
+      {% if can_register %}
+      <label for="inactive">Record</label>
+      <select id="inactive" name="inactive">
+        <option value="">Live register</option>
+        <option value="1" {% if include_inactive %}selected{% endif %}>Include deactivated</option>
+      </select>
+      {% endif %}
+      <button class="btn" type="submit">Search</button>
+      <a class="btn btn-outline" href="{{ url_for('asset.assets') }}">Reset</a>
+    </form>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>{% if assets %}{{ assets | length }} asset{{ '' if assets | length == 1 else 's' }}{% else %}Assets{% endif %}</h2>
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Asset</th><th>Category</th><th>Identity</th><th>Where</th>
+              <th>Purchase</th><th>Condition</th><th>Status</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in assets %}
+            <tr>
+              <td>
+                <a href="{{ url_for('asset.asset_detail', asset_id=item['id']) }}">
+                  {{ item["name"] }}
+                </a>
+                <br><span class="feed-meta">{{ item["asset_code"] }}</span>
+              </td>
+              <td>
+                {{ item["category_name"] or 'Uncategorised' }}
+                <br><span class="feed-meta">{{ item["category_code"] or '' }}</span>
+              </td>
+              <td>
+                {{ item["serial_number"] or 'No serial' }}
+                <br><span class="feed-meta">
+                  {{ item["manufacturer"] or '' }}{% if item["manufacturer"] and item["model_number"] %} · {% endif %}{{ item["model_number"] or '' }}
+                </span>
+              </td>
+              <td>
+                {{ item["department_name"] or 'In store' }}
+                <br><span class="feed-meta">
+                  {{ item["custodian_name"] or item["location"] or '—' }}
+                </span>
+              </td>
+              <td class="nowrap">
+                {{ "{:,.2f}".format(item["purchase_cost"] | float) }}
+                <span class="feed-meta">ETB</span>
+                <br><span class="feed-meta">{{ item["purchase_date"] or 'No date' }}</span>
+              </td>
+              <td>
+                <span class="status-badge {{ 'off' if item['condition'] in ('Poor', 'Damaged')
+                      else 'medium' if item['condition'] == 'Fair' else 'active' }}">
+                  {{ item["condition"] }}
+                </span>
+              </td>
+              <td>
+                <span class="status-badge {{ 'active' if item['status'] in ('Available', 'Assigned')
+                      else 'neutral' if item['status'] == 'Maintenance' else 'off' }}">
+                  {{ item["status"] }}
+                </span>
+              </td>
+              <td class="row-actions">
+                <a class="btn btn-outline"
+                   href="{{ url_for('asset.asset_detail', asset_id=item['id']) }}">Open</a>
+                {% if can_register and item["status"] != "Inactive" %}
+                <a class="btn btn-outline"
+                   href="{{ url_for('asset.edit_asset', asset_id=item['id']) }}">Edit</a>
+                {% endif %}
+                {% if can_allocate and item["status"] == "Available" %}
+                <a class="btn"
+                   href="{{ url_for('asset.allocate', asset_id=item['id']) }}">Allocate</a>
+                {% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="8">No asset matches this filter.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,35 @@
+{# Shared header and flash area for the four directory screens. #}
+{% macro directory_head(title, subtitle, connection=None) -%}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Admin · Directory integration</span>
+      <h1>{{ title }}</h1>
+      <p>{{ subtitle }}</p>
+    </div>
+    <nav class="stock-actions" aria-label="Directory sections">
+      <a class="btn btn-outline btn-sm" href="{{ url_for('admin_directory') }}">
+        <span class="arrow">←</span> Connections</a>
+      {% if connection %}
+      <a class="btn btn-outline btn-sm"
+         href="{{ url_for('admin_directory_groups', connection_id=connection.id) }}">Groups</a>
+      <a class="btn btn-outline btn-sm"
+         href="{{ url_for('admin_directory_sync', connection_id=connection.id) }}">Sync</a>
+      <a class="btn btn-outline btn-sm"
+         href="{{ url_for('admin_directory_connection', connection_id=connection.id) }}">Edit connection</a>
+      {% endif %}
+    </nav>
+  </div>
+</section>
+{%- endmacro %}
+
+{% macro directory_flash(notes=[]) -%}
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for category, message in messages %}
+    <div class="finance-alert {{ category }}">{{ message }}</div>
+  {% endfor %}
+{% endwith %}
+{% for note in notes %}
+  <div class="dir-form-note warn">{{ note }}</div>
+{% endfor %}
+{%- endmacro %}

@@ -1,0 +1,304 @@
+
+{% extends "base.html" %}
+
+{% block title %}RFQ Management | Dereje Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Procurement / RFQ</span>
+            <h1>Request for Quotation</h1>
+            <p>Manage supplier quotation requests and submission deadlines.</p>
+        </div>
+
+        <nav class="stock-actions">
+            <a href="{{ url_for('procurement.dashboard') }}"
+               class="btn btn-outline btn-sm">
+                Procurement Dashboard
+            </a>
+            {% if can_manage_rfq %}
+            <a href="#create-rfq"
+               class="btn btn-primary btn-sm">
+                Create RFQ
+            </a>
+            {% endif %}
+        </nav>
+    </div>
+</section>
+
+<section class="container finance-page">
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+            <div class="finance-alert {{ category }}">{{ message }}</div>
+        {% endfor %}
+    {% endwith %}
+
+    {% if not can_manage_rfq %}
+    <div class="finance-alert info">
+        You have read-only access to RFQ records.
+    </div>
+    {% endif %}
+
+    <!-- RFQ Statistics -->
+    <div class="hr-stats">
+        {{ kpi('Total RFQs', stats.total) }}
+        {{ kpi('Open RFQs', stats.open) }}
+        {{ kpi('Pending responses', stats.pending) }}
+        {{ kpi('Closed RFQs', stats.closed) }}
+    </div>
+
+    <!-- Create RFQ -->
+    {% if can_manage_rfq %}
+    <div class="finance-panel" id="create-rfq">
+
+        <h2>Create Request for Quotation</h2>
+
+        <form method="post"
+              action="{{ url_for('procurement.create_rfq') }}"
+              class="finance-form">
+
+            {{ csrf_field() }}
+
+            <div class="finance-grid">
+
+                <div>
+                    <label for="title">RFQ title *</label>
+                    <input type="text"
+                           id="title"
+                           name="title"
+                           maxlength="180"
+                           required>
+                </div>
+
+                <div>
+                    <label for="request_id">Approved requisition</label>
+                    <select name="request_id" id="request_id">
+                        <option value="">Select requisition (optional)</option>
+                        {% for request in approved_requests %}
+                        <option value="{{ request.id }}">
+                            {{ request.request_number }} -
+                            {{ request.item_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label for="submission_deadline">
+                        Submission deadline *
+                    </label>
+                    <input type="datetime-local"
+                           id="submission_deadline"
+                           name="submission_deadline"
+                           required>
+                </div>
+
+                <div>
+                    <label for="delivery_location">Delivery location</label>
+                    <input type="text"
+                           id="delivery_location"
+                           name="delivery_location"
+                           maxlength="200">
+                </div>
+
+                <div>
+                    <label for="delivery_days">Required delivery days</label>
+                    <input type="number"
+                           id="delivery_days"
+                           name="delivery_days"
+                           min="1"
+                           max="365">
+                </div>
+
+                <div>
+                    <label for="currency">Quotation currency</label>
+                    <select name="currency" id="currency">
+                        <option value="ETB">ETB</option>
+                        <option value="USD">USD</option>
+                        <option value="EUR">EUR</option>
+                    </select>
+                </div>
+
+                <div class="full">
+                    <label for="description">Requirements and specifications *</label>
+                    <textarea name="description"
+                              id="description"
+                              rows="4"
+                              maxlength="5000"
+                              required></textarea>
+                </div>
+
+                <div class="full">
+                    <label for="terms">Terms and conditions</label>
+                    <textarea name="terms"
+                              id="terms"
+                              rows="3"
+                              maxlength="3000"></textarea>
+                </div>
+
+                <div class="full">
+                    <label>Invite suppliers *</label>
+
+                    <div class="finance-grid">
+                        {% for supplier in suppliers %}
+                        {% if supplier.status == 'Active' %}
+                        <label class="supplier-select-option">
+                            <input type="checkbox"
+                                   name="supplier_ids"
+                                   value="{{ supplier.id }}">
+                            {{ supplier.name }}
+                        </label>
+                        {% endif %}
+                        {% else %}
+                        <p>No suppliers are currently registered.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="finance-form-actions">
+                <button type="submit" class="finance-btn primary">
+                    Create RFQ
+                </button>
+            </div>
+
+        </form>
+    </div>
+    {% endif %}
+
+    <!-- RFQ Search -->
+    <div class="dash-panel">
+        <h2>Search RFQs</h2>
+
+        <form method="get"
+              action="{{ url_for('procurement.rfq_management') }}"
+              class="finance-form">
+
+            <div class="finance-grid">
+
+                <div>
+                    <label for="search">RFQ reference or title</label>
+                    <input type="search"
+                           name="search"
+                           id="search"
+                           value="{{ filters.search }}"
+                           placeholder="Search RFQ">
+                </div>
+
+                <div>
+                    <label for="status">Status</label>
+                    <select name="status" id="status">
+                        <option value="">All statuses</option>
+                        {% for value in rfq_statuses %}
+                        <option value="{{ value }}"
+                            {% if filters.status == value %}selected{% endif %}>
+                            {{ value }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+            </div>
+
+            <div class="finance-form-actions">
+                <button type="submit" class="finance-btn primary">
+                    Filter
+                </button>
+                <a href="{{ url_for('procurement.rfq_management') }}"
+                   class="finance-btn secondary">
+                    Clear
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- RFQ List -->
+    <div class="dash-panel hr-table-panel">
+
+        <h2>RFQ Records</h2>
+
+        <div class="hr-table-wrap table-scroll">
+            <table>
+                <thead>
+                    <tr>
+                        <th>RFQ Reference</th>
+                        <th>Title</th>
+                        <th>Requisition</th>
+                        <th>Invited Suppliers</th>
+                        <th>Responses</th>
+                        <th>Deadline</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for rfq in rfqs %}
+                    <tr>
+
+                        <td class="nowrap">{{ rfq.rfq_number }}</td>
+                        <td>{{ rfq.title }}</td>
+                        <td>{{ rfq.request_number or '—' }}</td>
+                        <td>{{ rfq.supplier_count }}</td>
+                        <td>{{ rfq.response_count }}</td>
+                        <td>{{ rfq.submission_deadline }}</td>
+
+                        <td>
+                            <span class="status-badge
+                                {{ 'active' if rfq.status == 'Open'
+                                   else 'off' if rfq.status in
+                                   ('Cancelled', 'Closed')
+                                   else 'neutral' }}">
+                                {{ rfq.status }}
+                            </span>
+                        </td>
+
+                        <td>
+                            <div class="stock-actions">
+                                <a class="finance-btn secondary"
+                                   href="{{ url_for(
+                                       'procurement.rfq_details',
+                                       rfq_id=rfq.id
+                                   ) }}">
+                                    View
+                                </a>
+
+                                {% if can_manage_rfq and rfq.status == 'Open' %}
+                                <form method="post"
+                                      action="{{ url_for(
+                                          'procurement.close_rfq',
+                                          rfq_id=rfq.id
+                                      ) }}"
+                                      onsubmit="return confirm('Close this RFQ?');">
+
+                                    {{ csrf_field() }}
+
+                                    <button type="submit"
+                                            class="finance-btn secondary">
+                                        Close
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="employee-empty">
+                            No RFQs found.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</section>
+
+{% endblock %}

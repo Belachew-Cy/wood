@@ -1,118 +1,282 @@
+
 {% extends "base.html" %}
 {% from "_workflow.html" import approval_route %}
 
-{% block title %}{{ order.order_number }} | Procurement{% endblock %}
+{% block title %}{{ order.order_number }} | Procurement Management{% endblock %}
 
 {% block content %}
+
 <section class="dash-head">
   <div class="container">
     <div>
-      <span class="eyebrow">Purchase order</span>
+      <span class="eyebrow">Procurement / Purchase Order</span>
       <h1>{{ order.order_number }}</h1>
-      <p>{{ order.item_name }} · {{ order.supplier_name or 'No supplier recorded' }}</p>
+      <p>
+        {{ order.item_name }}
+        · {{ order.supplier_name or 'No supplier recorded' }}
+      </p>
     </div>
+
     <nav class="stock-actions" aria-label="Order actions">
-      <a class="btn btn-outline btn-sm" href="{{ url_for('procurement.dashboard') }}">Back to procurement</a>
-      <a class="btn btn-outline btn-sm" href="{{ url_for('procurement.requisitions') }}">Requisitions</a>
+      <a class="btn btn-outline btn-sm"
+         href="{{ url_for('procurement.dashboard') }}">
+        Back to procurement
+      </a>
+
+      {% if can_requisition %}
+      <a class="btn btn-outline btn-sm"
+         href="{{ url_for('procurement.requisitions') }}">
+        Requisitions
+      </a>
+      {% endif %}
+
+      {% if can_manage_po and order.status == 'Draft' %}
+      <a class="btn btn-primary btn-sm"
+         href="{{ url_for('procurement.edit_purchase_order',
+                          order_id=order.id) }}">
+        Edit order
+      </a>
+      {% endif %}
     </nav>
   </div>
 </section>
 
 <section class="container finance-page">
+
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% for category, message in messages %}
       <div class="finance-alert {{ category }}">{{ message }}</div>
     {% endfor %}
   {% endwith %}
 
+  <!-- ORDER OVERVIEW -->
+  <div class="hr-stats">
+    {{ kpi('Order quantity', "{:g}".format(order.quantity | float) ~ ' ' ~ order.unit) }}
+    {{ kpi('Received quantity', "{:g}".format(received | float) ~ ' ' ~ order.unit) }}
+    {{ kpi('Remaining quantity', "{:g}".format(remaining | float) ~ ' ' ~ order.unit) }}
+    {{ kpi('Order value', "{:,.2f}".format(order.total_cost | float) ~ ' ETB') }}
+  </div>
+
+  <!-- ORDER AND BUDGET DETAILS -->
   <div class="dash-grid">
+
     <div class="dash-panel">
-      <h2>The order</h2>
+      <h2>Purchase Order Information</h2>
+
       <dl class="detail-list">
+
+        <dt>PO Number</dt>
+        <dd>{{ order.order_number }}</dd>
+
         <dt>Status</dt>
         <dd>
-          <span class="status-badge {{ 'active' if order.status == 'Received' else 'off' if order.status == 'Cancelled' else 'neutral' }}">
+          <span class="status-badge
+            {{ 'active' if order.status == 'Received'
+               else 'off' if order.status == 'Cancelled'
+               else 'neutral' }}">
             {{ order.status }}
           </span>
         </dd>
-        <dt>Supplier</dt><dd>{{ order.supplier_name or '—' }}</dd>
-        <dt>Contact</dt>
-        <dd>{{ order.contact_person or '—' }}{% if order.supplier_phone %} · {{ order.supplier_phone }}{% endif %}</dd>
-        <dt>Item</dt><dd class="wrap-cell">{{ order.item_name }}</dd>
+
+        <dt>Supplier</dt>
+        <dd>{{ order.supplier_name or '—' }}</dd>
+
+        <dt>Contact person</dt>
+        <dd>
+          {{ order.contact_person or '—' }}
+          {% if order.supplier_phone %}
+            · {{ order.supplier_phone }}
+          {% endif %}
+        </dd>
+
+        <dt>Item</dt>
+        <dd class="wrap-cell">{{ order.item_name }}</dd>
+
         <dt>Quantity ordered</dt>
         <dd>{{ "{:g}".format(order.quantity | float) }} {{ order.unit }}</dd>
+
         <dt>Unit price</dt>
         <dd>{{ "{:,.2f} ETB".format(order.unit_price | float) }}</dd>
+
         <dt>Order total</dt>
-        <dd><strong>{{ "{:,.2f} ETB".format(order.total_cost | float) }}</strong></dd>
-        <dt>Expected delivery</dt><dd>{{ order.expected_date or '—' }}</dd>
-        <dt>Placed by</dt><dd>{{ order.created_by_name or '—' }}</dd>
-        <dt>Placed on</dt><dd>{{ order.created_at | audit_time }}</dd>
+        <dd>
+          <strong>
+            {{ "{:,.2f} ETB".format(order.total_cost | float) }}
+          </strong>
+        </dd>
+
+        <dt>Expected delivery</dt>
+        <dd>{{ order.expected_date or '—' }}</dd>
+
+        <dt>Placed by</dt>
+        <dd>{{ order.created_by_name or '—' }}</dd>
+
+        <dt>Placed on</dt>
+        <dd>{{ order.created_at | audit_time }}</dd>
+
         <dt>Last modified</dt>
-        <dd>{{ order.updated_by_name or '—' }}{% if order.updated_at %} · {{ order.updated_at | audit_time }}{% endif %}</dd>
+        <dd>
+          {{ order.updated_by_name or '—' }}
+          {% if order.updated_at %}
+            · {{ order.updated_at | audit_time }}
+          {% endif %}
+        </dd>
+
         {% if order.request_number %}
         <dt>Requisition</dt>
         <dd>
           {% if can_open_requisition %}
-          <a href="{{ url_for('procurement.requisition_detail', request_id=order.request_id) }}">{{ order.request_number }}</a>
-          {% else %}{{ order.request_number }}{% endif %}
+          <a href="{{ url_for('procurement.requisition_detail',
+                              request_id=order.request_id) }}">
+            {{ order.request_number }}
+          </a>
+          {% else %}
+            {{ order.request_number }}
+          {% endif %}
         </dd>
         {% endif %}
+
         {% if order.invoiced_at %}
-        <dt>Invoiced</dt><dd>{{ order.invoiced_at | audit_time }}</dd>
+        <dt>Invoiced</dt>
+        <dd>{{ order.invoiced_at | audit_time }}</dd>
         {% endif %}
+
       </dl>
     </div>
 
     <div class="dash-panel">
-      <h2>Budget and delivery</h2>
+      <h2>Budget and Delivery Summary</h2>
+
       <dl class="detail-list">
+
         <dt>Allocation</dt>
         <dd>{{ order.allocation_name or 'Not linked to a budget allocation' }}</dd>
+
         {% if order.allocation_name %}
-        <dt>Department</dt><dd>{{ order.allocation_department | title }}</dd>
-        <dt>Plan</dt><dd>{{ order.plan_name or '—' }}</dd>
-        <dt>Currency</dt><dd>{{ order.allocation_currency or 'ETB' }}</dd>
-        <dt>Available on allocation</dt>
+        <dt>Department</dt>
+        <dd>{{ order.allocation_department | title }}</dd>
+
+        <dt>Budget plan</dt>
+        <dd>{{ order.plan_name or '—' }}</dd>
+
+        <dt>Currency</dt>
+        <dd>{{ order.allocation_currency or 'ETB' }}</dd>
+
+        <dt>Available allocation</dt>
         <dd>{{ "{:,.2f} ETB".format(available | float) }}</dd>
-        <dt>Committed on allocation</dt>
+
+        <dt>Committed amount</dt>
         <dd>{{ "{:,.2f} ETB".format(committed | float) }}</dd>
         {% endif %}
-        <dt>Received so far</dt>
-        <dd>{{ "{:g}".format(received) }} {{ order.unit }}</dd>
-        <dt>Still expected</dt>
-        <dd>{{ "{:g}".format(remaining) }} {{ order.unit }}</dd>
+
+        <dt>Received quantity</dt>
+        <dd>{{ "{:g}".format(received | float) }} {{ order.unit }}</dd>
+
+        <dt>Remaining quantity</dt>
+        <dd>{{ "{:g}".format(remaining | float) }} {{ order.unit }}</dd>
+
+        <dt>Receipt progress</dt>
+        <dd>
+          {% if order.quantity and order.quantity | float > 0 %}
+            {{ "%.1f"|format(
+                (received | float / order.quantity | float) * 100
+            ) }}%
+          {% else %}
+            0%
+          {% endif %}
+        </dd>
+
       </dl>
-      <p class="panel-note">The order total stays committed against its allocation
-        until a supplier invoice converts it to recorded expenditure.</p>
+
+      <p class="panel-note">
+        The order total remains committed against its allocation until
+        the supplier invoice is recorded through the Finance workflow.
+      </p>
     </div>
+
   </div>
 
+  <!-- RFQ AND QUOTATION REFERENCES -->
+  {% if order.rfq_number or order.quotation_reference %}
+  <div class="dash-panel">
+    <h2>RFQ and Supplier Quotation</h2>
+
+    <dl class="detail-list">
+
+      {% if order.rfq_number %}
+      <dt>RFQ Reference</dt>
+      <dd>{{ order.rfq_number }}</dd>
+      {% endif %}
+
+      {% if order.quotation_reference %}
+      <dt>Supplier Quotation</dt>
+      <dd>{{ order.quotation_reference }}</dd>
+      {% endif %}
+
+      {% if order.quotation_date %}
+      <dt>Quotation Date</dt>
+      <dd>{{ order.quotation_date }}</dd>
+      {% endif %}
+
+      {% if order.quotation_valid_until %}
+      <dt>Quotation Valid Until</dt>
+      <dd>{{ order.quotation_valid_until }}</dd>
+      {% endif %}
+
+      {% if order.selection_justification %}
+      <dt>Supplier Selection Justification</dt>
+      <dd class="wrap-cell">{{ order.selection_justification }}</dd>
+      {% endif %}
+
+    </dl>
+  </div>
+  {% endif %}
+
+  <!-- APPROVAL WORKFLOW -->
   {{ approval_route(trail, 'Approval workflow', workflow_note) }}
 
+  <!-- DELIVERY HISTORY -->
   <div class="dash-panel hr-table-panel">
-    <h2>Deliveries</h2>
+
+    <h2>Delivery and Goods Receipt History</h2>
+
+    <p class="panel-note">
+      Record supplier deliveries here. Inventory posting is handled
+      separately by the Inventory module.
+    </p>
+
     <div class="hr-table-wrap table-scroll">
       <table>
         <thead>
           <tr>
-            <th>Date</th>
+            <th>Delivery Date</th>
             <th>Quantity</th>
-            <th>Received by</th>
+            <th>Received By</th>
+            <th>Receipt Reference</th>
             <th>Notes</th>
           </tr>
         </thead>
+
         <tbody>
           {% for row in deliveries %}
           <tr>
             <td class="nowrap">{{ row.delivery_date }}</td>
-            <td class="nowrap">{{ "{:g}".format(row.quantity | float) }} {{ order.unit }}</td>
+
+            <td class="nowrap">
+              {{ "{:g}".format(row.quantity | float) }}
+              {{ order.unit }}
+            </td>
+
             <td>{{ row.received_by_name }}</td>
+
+            <td>{{ row.receipt_number or '—' }}</td>
+
             <td class="wrap-cell">{{ row.notes or '—' }}</td>
           </tr>
+
           {% else %}
           <tr>
-            <td colspan="4" class="employee-empty">
+            <td colspan="5" class="employee-empty">
               Nothing has been delivered against this order yet.
             </td>
           </tr>
@@ -121,60 +285,162 @@
       </table>
     </div>
 
-    {% if can_deliver and order.status != 'Cancelled' and remaining > 0 %}
-    <form method="post" class="finance-form"
-          action="{{ url_for('procurement.add_delivery', order_id=order.id) }}">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <h3>Record a delivery</h3>
+    {% if can_deliver
+          and order.status != 'Cancelled'
+          and remaining > 0 %}
+
+    <form method="post"
+          class="finance-form"
+          action="{{ url_for('procurement.add_delivery',
+                             order_id=order.id) }}">
+
+      <input type="hidden"
+             name="csrf_token"
+             value="{{ csrf_token() }}">
+
+      <h3>Record a Supplier Delivery</h3>
+
       <div class="finance-grid">
-        <div><label>Delivery date *</label>
-          <input type="date" name="delivery_date" value="{{ today }}" required></div>
-        <div><label>Quantity received *</label>
-          <input type="number" name="quantity" min="0.01" max="{{ remaining }}"
-                 step="0.01" required></div>
-        <div class="full"><label>Notes</label>
-          <input name="notes" maxlength="500"
-                 placeholder="Delivery note, batch or condition"></div>
+
+        <div>
+          <label for="delivery_date">Delivery Date *</label>
+          <input type="date"
+                 id="delivery_date"
+                 name="delivery_date"
+                 value="{{ today }}"
+                 required>
+        </div>
+
+        <div>
+          <label for="quantity">Quantity Received *</label>
+          <input type="number"
+                 id="quantity"
+                 name="quantity"
+                 min="0.01"
+                 max="{{ remaining }}"
+                 step="0.01"
+                 required>
+        </div>
+
+        <div class="full">
+          <label for="delivery_notes">Delivery Notes</label>
+          <input type="text"
+                 id="delivery_notes"
+                 name="notes"
+                 maxlength="500"
+                 placeholder="Delivery note, batch or condition">
+        </div>
+
       </div>
+
       <div class="finance-form-actions">
-        <button class="finance-btn primary" type="submit">Save delivery</button>
+        <button class="finance-btn primary" type="submit">
+          Save Delivery
+        </button>
       </div>
+
     </form>
     {% endif %}
+
   </div>
 
+  <!-- INVENTORY AND ASSET INTEGRATION -->
+  {% if received > 0 and (can_stock or can_asset) %}
+
+  <div class="dash-panel">
+    <h2>Inventory and Asset Integration</h2>
+
+    <p class="panel-note">
+      Use the existing Inventory or Asset Management module to register
+      received items. Do not create duplicate stock or asset records
+      inside Procurement.
+    </p>
+
+    <nav class="stock-actions" aria-label="Receipt integration">
+
+      {% if can_stock %}
+      <a class="btn btn-outline btn-sm"
+         href="{{ url_for(
+             'inventory.stock_movement',
+             movement_type='IN',
+             reference_type='Purchasing',
+             reference_no=order.order_number,
+             procurement_order_id=order.id,
+             notes='Goods receipt for ' ~ order.order_number
+         ) }}">
+        Record Inventory Receipt
+      </a>
+      {% endif %}
+
+      {% if can_asset %}
+      <a class="btn btn-outline btn-sm"
+         href="{{ url_for(
+             'asset.create_asset',
+             name=order.item_name,
+             purchase_order_number=order.order_number,
+             procurement_order_id=order.id,
+             supplier=order.supplier_name or '',
+             purchase_cost=order.total_cost
+         ) }}">
+        Register Fixed Asset
+      </a>
+      {% endif %}
+
+    </nav>
+
+    <p class="panel-note">
+      Record consumable and stock items in Inventory. Record qualifying
+      fixed assets in Asset Management. Do not register the same received
+      quantity in both modules.
+    </p>
+  </div>
+
+  {% endif %}
+
+  <!-- SUPPLIER INVOICE AND FINANCE INTEGRATION -->
   <div class="dash-panel hr-table-panel">
-    <h2>Supplier invoices</h2>
+
+    <h2>Supplier Invoices and Finance</h2>
+
     <div class="hr-table-wrap table-scroll">
       <table>
         <thead>
           <tr>
-            <th>Invoice</th>
-            <th>Issued</th>
-            <th>Due</th>
+            <th>Invoice Number</th>
+            <th>Issue Date</th>
+            <th>Due Date</th>
             <th>Total (ETB)</th>
             <th>Paid (ETB)</th>
             <th>Balance (ETB)</th>
             <th>Status</th>
           </tr>
         </thead>
+
         <tbody>
           {% for row in invoices %}
+
           {% set paid = row.paid_etb | float %}
           {% set balance = (row.total_etb | float) - paid %}
+
           <tr>
             <td>{{ row.invoice_number }}</td>
             <td class="nowrap">{{ row.issue_date }}</td>
             <td class="nowrap">{{ row.due_date or '—' }}</td>
+
             <td>{{ "{:,.2f}".format(row.total_etb | float) }}</td>
             <td>{{ "{:,.2f}".format(paid) }}</td>
             <td>{{ "{:,.2f}".format(balance) }}</td>
+
             <td>
-              <span class="status-badge {{ 'active' if row.status == 'Paid' else 'off' if row.status == 'Cancelled' else 'neutral' }}">
+              <span class="status-badge
+                {{ 'active' if row.status == 'Paid'
+                   else 'off' if row.status == 'Cancelled'
+                   else 'neutral' }}">
                 {{ row.status }}
               </span>
             </td>
           </tr>
+
           {% else %}
           <tr>
             <td colspan="7" class="employee-empty">
@@ -186,28 +452,98 @@
       </table>
     </div>
 
-    {% if can_invoice and order.status != 'Cancelled' and not invoices %}
-    <form method="post" class="finance-form"
-          action="{{ url_for('procurement.invoice_order', order_id=order.id) }}">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <h3>Record the supplier invoice</h3>
-      <p class="panel-note">The invoice records the expenditure against the
-        linked allocation and releases the commitment this order placed.</p>
+    {% if can_invoice
+          and order.status != 'Cancelled'
+          and not invoices %}
+
+    <form method="post"
+          class="finance-form"
+          action="{{ url_for('procurement.invoice_order',
+                             order_id=order.id) }}">
+
+      <input type="hidden"
+             name="csrf_token"
+             value="{{ csrf_token() }}">
+
+      <h3>Record Supplier Invoice</h3>
+
+      <p class="panel-note">
+        Only record an invoice after checking the supplier invoice
+        against the approved purchase order and received goods.
+      </p>
+
       <div class="finance-grid">
-        <div><label>Invoice number</label>
-          <input name="invoice_number" maxlength="60"
-                 placeholder="SINV-{{ order.order_number }}"></div>
-        <div><label>Due date</label><input type="date" name="due_date"></div>
+
+        <div>
+          <label for="invoice_number">Invoice Number</label>
+          <input type="text"
+                 id="invoice_number"
+                 name="invoice_number"
+                 maxlength="60"
+                 placeholder="SINV-{{ order.order_number }}">
+        </div>
+
+        <div>
+          <label for="due_date">Due Date</label>
+          <input type="date"
+                 id="due_date"
+                 name="due_date">
+        </div>
+
       </div>
+
       <div class="finance-form-actions">
         <button class="finance-btn primary" type="submit">
-          Record invoice for {{ "{:,.2f}".format(order.total_cost | float) }} ETB
+          Record Invoice for
+          {{ "{:,.2f}".format(order.total_cost | float) }} ETB
         </button>
       </div>
+
     </form>
+
     {% elif not invoices and order.status != 'Cancelled' %}
-    <p class="panel-note">Only the finance team records and pays supplier invoices.</p>
+
+    <p class="panel-note">
+      Only authorized Finance personnel can record supplier invoices.
+    </p>
+
     {% endif %}
+
   </div>
+
+  <!-- AUDIT INFORMATION -->
+  {% if audit_logs is defined and audit_logs %}
+  <div class="dash-panel hr-table-panel">
+
+    <h2>Purchase Order Activity History</h2>
+
+    <div class="hr-table-wrap table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>User</th>
+            <th>Action</th>
+            <th>Details</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {% for log in audit_logs %}
+          <tr>
+            <td class="nowrap">{{ log.created_at | audit_time }}</td>
+            <td>{{ log.username }}</td>
+            <td>{{ log.action }}</td>
+            <td class="wrap-cell">{{ log.details or '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+  {% endif %}
+
 </section>
+
 {% endblock %}

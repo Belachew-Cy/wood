@@ -1,0 +1,289 @@
+
+{% extends "base.html" %}
+
+{% block title %}
+    {{ plan.title | default('Audit Plan Details') }} | Audit Management
+{% endblock %}
+
+{% block content %}
+
+{% set current_plan = plan | default({}, true) %}
+{% set current_status = current_plan.status | default('Planned') %}
+
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Audit Management / Audit Plans</span>
+            <h1>{{ current_plan.title | default('Audit Plan Details') }}</h1>
+            <p>
+                Plan Number:
+                {{ current_plan.plan_number | default('Not assigned') }}
+            </p>
+        </div>
+
+        <div class="stock-actions">
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.audit_plans') }}">
+                Back to Plans
+            </a>
+
+            <a class="btn btn-sm"
+               href="{{ url_for(
+                   'audit.edit_audit_plan',
+                   plan_id=current_plan.id
+               ) }}">
+                Edit Plan
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="container finance-page">
+
+    <!-- PLAN OVERVIEW -->
+
+    <div class="hr-stats">
+
+        <div class="dash-panel">
+            <span class="eyebrow">Department</span>
+            <h2>{{ current_plan.department | default('—') }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Risk Level</span>
+            <h2>{{ current_plan.risk_level | default('Medium') }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Status</span>
+            <h2>{{ current_status }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Assigned Auditor</span>
+            <h2>
+                {{ current_plan.auditor_name
+                   | default(current_plan.assigned_auditor_name
+                   | default('Unassigned')) }}
+            </h2>
+        </div>
+
+    </div>
+
+
+    <!-- GENERAL INFORMATION -->
+
+    <div class="dash-panel">
+
+        <h2>Audit Plan Information</h2>
+
+        <div class="table-scroll">
+            <table class="report-table">
+                <tbody>
+                    <tr>
+                        <th>Plan Number</th>
+                        <td>{{ current_plan.plan_number | default('—') }}</td>
+                    </tr>
+
+                    <tr>
+                        <th>Audit Title</th>
+                        <td>{{ current_plan.title | default('—') }}</td>
+                    </tr>
+
+                    <tr>
+                        <th>Department</th>
+                        <td>{{ current_plan.department | default('—') }}</td>
+                    </tr>
+
+                    <tr>
+                        <th>Audit Type</th>
+                        <td>{{ current_plan.audit_type | default('—') }}</td>
+                    </tr>
+
+                    <tr>
+                        <th>Start Date</th>
+                        <td>{{ current_plan.start_date | default('—') }}</td>
+                    </tr>
+
+                    <tr>
+                        <th>End Date</th>
+                        <td>{{ current_plan.end_date | default('—') }}</td>
+                    </tr>
+
+                    <tr>
+                        <th>Risk Level</th>
+                        <td>{{ current_plan.risk_level | default('Medium') }}</td>
+                    </tr>
+
+                    <tr>
+                        <th>Status</th>
+                        <td>
+                            <span class="status-badge neutral">
+                                {{ current_status }}
+                            </span>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th>Assigned Auditor</th>
+                        <td>
+                            {{ current_plan.auditor_name
+                               | default(current_plan.assigned_auditor_name
+                               | default('Unassigned')) }}
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th>Created At</th>
+                        <td>{{ current_plan.created_at | default('—') }}</td>
+                    </tr>
+
+                    <tr>
+                        <th>Last Updated</th>
+                        <td>{{ current_plan.updated_at | default('—') }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+
+    <!-- DESCRIPTION -->
+
+    <div class="dash-panel">
+        <h2>Audit Description</h2>
+        <p>{{ current_plan.description | default('No description provided.') }}</p>
+    </div>
+
+
+    <!-- SCOPE -->
+
+    <div class="dash-panel">
+        <h2>Audit Scope</h2>
+        <p>{{ current_plan.scope | default('No audit scope has been recorded.') }}</p>
+    </div>
+
+
+    <!-- OBJECTIVES -->
+
+    <div class="dash-panel">
+        <h2>Audit Objectives</h2>
+        <p>{{ current_plan.objectives | default('No objectives have been recorded.') }}</p>
+    </div>
+
+
+    <!-- METHODOLOGY -->
+
+    <div class="dash-panel">
+        <h2>Audit Methodology</h2>
+        <p>{{ current_plan.methodology | default('No methodology has been recorded.') }}</p>
+    </div>
+
+
+    <!-- ASSIGNED AUDITORS -->
+
+    <div class="dash-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Audit Assignments</h2>
+                <p>Auditors assigned to this audit plan.</p>
+            </div>
+
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.audit_assignments') }}">
+                Manage Assignments
+            </a>
+        </div>
+
+        <div class="table-scroll">
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>Auditor</th>
+                        <th>Role</th>
+                        <th>Assignment Status</th>
+                        <th>Assigned Date</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for assignment in assignments | default([]) %}
+                    <tr>
+                        <td>
+                            {{ assignment.auditor_name
+                               | default(assignment.user_name
+                               | default('—')) }}
+                        </td>
+                        <td>{{ assignment.role | default('Auditor') }}</td>
+                        <td>{{ assignment.status | default('Assigned') }}</td>
+                        <td>{{ assignment.assigned_at | default('—') }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="report-empty">
+                            No auditors have been assigned yet.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+
+    <!-- RELATED AUDIT RECORDS -->
+
+    <div class="dash-panel">
+
+        <h2>Related Audit Activities</h2>
+
+        <div class="stock-actions">
+
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.checklist_templates') }}">
+                Audit Checklists
+            </a>
+
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.risk_assessments') }}">
+                Risk Assessments
+            </a>
+
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.audit_findings') }}">
+                Audit Findings
+            </a>
+
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.corrective_actions') }}">
+                Corrective Actions
+            </a>
+
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.audit_evidence') }}">
+                Audit Evidence
+            </a>
+
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.audit_reports') }}">
+                Audit Reports
+            </a>
+
+        </div>
+
+    </div>
+
+
+    <!-- REMARKS -->
+
+    <div class="dash-panel">
+        <h2>Additional Remarks</h2>
+        <p>{{ current_plan.remarks | default('No additional remarks.') }}</p>
+    </div>
+
+</section>
+
+{% endblock %}

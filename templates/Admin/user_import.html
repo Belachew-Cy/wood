@@ -57,11 +57,82 @@
   .import-guide td { vertical-align: top; }
   .import-guide code { margin-right: 0.2rem; }
   .import-roles { margin: 0.2rem 0 0; color: var(--muted); font-size: 0.75rem; line-height: 1.6; }
+
+  /* Compact button size */
+  .btn-compact {
+    padding: 0.25rem 0.6rem;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    gap: 0.3rem;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+  }
+  .btn-compact svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  /* Interactive enhancements */
+  .btn-compact:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  }
+  .btn-compact:active {
+    transform: translateY(0);
+    box-shadow: none;
+  }
+
+  /* Better text alignment in guide table */
+  .import-guide td:nth-child(1),
+  .import-guide th:nth-child(1) { width: 120px; }
+  .import-guide td:nth-child(2),
+  .import-guide th:nth-child(2) { width: 80px; text-align: center; }
+  .import-guide td:nth-child(2) { text-align: center; }
+  .import-guide td:nth-child(3),
+  .import-guide th:nth-child(3) { text-align: left; }
+
+  /* Result table alignment */
+  .import-table th:nth-child(1),
+  .import-table td:nth-child(1) { text-align: center; }
+  .import-table th:nth-child(3),
+  .import-table td:nth-child(3) { text-align: left; }
+  .import-table th:nth-child(4),
+  .import-table td:nth-child(4) { text-align: left; }
+  .import-table th:nth-child(5),
+  .import-table td:nth-child(5) { text-align: center; }
+  .import-table th:nth-child(6),
+  .import-table td:nth-child(6) { text-align: center; }
+
+  /* Rejected table alignment */
+  .import-table.rejected th:nth-child(1),
+  .import-table.rejected td:nth-child(1) { text-align: center; }
+  .import-table.rejected th:nth-child(4),
+  .import-table.rejected td:nth-child(4) { text-align: left; }
+
+  /* File input hover */
+  .import-file:hover {
+    border-color: var(--line-strong);
+    background: var(--white);
+  }
+
+  /* Card foot alignment */
+  .dir-card-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  /* Summary pill alignment */
+  .dir-summary { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; }
+
   @media (max-width: 900px) {
     .import-table th:nth-child(5),
     .import-table td:nth-child(5),
     .import-table th:nth-child(6),
     .import-table td:nth-child(6) { display: table-cell; }
+    .dir-card-foot { flex-direction: column; align-items: stretch; }
+    .dir-card-foot .btn { width: 100%; justify-content: center; }
   }
 </style>
 
@@ -113,7 +184,7 @@
               once: they are not stored anywhere, so write them down before leaving this
               page. Each new account must choose a password of its own at first sign-in.</p>
           </div>
-          <a class="btn btn-sm btn-outline" href="{{ url_for('admin_user_import') }}">
+          <a class="btn btn-sm btn-outline btn-compact" href="{{ url_for('admin_user_import') }}">
             {{ ui('upload') }} Import another file
           </a>
         </div>
@@ -163,7 +234,7 @@
           </div>
         </div>
         <div class="import-scroll">
-          <table class="dir-table import-table">
+          <table class="dir-table import-table rejected">
             <thead>
               <tr>
                 <th scope="col">Line</th>
@@ -199,7 +270,7 @@
             <p>The sheet carries one account per row. Replace both example rows with real
               people and delete any row you do not need before uploading.</p>
           </div>
-          <a class="btn btn-sm" href="{{ url_for('admin_user_import_template') }}">
+          <a class="btn btn-sm btn-compact" href="{{ url_for('admin_user_import_template') }}">
             {{ ui('download') }} Download CSV template
           </a>
         </div>
@@ -286,7 +357,7 @@
           </div>
           <div class="dir-card-foot">
             <span class="cell-note">Nothing is created until you submit this file.</span>
-            <button type="submit" class="btn btn-sm">{{ ui('upload') }} Create accounts</button>
+            <button type="submit" class="btn btn-sm btn-compact">{{ ui('upload') }} Create accounts</button>
           </div>
         </form>
       </div>

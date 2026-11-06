@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}{{ item["sku"] }} label | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+<section class="dash-head no-print">
+  <div class="container">
+    <div>
+      <span class="eyebrow">INVENTORY MANAGEMENT</span>
+      <h1>Item label</h1>
+      <p>Print the SKU as a barcode and a QR code for the shelf.</p>
+    </div>
+    <a class="btn btn-outline btn-sm" href="{{ url_for('inventory.items') }}">
+      ← Inventory items
+    </a>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    <div class="stock-actions no-print">
+      <button class="btn btn-sm" type="button" onclick="window.print()">
+        Print label
+      </button>
+      <a class="btn btn-outline btn-sm"
+         href="{{ url_for('inventory.edit_item', item_id=item['id']) }}">
+        Edit item
+      </a>
+    </div>
+
+    <div class="item-label">
+      <div class="item-label-head">
+        <span class="eyebrow">{{ item["category"] }}</span>
+        <h2>{{ item["name"] }}</h2>
+        <p>{{ item["location"] or 'No location set' }}</p>
+      </div>
+      <img class="item-label-qr"
+           src="{{ url_for('inventory.item_qr', item_id=item['id']) }}"
+           alt="QR code for {{ item['sku'] }}" width="96" height="96" />
+      <img class="item-label-barcode"
+           src="{{ url_for('inventory.item_barcode', item_id=item['id']) }}"
+           alt="Barcode for {{ item['sku'] }}" height="60" />
+      <p class="item-label-sku">{{ item["sku"] }}</p>
+    </div>
+
+    <p class="feed-meta">
+      The codes encode the SKU only. Scanning one with the app's search box
+      finds this item.
+    </p>
+  </div>
+</section>
+{% endblock %}

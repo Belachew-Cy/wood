@@ -1,0 +1,103 @@
+
+{% extends "base.html" %}
+
+{% block title %}Allocate Department Asset{% endblock %}
+
+{% block content %}
+
+<div class="asset-dashboard">
+
+    <div class="asset-page-header">
+        <div>
+            <h2>Allocate Asset</h2>
+            <p>Assign an available organizational asset to a department.</p>
+        </div>
+    </div>
+
+    <div class="asset-panel">
+
+        <form method="POST">
+
+            <input type="hidden"
+                   name="csrf_token"
+                   value="{{ csrf_token() }}">
+
+            <div class="asset-form-grid">
+
+                <div class="asset-form-group">
+                    <label>Select Asset *</label>
+
+                    <select name="asset_id" required>
+                        <option value="">Select Asset</option>
+
+                        {% for asset in available_assets %}
+                        <option value="{{ asset.id }}">
+                            {{ asset.asset_code }} - {{ asset.name }}
+                        </option>
+                        {% endfor %}
+
+                    </select>
+                </div>
+
+                <div class="asset-form-group">
+                    <label>Department *</label>
+
+                    <select name="department_id" required>
+                        <option value="">Select Department</option>
+
+                        {% for department in departments %}
+                        <option value="{{ department.id }}">
+                            {{ department.name }}
+                        </option>
+                        {% endfor %}
+
+                    </select>
+                </div>
+
+                <div class="asset-form-group">
+                    <label>Employee / Custodian</label>
+
+                    <select name="custodian_id">
+                        <option value="">Select Custodian</option>
+
+                        {% for employee in employees %}
+                        <option value="{{ employee.id }}">
+                            {{ employee.full_name }}
+                        </option>
+                        {% endfor %}
+
+                    </select>
+                </div>
+
+                <div class="asset-form-group full-width">
+                    <label>Remarks</label>
+
+                    <textarea name="remarks"
+                              rows="4"
+                              placeholder="Enter allocation details"></textarea>
+                </div>
+
+            </div>
+
+            <div class="asset-form-actions">
+
+                <a href="{{ url_for('asset_management.department_assets') }}"
+                   class="asset-btn asset-btn-secondary">
+                    Cancel
+                </a>
+
+                <button type="submit"
+                        class="asset-btn asset-btn-primary">
+                    <i class="fas fa-check"></i>
+                    Allocate Asset
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+{% endblock %}

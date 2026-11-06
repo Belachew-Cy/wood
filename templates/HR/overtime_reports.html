@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi with context %}
+
+{% block title %}Overtime Reports | Dereje Belay Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Human Resources</span>
+      <h1>Overtime Reports &amp; Analytics</h1>
+      <p>Review overtime activity, department usage and payroll costs.</p>
+    </div>
+    <nav class="stock-actions" aria-label="Overtime actions">
+      <a class="btn btn-outline btn-sm" href="{{ url_for('hr.overtime_dashboard') }}">Back to Overtime</a>
+    </nav>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% set ot_active = request.endpoint and (request.endpoint == 'hr.overtime_dashboard' or request.endpoint.startswith('hr.overtime_') or request.endpoint == 'hr.submit_overtime_request') %}
+    <nav class="hr-navigation" aria-label="HR Management">
+      <a class="hr-nav-link" href="{{ url_for('hr_dashboard') }}">Dashboard</a>
+      <a class="hr-nav-link" href="{{ url_for('employees') }}">Employees</a>
+      <a class="hr-nav-link" href="{{ url_for('attendance') }}">Attendance</a>
+      <a class="hr-nav-link" href="{{ url_for('recruitment.hr_vacancies') }}">Hiring desk</a>
+      <a class="hr-nav-link" href="{{ url_for('leave_management') }}">Leave</a>
+      <a class="hr-nav-link {% if ot_active %}active{% endif %}" href="{{ url_for('hr.overtime_dashboard') }}">Overtime</a>
+      <a class="hr-nav-link" href="{{ url_for('training_performance') }}">Training &amp; Performance</a>
+      <a class="hr-nav-link" href="{{ url_for('manage_hierarchy') }}">Organization</a>
+      <a class="hr-nav-link" href="{{ url_for('reports_centre') }}">Reports</a>
+      <a class="hr-nav-link" href="{{ url_for('hr_settings.index') }}">HR Settings</a>
+    </nav>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+  </div>
+</section>
+
+<section class="section bg-white">
+  <div class="container">
+
+    <div class="dash-panel">
+      <h2>Report period</h2>
+      <form method="GET" class="dash-form">
+        <div class="account-grid">
+          <div>
+            <label for="start_date">Start date *</label>
+            <input type="date" id="start_date" name="start_date" value="{{ start_date }}" required />
+          </div>
+          <div>
+            <label for="end_date">End date *</label>
+            <input type="date" id="end_date" name="end_date" value="{{ end_date }}" required />
+          </div>
+        </div>
+        <div class="finance-form-actions">
+          <button type="submit" class="btn">Generate report <span class="arrow">→</span></button>
+          <button type="button" class="btn btn-outline" onclick="window.print()">Print</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="hr-stats">
+      {{ kpi('Total requests', report.summary.total_requests or 0, 'Requests in this period') }}
+      {{ kpi('Requested hours', "%.2f"|format(report.summary.requested_hours or 0), 'Hours asked for') }}
+      {{ kpi('Approved hours', "%.2f"|format(report.summary.approved_hours or 0), 'Hours cleared by managers', 'up') }}
+      {{ kpi('Verified hours', "%.2f"|format(report.summary.verified_hours or 0), 'Hours verified by HR') }}
+      {{ kpi('Pending', report.summary.pending_requests or 0, 'Waiting on a decision', 'warn' if report.summary.pending_requests else 'flat') }}
+      {{ kpi('Rejected', report.summary.rejected_requests or 0, 'Not granted', 'off' if report.summary.rejected_requests else 'flat') }}
+    </div>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>Overtime by department</h2>
+      {% if report.departments %}
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Department</th>
+              <th>Requests</th>
+              <th>Requested hours</th>
+              <th>Approved hours</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in report.departments %}
+            <tr>
+              <td>{{ item.department or "Unassigned" }}</td>
+              <td>{{ item.total_requests }}</td>
+              <td>{{ "%.2f"|format(item.requested_hours or 0) }}</td>
+              <td>{{ "%.2f"|format(item.approved_hours or 0) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="empty-state">No department data available.</p>
+      {% endif %}
+    </div>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>Monthly overtime summary</h2>
+      {% if report.monthly %}
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Month</th>
+              <th>Requests</th>
+              <th>Requested hours</th>
+              <th>Approved hours</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in report.monthly %}
+            <tr>
+              <td>{{ item.payroll_month }}</td>
+              <td>{{ item.total_requests }}</td>
+              <td>{{ "%.2f"|format(item.requested_hours or 0) }}</td>
+              <td>{{ "%.2f"|format(item.approved_hours or 0) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="empty-state">No monthly data available.</p>
+      {% endif %}
+    </div>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>Overtime payroll cost</h2>
+      {% if payroll_costs %}
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Payroll month</th>
+              <th>Department</th>
+              <th>Imported hours</th>
+              <th>Overtime cost (ETB)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in payroll_costs %}
+            <tr>
+              <td>{{ item.payroll_month }}</td>
+              <td>{{ item.department or "Unassigned" }}</td>
+              <td>{{ "%.2f"|format(item.imported_hours or 0) }}</td>
+              <td>{{ "%.2f"|format(item.overtime_cost or 0) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="empty-state">No imported payroll overtime found.</p>
+      {% endif %}
+    </div>
+
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,390 @@
+
+{% extends "base.html" %}
+
+{% block title %}Audit Review Details | Audit Management{% endblock %}
+
+{% block content %}
+
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Audit Management / Review Details</span>
+            <h1>{{ review.review_number | default('Audit Review') }}</h1>
+            <p>
+                Review the assigned audit work, document observations
+                and maintain review decision history.
+            </p>
+        </div>
+
+        <div class="stock-actions">
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.auditor_reviews') }}">
+                Back to Reviews
+            </a>
+
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.dashboard') }}">
+                Dashboard
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="container finance-page">
+
+    <!-- REVIEW STATUS -->
+
+    <div class="hr-stats">
+
+        <div class="dash-panel">
+            <span class="eyebrow">Review Status</span>
+            <h2>{{ review.status | default('Pending') }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Department</span>
+            <h2>{{ review.department | default('—') }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Assigned Auditor</span>
+            <h2>{{ review.auditor_name | default('—') }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Due Date</span>
+            <h2>{{ review.due_date | default('—') }}</h2>
+        </div>
+
+    </div>
+
+
+    <!-- REVIEW INFORMATION -->
+
+    <div class="dash-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Review Information</h2>
+                <p>Basic information about this audit review.</p>
+            </div>
+
+            <span class="status-badge neutral">
+                {{ review.status | default('Pending') }}
+            </span>
+        </div>
+
+        <div class="form-grid">
+
+            <div class="form-group">
+                <label>Review Reference</label>
+                <p>{{ review.review_number | default(review.id | default('—')) }}</p>
+            </div>
+
+            <div class="form-group">
+                <label>Audit Plan</label>
+                <p>{{ review.plan_title | default('—') }}</p>
+            </div>
+
+            <div class="form-group">
+                <label>Department</label>
+                <p>{{ review.department | default('—') }}</p>
+            </div>
+
+            <div class="form-group">
+                <label>Assigned Auditor</label>
+                <p>{{ review.auditor_name | default('—') }}</p>
+            </div>
+
+            <div class="form-group">
+                <label>Review Date</label>
+                <p>{{ review.review_date | default('—') }}</p>
+            </div>
+
+            <div class="form-group">
+                <label>Due Date</label>
+                <p>{{ review.due_date | default('—') }}</p>
+            </div>
+
+            <div class="form-group form-full">
+                <label>Review Scope</label>
+                <p>{{ review.scope | default('No scope information provided.') }}</p>
+            </div>
+
+            <div class="form-group form-full">
+                <label>Review Description</label>
+                <p>{{ review.description | default('No description provided.') }}</p>
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- AUDITOR OBSERVATIONS -->
+
+    <div class="dash-panel hr-table-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Auditor Observations</h2>
+                <p>Observations submitted as part of the audit review.</p>
+            </div>
+        </div>
+
+        <div class="table-scroll">
+
+            <table class="report-table">
+
+                <thead>
+                    <tr>
+                        <th>Reference</th>
+                        <th>Observation</th>
+                        <th>Category</th>
+                        <th>Severity</th>
+                        <th>Submitted By</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for observation in observations | default([]) %}
+
+                    <tr>
+                        <td>
+                            {{ observation.reference
+                               | default(observation.id | default('—')) }}
+                        </td>
+
+                        <td>{{ observation.description | default('—') }}</td>
+
+                        <td>{{ observation.category | default('—') }}</td>
+
+                        <td>{{ observation.severity | default('—') }}</td>
+
+                        <td>{{ observation.submitted_by | default('—') }}</td>
+
+                        <td>{{ observation.created_at | default('—') }}</td>
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="6" class="report-empty">
+                            No observations have been recorded.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <!-- EVIDENCE REFERENCES -->
+
+    <div class="dash-panel hr-table-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Supporting Evidence</h2>
+                <p>Evidence linked to this review.</p>
+            </div>
+
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.audit_evidence') }}">
+                Evidence Register
+            </a>
+        </div>
+
+        <div class="table-scroll">
+
+            <table class="report-table">
+
+                <thead>
+                    <tr>
+                        <th>Evidence Reference</th>
+                        <th>Description</th>
+                        <th>Evidence Type</th>
+                        <th>Uploaded By</th>
+                        <th>Upload Date</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for evidence in evidence_records | default([]) %}
+
+                    <tr>
+                        <td>
+                            {{ evidence.evidence_number
+                               | default(evidence.id | default('—')) }}
+                        </td>
+
+                        <td>{{ evidence.description | default('—') }}</td>
+
+                        <td>{{ evidence.evidence_type | default('—') }}</td>
+
+                        <td>{{ evidence.uploaded_by | default('—') }}</td>
+
+                        <td>{{ evidence.created_at | default('—') }}</td>
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="5" class="report-empty">
+                            No supporting evidence is linked to this review.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <!-- REVIEW DECISION -->
+
+    {% if can_review | default(false) %}
+
+    <div class="dash-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Reviewer Decision</h2>
+                <p>
+                    Record the review outcome and provide supporting comments.
+                </p>
+            </div>
+        </div>
+
+        <form method="POST"
+              action="{{ review_action_url | default('#') }}">
+
+            {% if csrf_token is defined %}
+                {{ csrf_token() }}
+            {% endif %}
+
+            <div class="form-grid">
+
+                <div class="form-group">
+                    <label for="decision">Decision</label>
+
+                    <select id="decision"
+                            name="decision"
+                            required>
+
+                        <option value="">Select Decision</option>
+                        <option value="Approved">Approve Review</option>
+                        <option value="Returned">Return for Correction</option>
+                        <option value="Rejected">Reject Review</option>
+
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="review_date">Decision Date</label>
+
+                    <input type="date"
+                           id="review_date"
+                           name="review_date"
+                           required>
+                </div>
+
+                <div class="form-group form-full">
+                    <label for="comments">Reviewer Comments</label>
+
+                    <textarea id="comments"
+                              name="comments"
+                              rows="5"
+                              maxlength="5000"
+                              placeholder="Explain the review decision and required corrections..."
+                              required></textarea>
+                </div>
+
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    Submit Review Decision
+                </button>
+            </div>
+
+        </form>
+
+    </div>
+
+    {% endif %}
+
+
+    <!-- REVIEW HISTORY -->
+
+    <div class="dash-panel hr-table-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Review History</h2>
+                <p>Previously recorded decisions and review activities.</p>
+            </div>
+        </div>
+
+        <div class="table-scroll">
+
+            <table class="report-table">
+
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Reviewer</th>
+                        <th>Decision</th>
+                        <th>Comments</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for entry in review_history | default([]) %}
+
+                    <tr>
+                        <td>{{ entry.created_at | default('—') }}</td>
+
+                        <td>{{ entry.reviewer_name | default('—') }}</td>
+
+                        <td>{{ entry.decision | default('—') }}</td>
+
+                        <td>{{ entry.comments | default('—') }}</td>
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="4" class="report-empty">
+                            No review history is available.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</section>
+
+{% endblock %}

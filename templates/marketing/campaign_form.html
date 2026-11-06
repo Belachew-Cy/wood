@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit' if campaign else 'New' }} Campaign | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">MARKETING MANAGEMENT</span>
+      <h1>{{ campaign["name"] if campaign else 'New Campaign' }}</h1>
+      <p>{% if campaign %}
+          {{ campaign["status"] }} · {{ campaign["channel"] or 'channel to be set' }}
+          · {{ campaign["start_date"] or 'dates to be fixed' }}
+        {% else %}
+          Name the channel and the audience; the budget line is what the plan
+          will be drawn against.
+        {% endif %}</p>
+    </div>
+    <a class="btn btn-outline" href="{{ url_for('marketing.campaigns') }}">
+      ← Back to campaigns
+    </a>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="dash-panel">
+      <h2>{{ 'Campaign details' if campaign else 'Register a campaign' }}</h2>
+
+      <form method="POST" class="dash-form stock-grid">
+        {{ csrf_field() }}
+        <div>
+          <label for="name">Campaign name *</label>
+          <input id="name" name="name" maxlength="150" required
+                 value="{{ campaign['name'] if campaign else '' }}"
+                 placeholder="e.g. Showroom Walk-in Week" />
+        </div>
+
+        <div>
+          <label for="plan_id">Marketing plan</label>
+          <select id="plan_id" name="plan_id">
+            <option value="">Not tied to a plan</option>
+            {% for option in plans %}
+            <option value="{{ option['id'] }}"
+              {% if campaign and campaign['plan_id'] == option['id'] %}selected{% endif %}>
+              {{ option['title'] }} ({{ option['status'] }})</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label for="channel">Channel</label>
+          <select id="channel" name="channel">
+            <option value="">Not chosen yet</option>
+            {% for value in channels %}
+            <option value="{{ value }}"
+              {% if campaign and campaign['channel'] == value %}selected{% endif %}>
+              {{ value }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label for="target_audience">Target audience</label>
+          <input id="target_audience" name="target_audience" maxlength="200"
+                 value="{{ (campaign['target_audience'] or '') if campaign else '' }}"
+                 placeholder="e.g. Contractors in Addis Ababa, kitchen refits" />
+        </div>
+
+        <div>
+          <label for="start_date">Start date</label>
+          <input id="start_date" type="date" name="start_date"
+                 value="{{ (campaign['start_date'] or '') if campaign else '' }}" />
+        </div>
+
+        <div>
+          <label for="end_date">End date</label>
+          <input id="end_date" type="date" name="end_date"
+                 value="{{ (campaign['end_date'] or '') if campaign else '' }}" />
+        </div>
+
+        <div>
+          <label for="budget">Campaign budget</label>
+          <input id="budget" type="number" step="0.01" min="0" name="budget"
+                 value="{{ campaign['budget'] if campaign else 0 }}" />
+        </div>
+
+        <div>
+          <label for="currency">Currency</label>
+          <select id="currency" name="currency">
+            {% for code in currencies %}
+            <option value="{{ code }}"
+              {% if campaign and campaign['currency'] == code %}selected{% endif %}>
+              {{ code }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        {% if campaign %}
+        <div>
+          <label for="status">Status</label>
+          <select id="status" name="status">
+            {% for value in campaign_statuses %}
+            <option value="{{ value }}"
+              {% if campaign['status'] == value %}selected{% endif %}>
+              {{ value }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endif %}
+
+        <div class="stock-notes">
+          <label for="description">Description</label>
+          <textarea id="description" name="description" rows="4" maxlength="2000"
+                    placeholder="What runs, what it costs and what it should produce.">{{ (campaign['description'] or '') if campaign else '' }}</textarea>
+        </div>
+
+        <div class="stock-form-actions">
+          <button class="btn" type="submit">Save campaign</button>
+          <a class="btn btn-outline" href="{{ url_for('marketing.campaigns') }}">Cancel</a>
+        </div>
+      </form>
+    </div>
+
+    {% if campaign %}
+    <div class="dash-panel">
+      <h2>Record</h2>
+      <dl class="detail-list">
+        <dt>Raised by</dt><dd>{{ campaign["created_by_name"] or '—' }}</dd>
+        <dt>Last modified</dt>
+        <dd>{{ campaign["updated_by_name"] or '—' }} ·
+            {{ campaign["updated_at"] | audit_time }}</dd>
+        <dt>Digital pushes</dt><dd>{{ campaign["digital_count"] }}</dd>
+      </dl>
+      <p class="panel-note">Saving writes one audit line with the fields that
+        actually moved, and stamps this record with your name.</p>
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block title %}{{ exam_title }}{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Recruitment examination</span>
+      <h1>{{ exam_title }}</h1>
+      <p>{{ total_marks | round(2) }} marks · pass at
+        {{ exam.pass_mark | round(2) }} ·
+        {{ questions | length }} questions ·
+        {{ exam.duration_minutes }} minutes from the first question</p>
+    </div>
+    <div class="stock-actions">
+      <span class="exam-clock" id="exam-clock"
+            data-seconds="{{ remaining_seconds if remaining_seconds is not none else '' }}">
+        {% if remaining_seconds is not none %}
+        {{ (remaining_seconds // 60) | int }}:{{ '%02d' | format(remaining_seconds % 60) }}
+        left
+        {% elif attempt.status == 'In Progress' %}
+        No time limit on this paper
+        {% else %}
+        Waiting to open
+        {% endif %}
+      </span>
+      <a class="btn btn-outline btn-sm" href="{{ back }}">Leave without handing in</a>
+    </div>
+  </div>
+</section>
+
+<section class="container finance-page">
+  {% if sitting_token %}
+  <p class="panel-note">
+    You are sitting this paper from a one-time link, so it is worth a single attempt:
+    once you hand it in the link stops working. Nothing on this page is saved until you
+    submit - if the connection drops, reload this same link before the clock runs out.
+  </p>
+  {% else %}
+  <p class="panel-note">
+    This paper is linked to your application, so you reach it from
+    <a href="{{ back }}">My applications</a>. It is worth a single attempt.
+  </p>
+  {% endif %}
+
+  <div class="dash-panel">
+    <h2>Answer every question</h2>
+    <p class="panel-note">Choose one option per question. Unanswered questions score
+      nothing, and the paper hands itself in when the clock reaches zero.</p>
+    <form method="POST" class="dash-form exam-paper" id="exam-form">
+      {{ csrf_field() }}
+      {% for question in questions %}
+      <fieldset class="exam-question">
+        <legend>
+          <span class="exam-question-number">{{ loop.index }}</span>
+          {{ question.question }}
+          <em>{{ question.marks | round(2) }} {{ 'mark' if question.marks | round(2) == 1 else 'marks' }}</em>
+        </legend>
+        {% for letter in ('A', 'B', 'C', 'D') %}
+        {% set option = question['option_' ~ (letter | lower)] %}
+        <label class="exam-option">
+          <input type="radio" name="question_{{ question.id }}" value="{{ letter }}" required />
+          <span><strong>{{ letter }}.</strong> {{ option }}</span>
+        </label>
+        {% endfor %}
+      </fieldset>
+      {% else %}
+      <p class="empty-state"><strong>This paper has no questions.</strong> Contact the HR
+        desk before you hand anything in.</p>
+      {% endfor %}
+      <div class="exam-actions">
+        <button class="btn finance-btn primary" type="submit">Hand in the paper</button>
+        <span class="cell-note">{{ questions | length }} questions ·
+          {{ total_marks | round(2) }} marks total</span>
+      </div>
+    </form>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    var clock = document.getElementById('exam-clock');
+    var form = document.getElementById('exam-form');
+    if (!clock || !form) return;
+    var raw = clock.getAttribute('data-seconds');
+    if (raw === '' || raw === null) return;
+    var left = parseInt(raw, 10);
+    if (isNaN(left) || left <= 0) return;
+    var submit = form.querySelector('button[type="submit"]');
+    var timer = setInterval(function () {
+      left -= 1;
+      if (left <= 0) {
+        clearInterval(timer);
+        clock.textContent = 'Time up - handing in';
+        if (submit) submit.disabled = true;
+        form.submit();
+        return;
+      }
+      var minutes = Math.floor(left / 60);
+      var seconds = left % 60;
+      clock.textContent = minutes + ':' + (seconds < 10 ? '0' + seconds : seconds) + ' left';
+    }, 1000);
+  })();
+</script>
+{% endblock %}

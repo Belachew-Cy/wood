@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container-fluid py-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h3>{{ campaign.title }}</h3>
+            <p class="text-muted">{{ campaign.campaign_code }}</p>
+        </div>
+
+        <span class="badge bg-success">{{ campaign.status }}</span>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-body">
+
+            {% if campaign.status == "Draft" %}
+            <form method="POST"
+                  action="{{ url_for(
+                      'asset_management.start_verification_campaign',
+                      campaign_id=campaign.id
+                  ) }}">
+                <input type="hidden"
+                       name="csrf_token"
+                       value="{{ csrf_token() }}">
+                <button class="btn btn-success">Start Verification</button>
+            </form>
+            {% endif %}
+
+            <div class="table-responsive mt-3">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>Asset Code</th>
+                            <th>Asset Name</th>
+                            <th>Location</th>
+                            <th>Verification Status</th>
+                            <th>Physical Condition</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {% for record in records %}
+                        <tr>
+                            <td>{{ record.asset.asset_code }}</td>
+                            <td>{{ record.asset.name }}</td>
+                            <td>{{ record.physical_location or "-" }}</td>
+                            <td>{{ record.verification_status }}</td>
+                            <td>{{ record.physical_condition or "-" }}</td>
+
+                            <td>
+                                {% if campaign.status == "In Progress" %}
+                                <button class="btn btn-sm btn-outline-success"
+                                        type="button"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#verify{{ record.id }}">
+                                    Verify
+                                </button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center">
+                                No assets found.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if campaign.status == "In Progress" %}
+            <form method="POST"
+                  action="{{ url_for(
+                      'asset_management.submit_verification_campaign',
+                      campaign_id=campaign.id
+                  ) }}">
+                <input type="hidden"
+                       name="csrf_token"
+                       value="{{ csrf_token() }}">
+                <button class="btn btn-primary mt-3">
+                    Submit for Review
+                </button>
+            </form>
+            {% endif %}
+
+        </div>
+    </div>
+
+</div>
+
+{# ---- Modals rendered OUTSIDE the table ---- #}
+{% if campaign.status == "In Progress" %}
+    {% for record in records %}
+    <div class="modal fade"
+         id="verify{{ record.id }}"
+         tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST"
+                      action="{{ url_for(
+                          'asset_management.verify_asset_record',
+                          record_id=record.id
+                      ) }}">
+                    <input type="hidden"
+                           name="csrf_token"
+                           value="{{ csrf_token() }}">
+
+                    <div class="modal-header">
+                        <h5>Verify Asset</h5>
+                        <button type="button"
+                                class="btn-close"
+                                data-bs-dismiss="modal"></button>
+                    </div>
+
+                    <div class="modal-body">
+                        <p><strong>{{ record.asset.name }}</strong></p>
+
+                        <label class="form-label">
+                            Verification Status
+                        </label>
+                        <select name="verification_status"
+                                class="form-select"
+                                required>
+                            <option value="Verified">Verified</option>
+                            <option value="Missing">Missing</option>
+                            <option value="Damaged">Damaged</option>
+                            <option value="Wrong Location">Wrong Location</option>
+                        </select>
+
+                        <label class="form-label mt-3">
+                            Physical Condition
+                        </label>
+                        <select name="physical_condition"
+                                class="form-select">
+                            <option value="Good">Good</option>
+                            <option value="Fair">Fair</option>
+                            <option value="Poor">Poor</option>
+                            <option value="Damaged">Damaged</option>
+                        </select>
+
+                        <label class="form-label mt-3">
+                            Physical Location
+                        </label>
+                        <input type="text"
+                               name="physical_location"
+                               class="form-control">
+
+                        <label class="form-label mt-3">Remarks</label>
+                        <textarea name="remarks"
+                                  class="form-control"></textarea>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button class="btn btn-success">
+                            Save Verification
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+{% endif %}
+
+{% endblock %}

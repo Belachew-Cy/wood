@@ -1,0 +1,129 @@
+{% extends "public_base.html" %}
+
+{% block title %}Apply: {{ vacancy.job_title }} | Careers{% endblock %}
+
+{% block content %}
+<section class="page-hero">
+  <div class="container">
+    <span class="eyebrow">Application</span>
+    <h1>{{ vacancy.job_title }}</h1>
+    <p>{{ vacancy.department }} · {{ vacancy.job_type }}
+      {%- if vacancy.location %} · {{ vacancy.location }}{% endif %}
+      {%- if vacancy.closing_date %} · closes {{ vacancy.closing_date | friendly_date }}{% endif %}</p>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    <div class="dash-grid">
+      <div class="dash-panel">
+        <h2>Your application</h2>
+        <p class="panel-note">
+          {% if user %}
+          You are signed in as {{ user.full_name }}, so this application is linked to your
+          account and the screening result appears under My applications.
+          {% else %}
+          No account is needed. Keep the reference we send you back - it is how the HR desk
+          finds your file.
+          {% endif %}
+        </p>
+        <form method="POST" enctype="multipart/form-data"
+              action="{{ url_for('recruitment.apply', vacancy_id=vacancy.id) }}"
+              class="dash-form account-grid">
+          {{ csrf_field() }}
+          <div>
+            <label for="full_name">Full name *</label>
+            <input id="full_name" name="full_name" maxlength="120" required
+                   value="{{ values.get('full_name') or '' }}" autocomplete="name" />
+          </div>
+          <div>
+            <label for="email">Email *</label>
+            <input id="email" name="email" type="email" maxlength="160" required
+                   value="{{ values.get('email') or '' }}" autocomplete="email" />
+          </div>
+          <div>
+            <label for="phone">Phone *</label>
+            <input id="phone" name="phone" maxlength="30" required
+                   value="{{ values.get('phone') or '' }}" autocomplete="tel" />
+          </div>
+          <div>
+            <label for="date_of_birth">Date of birth</label>
+            <input id="date_of_birth" name="date_of_birth" type="date"
+                   value="{{ values.get('date_of_birth') or '' }}" />
+            <p class="cell-note">
+              {% if vacancy.minimum_age or vacancy.maximum_age %}
+              This post is for ages
+              {{ vacancy.minimum_age or 'any' }}–{{ vacancy.maximum_age or 'no limit' }}.
+              {% else %}
+              Only used to confirm the age the post requires.
+              {% endif %}
+            </p>
+          </div>
+          <div>
+            <label for="gpa">Latest GPA</label>
+            <input id="gpa" name="gpa" type="number" step="0.01" min="0" max="7"
+                   value="{{ values.get('gpa') or '' }}" />
+            <p class="cell-note">
+              {% if vacancy.minimum_gpa %}
+              Minimum {{ '%.2f' | format(vacancy.minimum_gpa) }} for this post.
+              {% else %}
+              No minimum set for this post.
+              {% endif %}
+            </p>
+          </div>
+          <div>
+            <label for="education">Highest qualification</label>
+            <input id="education" name="education" maxlength="200"
+                   value="{{ values.get('education') or '' }}"
+                   placeholder="Field, institution and year" />
+          </div>
+          <div class="full">
+            <label for="experience">Work experience</label>
+            <textarea id="experience" name="experience" rows="5"
+                      maxlength="2000">{{ values.get('experience') or '' }}</textarea>
+          </div>
+          <div class="full">
+            <label for="cover_letter">Cover letter</label>
+            <textarea id="cover_letter" name="cover_letter" rows="6"
+                      maxlength="4000">{{ values.get('cover_letter') or '' }}</textarea>
+          </div>
+          <div class="full">
+            <label for="cv">Attach your CV (PDF, DOC or DOCX, up to 5 MB)</label>
+            <input id="cv" name="cv" type="file" accept=".pdf,.doc,.docx" />
+          </div>
+          <div class="full">
+            <button class="btn finance-btn primary" type="submit">Submit application</button>
+            <a class="btn btn-outline" href="{{ url_for('recruitment.vacancies') }}">
+              Back to vacancies
+            </a>
+          </div>
+        </form>
+      </div>
+
+      <div class="dash-panel">
+        <h2>The post</h2>
+        <dl class="detail-list">
+          <dt>Department</dt><dd>{{ vacancy.department }}</dd>
+          <dt>Employment type</dt><dd>{{ vacancy.job_type }}</dd>
+          <dt>Openings</dt><dd>{{ vacancy.openings }}</dd>
+          {% if vacancy.location %}<dt>Location</dt><dd>{{ vacancy.location }}</dd>{% endif %}
+          {% if vacancy.reference %}<dt>Reference</dt><dd>{{ vacancy.reference }}</dd>{% endif %}
+          <dt>Closes</dt>
+          <dd>{{ vacancy.closing_date | friendly_date if vacancy.closing_date else 'No closing date' }}</dd>
+          {% if vacancy.internal_only %}
+          <dt>Who may apply</dt><dd>Reserved for the company's own staff</dd>
+          {% endif %}
+        </dl>
+        {% if vacancy.description %}
+        <h2>What the work is</h2>
+        <p class="panel-note wrap-cell">{{ vacancy.description }}</p>
+        {% endif %}
+        {% if vacancy.requirements %}
+        <h2>What we ask for</h2>
+        <p class="panel-note wrap-cell">{{ vacancy.requirements }}</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

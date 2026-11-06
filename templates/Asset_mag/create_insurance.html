@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container py-4">
+
+    <h3>Register Asset Insurance</h3>
+
+    <div class="card border-0 shadow-sm mt-3">
+        <div class="card-body">
+
+            <form method="POST">
+
+                <input type="hidden"
+                       name="csrf_token"
+                       value="{{ csrf_token() }}">
+
+                <div class="mb-3">
+                    <label class="form-label">Select Asset</label>
+
+                    <select name="asset_id"
+                            class="form-select"
+                            required>
+
+                        <option value="">Select Asset</option>
+
+                        {% for asset in assets %}
+                        <option value="{{ asset.id }}">
+                            {{ asset.asset_code }} - {{ asset.name }}
+                        </option>
+                        {% endfor %}
+
+                    </select>
+                </div>
+
+                <div class="row">
+
+                    <div class="col-md-6 mb-3">
+                        <label>Policy Number</label>
+                        <input type="text"
+                               name="policy_number"
+                               class="form-control"
+                               required>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label>Insurance Company</label>
+                        <input type="text"
+                               name="insurance_company"
+                               class="form-control"
+                               required>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label>Insurance Type</label>
+                        <select name="insurance_type"
+                                class="form-select">
+                            <option>Property Insurance</option>
+                            <option>Fire Insurance</option>
+                            <option>Theft Insurance</option>
+                            <option>Comprehensive Insurance</option>
+                            <option>Other</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label>Coverage Amount (ETB)</label>
+                        <input type="number"
+                               name="coverage_amount"
+                               min="0.01"
+                               step="0.01"
+                               class="form-control"
+                               required>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label>Premium Amount (ETB)</label>
+                        <input type="number"
+                               name="premium_amount"
+                               min="0"
+                               step="0.01"
+                               class="form-control">
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label>Contact Person</label>
+                        <input type="text"
+                               name="contact_person"
+                               class="form-control">
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label>Contact Phone</label>
+                        <input type="text"
+                               name="contact_phone"
+                               class="form-control">
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label>Policy Start Date</label>
+                        <input type="date"
+                               name="start_date"
+                               class="form-control"
+                               required>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label>Policy Expiry Date</label>
+                        <input type="date"
+                               name="expiry_date"
+                               class="form-control"
+                               required>
+                    </div>
+
+                </div>
+
+                <button type="submit" class="btn btn-success">
+                    Save Insurance Policy
+                </button>
+
+            </form>
+
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}

@@ -1,0 +1,357 @@
+
+{% extends "base.html" %}
+
+{% block title %}Audit Risk Details | Audit Management{% endblock %}
+
+{% block content %}
+
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Audit Management / Risk Assessment</span>
+            <h1>{{ risk.risk_number | default('Risk Details') }}</h1>
+            <p>
+                Review identified risks, evaluate exposure and monitor
+                mitigation measures.
+            </p>
+        </div>
+
+        <div class="stock-actions">
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.risk_assessments') }}">
+                Back to Risk Assessments
+            </a>
+
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.dashboard') }}">
+                Dashboard
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="container finance-page">
+
+    <!-- RISK SUMMARY -->
+
+    <div class="hr-stats">
+
+        <div class="dash-panel">
+            <span class="eyebrow">Risk Level</span>
+            <h2>{{ risk.risk_level | default('Not Rated') }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Risk Score</span>
+            <h2>{{ risk.risk_score | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Likelihood</span>
+            <h2>{{ risk.likelihood | default('—') }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Impact</span>
+            <h2>{{ risk.impact | default('—') }}</h2>
+        </div>
+
+    </div>
+
+
+    <!-- RISK INFORMATION -->
+
+    <div class="dash-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Risk Information</h2>
+                <p>Identification and classification of the assessed risk.</p>
+            </div>
+
+            <span class="status-badge neutral">
+                {{ risk.status | default('Open') }}
+            </span>
+        </div>
+
+        <div class="form-grid">
+
+            <div class="form-group">
+                <label>Risk Reference</label>
+                <p>{{ risk.risk_number | default(risk.id | default('—')) }}</p>
+            </div>
+
+            <div class="form-group">
+                <label>Risk Title</label>
+                <p>{{ risk.title | default('—') }}</p>
+            </div>
+
+            <div class="form-group">
+                <label>Department</label>
+                <p>{{ risk.department | default('—') }}</p>
+            </div>
+
+            <div class="form-group">
+                <label>Risk Category</label>
+                <p>{{ risk.risk_category | default('—') }}</p>
+            </div>
+
+            <div class="form-group">
+                <label>Risk Owner</label>
+                <p>{{ risk.risk_owner | default('—') }}</p>
+            </div>
+
+            <div class="form-group">
+                <label>Assessment Date</label>
+                <p>{{ risk.assessment_date | default('—') }}</p>
+            </div>
+
+            <div class="form-group form-full">
+                <label>Risk Description</label>
+                <p>{{ risk.description | default('No risk description available.') }}</p>
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- RISK SCORING -->
+
+    <div class="dash-panel">
+
+        <h2>Risk Evaluation</h2>
+
+        <div class="form-grid">
+
+            <div class="form-group">
+                <label>Likelihood (1–5)</label>
+                <p>{{ risk.likelihood | default('—') }}</p>
+            </div>
+
+            <div class="form-group">
+                <label>Impact (1–5)</label>
+                <p>{{ risk.impact | default('—') }}</p>
+            </div>
+
+            <div class="form-group">
+                <label>Calculated Risk Score</label>
+                <p>{{ risk.risk_score | default('—') }}</p>
+            </div>
+
+            <div class="form-group">
+                <label>Risk Level</label>
+                <p>{{ risk.risk_level | default('—') }}</p>
+            </div>
+
+        </div>
+
+        <p class="eyebrow">
+            Risk score should be calculated and validated by the backend
+            using the organization's approved risk assessment policy.
+        </p>
+
+    </div>
+
+
+    <!-- EXISTING CONTROLS -->
+
+    <div class="dash-panel">
+
+        <h2>Existing Controls</h2>
+
+        <p>
+            {{ risk.existing_controls
+               | default('No existing controls have been documented.') }}
+        </p>
+
+    </div>
+
+
+    <!-- MITIGATION PLAN -->
+
+    <div class="dash-panel">
+
+        <h2>Risk Mitigation Plan</h2>
+
+        <div class="form-grid">
+
+            <div class="form-group form-full">
+                <label>Mitigation Measures</label>
+                <p>
+                    {{ risk.mitigation_plan
+                       | default('No mitigation plan has been recorded.') }}
+                </p>
+            </div>
+
+            <div class="form-group">
+                <label>Mitigation Owner</label>
+                <p>{{ risk.mitigation_owner | default('—') }}</p>
+            </div>
+
+            <div class="form-group">
+                <label>Target Completion Date</label>
+                <p>{{ risk.target_date | default('—') }}</p>
+            </div>
+
+            <div class="form-group">
+                <label>Mitigation Status</label>
+                <p>{{ risk.mitigation_status | default('Not Started') }}</p>
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- RELATED CORRECTIVE ACTIONS -->
+
+    <div class="dash-panel hr-table-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Related Corrective Actions</h2>
+                <p>Actions associated with this risk assessment.</p>
+            </div>
+
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.corrective_actions') }}">
+                All Corrective Actions
+            </a>
+        </div>
+
+        <div class="table-scroll">
+
+            <table class="report-table">
+
+                <thead>
+                    <tr>
+                        <th>Action Reference</th>
+                        <th>Description</th>
+                        <th>Responsible Person</th>
+                        <th>Due Date</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for action in corrective_actions | default([]) %}
+
+                    <tr>
+                        <td>
+                            {{ action.action_number
+                               | default(action.id | default('—')) }}
+                        </td>
+
+                        <td>
+                            {{ action.title
+                               | default(action.description | default('—')) }}
+                        </td>
+
+                        <td>{{ action.responsible_person | default('—') }}</td>
+
+                        <td>{{ action.due_date | default('—') }}</td>
+
+                        <td>{{ action.status | default('Pending') }}</td>
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="5" class="report-empty">
+                            No corrective actions are linked to this risk.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <!-- RISK REVIEW HISTORY -->
+
+    <div class="dash-panel hr-table-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Risk Review History</h2>
+                <p>Previous risk assessments and monitoring activities.</p>
+            </div>
+        </div>
+
+        <div class="table-scroll">
+
+            <table class="report-table">
+
+                <thead>
+                    <tr>
+                        <th>Review Date</th>
+                        <th>Reviewed By</th>
+                        <th>Risk Score</th>
+                        <th>Risk Level</th>
+                        <th>Comments</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for entry in review_history | default([]) %}
+
+                    <tr>
+                        <td>{{ entry.review_date | default('—') }}</td>
+
+                        <td>{{ entry.reviewed_by | default('—') }}</td>
+
+                        <td>{{ entry.risk_score | default('—') }}</td>
+
+                        <td>{{ entry.risk_level | default('—') }}</td>
+
+                        <td>{{ entry.comments | default('—') }}</td>
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="5" class="report-empty">
+                            No previous risk reviews are available.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <!-- SECURITY NOTICE -->
+
+    <div class="dash-panel">
+
+        <h2>Risk Management Controls</h2>
+
+        <ul>
+            <li>Risk scores must be calculated and validated on the server.</li>
+            <li>Only authorized audit users may view confidential risk assessments.</li>
+            <li>Preserve links between risks, audit plans, findings and corrective actions.</li>
+            <li>Keep departmental source records read-only.</li>
+            <li>Record risk assessment access and changes in the existing audit logs.</li>
+            <li>Do not treat missing risk information as a zero-risk assessment.</li>
+        </ul>
+
+    </div>
+
+</section>
+
+{% endblock %}

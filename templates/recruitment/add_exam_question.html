@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block title %}Add a question | {{ exam.exam_title }}{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Examination drafting</span>
+      <h1>Add a question</h1>
+      <p>{{ exam.exam_title }} · {{ exam.job_title }} ·
+        {{ '%g' | format(total_question_marks | float) }} of
+        {{ '%g' | format(exam.total_marks | float) }} marks already assigned</p>
+    </div>
+    <nav class="stock-actions" aria-label="Question actions">
+      <a class="btn btn-outline btn-sm" href="{{ url_for('recruitment.exam_questions', exam_id=exam.id) }}">
+        Back to the paper
+      </a>
+    </nav>
+  </div>
+</section>
+
+<section class="container finance-page">
+  <div class="dash-panel">
+    <h2>The question</h2>
+    <form method="POST" action="{{ url_for('recruitment.add_exam_question', exam_id=exam.id) }}"
+          class="dash-form account-grid">
+      {{ csrf_field() }}
+      <div class="full">
+        <label for="question">Question *</label>
+        <textarea id="question" name="question" rows="3" maxlength="1000" required>{{
+          fields.question }}</textarea>
+      </div>
+
+      {% for letter in ('A', 'B', 'C', 'D') %}
+      {% set name = 'option_' ~ (letter | lower) %}
+      <div>
+        <label for="{{ name }}">{{ letter }} *</label>
+        <input id="{{ name }}" name="{{ name }}" maxlength="1000" required
+               value="{{ fields[name] }}" />
+      </div>
+      {% endfor %}
+
+      <div>
+        <label for="correct_answer">Correct option *</label>
+        <select id="correct_answer" name="correct_answer" required>
+          {% for letter in ('A', 'B', 'C', 'D') %}
+          <option value="{{ letter }}"
+            {% if fields.correct_answer == letter %}selected{% endif %}>
+            {{ letter }}{% if fields['option_' ~ (letter | lower)] %}
+            - {{ fields['option_' ~ (letter | lower)] | truncate(48, true) }}{% endif %}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label for="marks">Marks *</label>
+        <input id="marks" name="marks" type="number" step="0.5" min="0.5"
+               value="{{ fields.marks or '' }}" required />
+        <p class="cell-note">{{ '%g' | format((exam.total_marks | float)
+          - (total_question_marks | float)) }} marks are still unassigned on this paper.</p>
+      </div>
+
+      <div class="full">
+        <button class="btn finance-btn primary" type="submit">Save the question</button>
+        <a class="btn btn-outline"
+           href="{{ url_for('recruitment.import_exam_questions', exam_id=exam.id) }}">
+          Upload from a sheet
+        </a>
+        <a class="btn btn-outline" href="{{ url_for('recruitment.exam_questions', exam_id=exam.id) }}">
+          Back to the paper
+        </a>
+      </div>
+    </form>
+    <p class="panel-note">A question is refused when it would take the paper past its
+      {{ '%g' | format(exam.total_marks | float) }} total, so the pass mark always measures
+      a paper that is fully written. Several at once go in from
+      <a href="{{ url_for('recruitment.import_exam_questions', exam_id=exam.id) }}">
+        the upload sheet</a>.</p>
+  </div>
+</section>
+{% endblock %}

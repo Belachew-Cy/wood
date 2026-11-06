@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container-fluid py-4">
+
+    <h3>Asset Inventory Register</h3>
+
+    <form method="GET" class="row g-2 my-3">
+
+        <div class="col-md-4">
+            <input type="text"
+                   name="search"
+                   class="form-control"
+                   placeholder="Search asset code, name or serial number"
+                   value="{{ search }}">
+        </div>
+
+        <div class="col-md-3">
+            <select name="category_id" class="form-select">
+                <option value="">All Categories</option>
+
+                {% for category in categories %}
+                <option value="{{ category.id }}"
+                    {% if selected_category == category.id %}selected{% endif %}>
+                    {{ category.name }}
+                </option>
+                {% endfor %}
+
+            </select>
+        </div>
+
+        <div class="col-md-3">
+            <select name="status" class="form-select">
+                <option value="">All Statuses</option>
+                {% for item in ["Available", "Assigned", "Maintenance", "Inactive", "Disposed"] %}
+                <option value="{{ item }}"
+                    {% if selected_status == item %}selected{% endif %}>
+                    {{ item }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="col-md-2">
+            <button class="btn btn-success w-100">Filter</button>
+        </div>
+
+    </form>
+
+    <div class="card border-0 shadow-sm">
+        <div class="table-responsive">
+
+            <table class="table table-hover align-middle mb-0">
+
+                <thead class="table-light">
+                    <tr>
+                        <th>Asset Code</th>
+                        <th>Asset Name</th>
+                        <th>Category</th>
+                        <th>Department ID</th>
+                        <th>Employee ID</th>
+                        <th>Purchase Cost</th>
+                        <th>Condition</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for asset in assets %}
+                    <tr>
+                        <td>{{ asset.asset_code }}</td>
+                        <td>{{ asset.name }}</td>
+                        <td>{{ asset.category.name if asset.category else "-" }}</td>
+                        <td>{{ asset.department_id or "-" }}</td>
+                        <td>{{ asset.employee_id or "-" }}</td>
+                        <td>{{ "{:,.2f}".format(asset.purchase_cost or 0) }}</td>
+                        <td>{{ asset.condition or "-" }}</td>
+                        <td>{{ asset.status }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="text-center py-4">
+                            No asset records found.
+                        </td>
+                    </tr>
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}

@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi with context %}
+
+{% block title %}{{ asset["name"] }} | Asset{% endblock %}
+
+{% block content %}
+{% set tone = 'active' if asset["status"] in ('Available', 'Assigned')
+              else 'neutral' if asset["status"] == 'Maintenance' else 'off' %}
+{% set warranty_due = asset["warranty_expiry"] and asset["warranty_expiry"] < today %}
+
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">ASSET · {{ asset["asset_code"] }}</span>
+      <h1>{{ asset["name"] }}</h1>
+      <p>
+        {{ asset["category_name"] or 'Uncategorised' }}
+        · {{ asset["department_name"] or 'In store' }}
+        · {{ asset["condition"] }} condition
+        <span class="status-badge {{ tone }}">{{ asset["status"] }}</span>
+      </p>
+    </div>
+    <div class="row-actions">
+      <a class="btn btn-outline" href="{{ url_for('asset.assets') }}">
+        ← Register
+      </a>
+      {% if can_register and asset["status"] != "Inactive" %}
+      <a class="btn"
+         href="{{ url_for('asset.edit_asset', asset_id=asset['id']) }}">Edit</a>
+      {% endif %}
+      {% if can_allocate and asset["status"] == "Available" %}
+      <a class="btn"
+         href="{{ url_for('asset.allocate', asset_id=asset['id']) }}">Allocate</a>
+      {% endif %}
+      {% if can_allocate and allocation %}
+      <form method="POST"
+            action="{{ url_for('asset.return_asset', allocation_id=allocation['id']) }}"
+            onsubmit="return confirm('Return this asset to the available pool?');">
+        {{ csrf_field() }}
+        <button class="btn btn-outline" type="submit">Return asset</button>
+      </form>
+      {% endif %}
+      {% if can_register and asset["status"] != "Inactive" and not allocation %}
+      <form method="POST"
+            action="{{ url_for('asset.deactivate_asset', asset_id=asset['id']) }}"
+            onsubmit="return confirm('Deactivate this asset? It stays on the record but leaves the live register.');">
+        {{ csrf_field() }}
+        <button class="btn-danger" type="submit">Deactivate</button>
+      </form>
+      {% endif %}
+      {% if can_register and asset["status"] == "Inactive" %}
+      <form method="POST"
+            action="{{ url_for('asset.reactivate_asset', asset_id=asset['id']) }}">
+        {{ csrf_field() }}
+        <button class="btn" type="submit">Return to register</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="hr-stats">
+      {{ kpi('Purchase cost', "{:,.2f}".format(asset["purchase_cost"] | float),
+             'ETB', 'flat', 'wallet') }}
+      {{ kpi('Purchased', asset["purchase_date"] or 'No date', 'on the invoice',
+             'flat', 'calendar') }}
+      {{ kpi('Warranty', asset["warranty_expiry"] or 'Not recorded',
+             'expired' if warranty_due else 'on file',
+             'down' if warranty_due else 'flat', 'shield') }}
+      {{ kpi('Allocations', history | length, 'since registration', 'flat',
+             'clipboard') }}
+      {{ kpi('Condition', asset["condition"], 'last recorded', 'flat', 'wrench') }}
+    </div>
+
+    <div class="chart-grid">
+      <div class="dash-panel">
+        <h2>Identification</h2>
+        <dl class="detail-list">
+          <dt>Asset code</dt><dd>{{ asset["asset_code"] }}</dd>
+          <dt>Category</dt>
+          <dd>{{ asset["category_name"] or 'Uncategorised' }}
+            {% if asset["category_code"] %}
+            <span class="feed-meta">({{ asset["category_code"] }})</span>
+            {% endif %}</dd>
+          <dt>Serial number</dt><dd>{{ asset["serial_number"] or '—' }}</dd>
+          <dt>Model</dt><dd>{{ asset["model_number"] or '—' }}</dd>
+          <dt>Manufacturer</dt><dd>{{ asset["manufacturer"] or '—' }}</dd>
+          <dt>Supplier</dt><dd>{{ asset["supplier"] or '—' }}</dd>
+          <dt>Purchase order</dt>
+          <dd>{% if purchase_order %}
+              <a href="{{ url_for('procurement.order_detail', order_id=purchase_order['id']) }}">{{ purchase_order['order_number'] }}</a>
+              {% else %}{{ asset["purchase_order_number"] or '—' }}{% endif %}</dd>
+          <dt>Funding source</dt>
+          <dd>{{ asset["funding_source"] or '—' }}</dd>
+          <dt>Location</dt><dd>{{ asset["location"] or '—' }}</dd>
+          <dt>Registered by</dt>
+          <dd>{{ asset["created_by_name"] or '—' }}
+            · {{ asset["created_at"] | audit_time }}</dd>
+          <dt>Last modified</dt>
+          <dd>{{ asset["updated_by_name"] or asset["created_by_name"] or '—' }}
+            · {{ asset["updated_at"] | audit_time }}</dd>
+        </dl>
+        {% if asset["description"] %}
+        <p class="panel-note">{{ asset["description"] }}</p>
+        {% endif %}
+      </div>
+
+      <div class="dash-panel">
+        <h2>Custody</h2>
+        {% if allocation %}
+        <dl class="detail-list">
+          <dt>Department</dt><dd>{{ allocation["department_name"] }}</dd>
+          <dt>Custodian</dt>
+          <dd>{{ allocation["custodian_name"] or 'No named custodian' }}</dd>
+          <dt>Allocated</dt><dd>{{ allocation["allocation_date"] }}</dd>
+          <dt>Expected return</dt>
+          <dd>{{ allocation["expected_return"] or 'Not set' }}</dd>
+          <dt>Allocated by</dt>
+          <dd>{{ allocation["allocated_by_name"] or '—' }}</dd>
+          {% if allocation["remarks"] %}
+          <dt>Remarks</dt><dd>{{ allocation["remarks"] }}</dd>
+          {% endif %}
+        </dl>
+        {% elif asset["status"] == "Inactive" %}
+        <p class="panel-note">This unit is deactivated and holds no custody. Its
+          history stays on the record; return it to the register before handing
+          it out again.</p>
+        {% else %}
+        <p class="panel-note">This unit is on the available shelf. Allocate it to
+          a department, and to a named custodian when one person is
+          answerable.</p>
+        {% endif %}
+        {% if asset["notes"] %}
+        <h3>Register notes</h3>
+        <p class="panel-note">{{ asset["notes"] }}</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>Allocation history</h2>
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Department</th><th>Custodian</th><th>Allocated</th>
+              <th>Expected return</th><th>Returned</th><th>Status</th>
+              <th>Remarks</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in history %}
+            <tr>
+              <td>{{ row["department_name"] }}</td>
+              <td>{{ row["custodian_name"] or '—' }}</td>
+              <td class="nowrap">{{ row["allocation_date"] }}</td>
+              <td class="nowrap">{{ row["expected_return"] or '—' }}</td>
+              <td class="nowrap">{{ row["returned_at"] | audit_time or '—' }}</td>
+              <td>
+                <span class="status-badge {{ 'active' if row['status'] == 'Active' else 'neutral' }}">
+                  {{ row["status"] }}
+                </span>
+              </td>
+              <td>{{ row["remarks"] or '—' }}</td>
+              <td>
+                {% if can_allocate and row["status"] == "Active" %}
+                <form method="POST"
+                      action="{{ url_for('asset.return_asset', allocation_id=row['id']) }}"
+                      onsubmit="return confirm('Return this asset to the available pool?');">
+                  {{ csrf_field() }}
+                  <button class="btn btn-outline" type="submit">Return</button>
+                </form>
+                {% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="8">This asset has not been allocated yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

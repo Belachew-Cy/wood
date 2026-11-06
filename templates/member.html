@@ -71,6 +71,7 @@
     <div class="dash-grid">
       <div class="dash-panel">
         <h2>My Profile</h2>
+        <div class="dash-table-wrap">
         <table>
           <tbody>
             <tr><td><strong>Full name</strong></td><td>{{ user.full_name }}</td></tr>
@@ -79,6 +80,7 @@
             <tr><td><strong>Role</strong></td><td><span class="role-badge member">member</span></td></tr>
           </tbody>
         </table>
+        </div>
         <a href="{{ url_for('contact') }}" class="btn" style="margin-top:1.5rem;">Request a Quote <span class="arrow">→</span></a>
       </div>
       <div class="dash-panel">

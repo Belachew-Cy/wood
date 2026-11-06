@@ -1,0 +1,272 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi with context %}
+
+{% block title %}{{ count["number"] }} | Stocktake | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">INVENTORY MANAGEMENT</span>
+      <h1>{{ count["number"] }}</h1>
+      <p>{{ count["title"] }} · counted {{ count["count_date"] }} · opened by
+        {{ count["created_by_name"] }}</p>
+    </div>
+    <a class="btn btn-outline btn-sm" href="{{ url_for('inventory.stocktakes') }}">
+      ← All stocktakes
+    </a>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    {% set badge = 'neutral' if count['status'] == 'COUNTING'
+       else 'medium' if count['status'] == 'SUBMITTED'
+       else 'active' %}
+    <div class="hr-stats">
+      {{ kpi('Status', statuses[count["status"]],
+             'opened ' ~ (count["created_at"] | audit_time)) }}
+      {{ kpi('Lines', progress["lines"], 'active items in the register') }}
+      {{ kpi('Counted', progress["counted"],
+             '%d still blank' | format(progress["lines"] - progress["counted"]),
+             'down' if progress["counted"] < progress["lines"] else 'up') }}
+      {{ kpi('Variances', progress["variances"], 'lines that disagree',
+             'down' if progress["variances"] else 'flat') }}
+    </div>
+
+    <div class="dash-panel">
+      <h2>Session
+        <span class="status-badge {{ badge }}">{{ statuses[count["status"]] }}</span>
+      </h2>
+      <dl class="detail-list">
+        <dt>Count date</dt><dd>{{ count["count_date"] }}</dd>
+        <dt>Opened by</dt><dd>{{ count["created_by_name"] }}</dd>
+        {% if count["submitted_at"] %}
+        <dt>Submitted</dt><dd>{{ count["submitted_at"] | audit_time }}</dd>
+        {% endif %}
+        {% if count["decided_by_name"] %}
+        <dt>{{ 'Approved by' if count['status'] in ('APPROVED', 'POSTED') else 'Returned by' }}</dt>
+        <dd>{{ count["decided_by_name"] }} · {{ count["decided_at"] | audit_time }}</dd>
+        {% endif %}
+        {% if count["posted_at"] %}
+        <dt>Posted</dt><dd>{{ count["posted_at"] | audit_time }}</dd>
+        {% endif %}
+        {% if count["notes"] %}
+        <dt>Notes</dt><dd>{{ count["notes"] }}</dd>
+        {% endif %}
+        {% if count["decision_note"] %}
+        <dt>Review note</dt><dd>{{ count["decision_note"] }}</dd>
+        {% endif %}
+      </dl>
+    </div>
+
+    {% if count["status"] == 'COUNTING' and can_count %}
+    <div class="dash-panel">
+      <h2>Record the shelf</h2>
+      <p class="feed-meta">Expected is what the ledger believed when the count
+        was opened. Enter what is physically there; blanks stay uncounted.</p>
+      <form method="POST"
+            action="{{ url_for('inventory.stocktake_count', stocktake_id=count['id']) }}">
+        {{ csrf_field() }}
+        <div class="hr-table-wrap table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>SKU</th><th>Item</th><th>Expected</th><th>Counted</th>
+                <th>Variance</th><th>Shelf now</th>
+                <th>Recorded by</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for line in lines %}
+              <tr>
+                <td>{{ line["sku"] }}</td>
+                <td>{{ line["name"] }}</td>
+                <td>{{ line["expected_qty"] }} {{ line["unit"] }}</td>
+                <td>
+                  <input class="count-input" type="number" step="0.001" min="0"
+                         name="count_{{ line['id'] }}"
+                         value="{{ '' if line['counted_qty'] is none else line['counted_qty'] }}"
+                         aria-label="Count for {{ line['name'] }}" />
+                </td>
+                <td>
+                  {% if line["counted_qty"] is none %}
+                    <span class="status-badge neutral">Not counted</span>
+                  {% elif line["variance"] == 0 %}
+                    <span class="status-badge active">Matches</span>
+                  {% else %}
+                    <span class="status-badge {{ 'critical' if line['variance'] < 0 else 'medium' }}">
+                      {{ "%+.3f" | format(line["variance"]) }} {{ line["unit"] }}
+                    </span>
+                  {% endif %}
+                </td>
+                <td>
+                  {{ line["current_qty"] }} {{ line["unit"] }}
+                  {% if line["counted_qty"] is not none
+                        and line["current_qty"] != line["expected_qty"] %}
+                  <br><span class="feed-meta">Moved since the count opened</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if line["counted_by_name"] %}
+                  {{ line["counted_by_name"] }}
+                  <br><span class="feed-meta">{{ line["counted_at"] | audit_time }}</span>
+                  {% else %}—{% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="stock-form-actions">
+          <button class="btn btn-sm" type="submit">Save counts</button>
+          <button class="btn btn-outline btn-sm" type="submit" name="action" value="fill">
+            Fill blanks at system quantity
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <div class="dash-panel">
+      <h2>Send for approval</h2>
+      <p class="feed-meta">Every line must be counted. The reviewer cannot be the
+        account that recorded the count.</p>
+      <form method="POST"
+            action="{{ url_for('inventory.stocktake_submit', stocktake_id=count['id']) }}"
+            onsubmit="return confirm('Submit {{ count['number'] }} for approval?');">
+        {{ csrf_field() }}
+        <div class="stock-form-actions">
+          <button class="btn btn-sm" type="submit">Submit stocktake</button>
+        </div>
+      </form>
+    </div>
+    {% elif count["status"] == 'COUNTING' %}
+    <div class="finance-alert info">
+      This count is open. You can open it, but recording quantities needs the
+      “Physical stock count” right.
+    </div>
+    {% endif %}
+
+    {% if count["status"] != 'COUNTING' %}
+    <div class="dash-panel hr-table-panel">
+      <h2>Counted lines</h2>
+      <div class="hr-table-wrap table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>SKU</th><th>Item</th><th>Expected</th><th>Counted</th>
+              <th>Variance</th><th>Shelf now</th><th>Recorded by</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for line in lines %}
+            <tr>
+              <td>{{ line["sku"] }}</td>
+              <td>{{ line["name"] }}</td>
+              <td>{{ line["expected_qty"] }} {{ line["unit"] }}</td>
+              <td>{{ line["counted_qty"] }} {{ line["unit"] }}</td>
+              <td>
+                {% if line["variance"] == 0 %}
+                  <span class="status-badge active">Matches</span>
+                {% else %}
+                  <span class="status-badge {{ 'critical' if line['variance'] < 0 else 'medium' }}">
+                    {{ "%+.3f" | format(line["variance"]) }} {{ line["unit"] }}
+                  </span>
+                {% endif %}
+              </td>
+              <td>{{ line["current_qty"] }} {{ line["unit"] }}</td>
+              <td>
+                {% if line["counted_by_name"] %}
+                {{ line["counted_by_name"] }}
+                <br><span class="feed-meta">{{ line["counted_at"] | audit_time }}</span>
+                {% else %}—{% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7">No lines were counted.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if count["status"] == 'SUBMITTED' and can_approve %}
+      {% if owns_count %}
+      <div class="finance-alert info">
+        You recorded this count, so another approver has to decide it.
+      </div>
+      {% else %}
+      <div class="dash-panel">
+        <h2>Review the count</h2>
+        <form method="POST"
+              action="{{ url_for('inventory.stocktake_approve', stocktake_id=count['id']) }}"
+              class="dash-form stock-grid">
+          {{ csrf_field() }}
+          <div class="stock-notes">
+            <label for="note">Approval note</label>
+            <input id="note" name="note" maxlength="400"
+                   placeholder="Optional note kept with the decision" />
+          </div>
+          <div class="stock-form-actions">
+            <button class="btn btn-sm" type="submit">Approve count</button>
+          </div>
+        </form>
+        <form method="POST"
+              action="{{ url_for('inventory.stocktake_reject', stocktake_id=count['id']) }}"
+              class="dash-form stock-grid">
+          {{ csrf_field() }}
+          <div class="stock-notes">
+            <label for="reject-note">Return reason *</label>
+            <input id="reject-note" name="note" maxlength="400" required
+                   placeholder="What has to be recounted?" />
+          </div>
+          <div class="stock-form-actions">
+            <button class="btn btn-outline btn-sm" type="submit">Return for recount</button>
+          </div>
+        </form>
+      </div>
+      {% endif %}
+    {% elif count["status"] == 'SUBMITTED' and owns_count %}
+    <div class="finance-alert info">
+      Waiting for a second desk to approve this count.
+    </div>
+    {% endif %}
+
+    {% if count["status"] == 'APPROVED' and can_count %}
+    <div class="dash-panel">
+      <h2>Post the correction</h2>
+      <p class="feed-meta">Each variance becomes a stock movement. Posting stops
+        if any shelf moved after the count, so nothing is corrected against a
+        stale snapshot.</p>
+      <form method="POST"
+            action="{{ url_for('inventory.stocktake_post', stocktake_id=count['id']) }}"
+            onsubmit="return confirm('Post {{ count['number'] }} and correct {{ progress['variances'] }} line(s)?');">
+        {{ csrf_field() }}
+        <div class="stock-form-actions">
+          <button class="btn btn-sm" type="submit">Post to ledger</button>
+        </div>
+      </form>
+    </div>
+    {% elif count["status"] == 'APPROVED' %}
+    <div class="finance-alert info">
+      Approved and waiting for someone with the counting right to post it.
+    </div>
+    {% endif %}
+
+    {% if count["status"] == 'POSTED' %}
+    <div class="finance-alert success">
+      Posted to the ledger on {{ count["posted_at"] | audit_time }}. Every
+      difference is in the movement history.
+      <a href="{{ url_for('inventory.history') }}">Open movement history →</a>
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

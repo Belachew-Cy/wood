@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi, bars with context %}
+
+{% block title %}Reorder alerts | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">INVENTORY MANAGEMENT</span>
+      <h1>Reorder alerts</h1>
+      <p>Items at or under their minimum. The suggested order uses the item's
+        reorder quantity, or the shortfall when none is set.</p>
+    </div>
+    <a class="btn btn-outline btn-sm" href="{{ url_for('inventory.dashboard') }}">
+      ← Inventory desk
+    </a>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="hr-stats">
+      {{ kpi('Out of stock', out, 'nothing on the shelf',
+             'down' if out else 'flat') }}
+      {{ kpi('Below minimum', low, 'still usable, restock soon',
+             'down' if low else 'flat') }}
+      {{ kpi('Suggested order value (ETB)', "{:,.2f}".format(suggested_value),
+             'at today’s unit cost') }}
+      {{ kpi('Items to reorder', items | length, 'on this list') }}
+    </div>
+
+    {% if items %}
+    {% set order_rows = [] %}
+    {% for item in items %}
+      {% set _ = order_rows.append({
+        'label': item['name'],
+        'value': item['suggested'] * item['unit_cost'],
+        'display': '{:,.0f}'.format(item['suggested'] * item['unit_cost'])
+      }) %}
+    {% endfor %}
+    <div class="chart-grid">
+      {{ bars('Order value by item', order_rows[:6], 'ETB') }}
+    </div>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>Reorder list</h2>
+      <div class="hr-table-wrap table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>SKU</th><th>Item</th><th>Category</th><th>On hand</th>
+              <th>Minimum</th><th>Shortfall</th><th>Suggest order</th>
+              <th>Unit cost</th><th>Order value</th><th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in items %}
+            <tr>
+              <td>{{ item["sku"] }}</td>
+              <td>{{ item["name"] }}</td>
+              <td>{{ item["category"] }}</td>
+              <td>{{ item["quantity"] }} {{ item["unit"] }}</td>
+              <td>{{ item["min_stock"] }} {{ item["unit"] }}</td>
+              <td>{{ item["min_stock"] - item["quantity"] }} {{ item["unit"] }}</td>
+              <td><strong>{{ item["suggested"] }} {{ item["unit"] }}</strong></td>
+              <td>{{ "{:,.2f}".format(item["unit_cost"]) }}</td>
+              <td>{{ "{:,.2f}".format(item["suggested"] * item["unit_cost"]) }}</td>
+              <td>
+                <span class="status-badge {{ 'critical' if item['state'] == 'OUT' else 'medium' }}">
+                  {{ 'Out of stock' if item['state'] == 'OUT' else 'Below minimum' }}
+                </span>
+              </td>
+              <td class="row-actions">
+                {% if can_receive %}
+                <a class="btn"
+                   href="{{ url_for('inventory.stock_movement') }}">
+                  Receive stock
+                </a>
+                {% endif %}
+                <a class="btn btn-outline"
+                   href="{{ url_for('inventory.edit_item', item_id=item['id']) }}">
+                  Edit item
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% else %}
+    <div class="finance-alert success">
+      Every active item is above its minimum. Nothing to reorder today.
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,450 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi with context %}
+
+{% block title %}{{ project["project_name"] }} | Project{% endblock %}
+
+{% block content %}
+{% set status_tone = 'active' if project["status"] in ('In Progress', 'Completed')
+                     else 'off' if project["status"] in ('Cancelled', 'On Hold')
+                     else 'neutral' %}
+{% set moves = {'Draft': ('Cancelled',),
+                'In Progress': ('On Hold', 'Completed', 'Cancelled'),
+                'On Hold': ('In Progress', 'Completed', 'Cancelled')
+               }.get(project["status"], ()) %}
+
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">PROJECT · {{ project["project_code"] }}</span>
+      <h1>{{ project["project_name"] }}</h1>
+      <p>
+        {{ project["client_name"] or 'No client named' }}
+        · {{ project["location"] or 'No site set' }}
+        · {{ project["department_name"] or project["department"] }}
+        <span class="status-badge {{ status_tone }}">{{ project["status"] }}</span>
+        {% if project["is_archived"] %}<span class="feed-meta">Archived</span>{% endif %}
+      </p>
+    </div>
+    <div class="row-actions">
+      <a class="btn btn-outline" href="{{ url_for('project.projects') }}">
+        ← Register
+      </a>
+      {% if can_register and not project["is_archived"]
+            and project["status"] in ('Draft', 'Pending') %}
+      <a class="btn" href="{{ url_for('project.edit_project', project_id=project['id']) }}">
+        Edit
+      </a>
+      {% endif %}
+      {% if can_requisition and not project["is_archived"]
+            and project["status"] in ('In Progress', 'On Hold') %}
+      <a class="btn btn-outline"
+         href="{{ url_for('procurement.requisition_new',
+                          department='project',
+                          justification='Materials for ' ~ project['project_code'] ~ ' - ' ~ project['project_name']) }}">
+        Raise a requisition
+      </a>
+      {% endif %}
+      {% if can_register and project["status"] == 'Draft' and not project["is_archived"] %}
+      <form method="POST"
+            action="{{ url_for('project.submit_project', project_id=project['id']) }}">
+        {{ csrf_field() }}
+        <button class="btn" type="submit">Submit for approval</button>
+      </form>
+      {% endif %}
+      {% if can_register and not project["is_archived"] %}
+      <form method="POST"
+            action="{{ url_for('project.archive_project', project_id=project['id']) }}"
+            onsubmit="return confirm('Archive this project?');">
+        {{ csrf_field() }}
+        <button class="btn-danger" type="submit">Archive</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="hr-stats">
+      {{ kpi('Budget', "{:,.2f}".format(project["budget"] | float),
+             project["currency"], 'flat', 'wallet') }}
+      {{ kpi('Reserved', "{:,.2f}".format(project["committed"] | float),
+             'against its allocation', 'flat', 'file') }}
+      {{ kpi('Progress', "{}%".format(project["progress"] | int),
+             '{} of {} tasks open'.format(project["open_tasks"], project["task_count"]),
+             'flat', 'chart') }}
+      {{ kpi('Open milestones', project["open_milestones"], 'still to be held',
+             'warn' if project["open_milestones"] else 'flat', 'clock') }}
+      {{ kpi('Team', project["member_count"], 'accounts assigned', 'flat', 'users') }}
+    </div>
+
+    <div class="chart-grid">
+      <div class="dash-panel">
+        <h2>Dates and money</h2>
+        <dl class="detail-list">
+          <dt>Start</dt><dd>{{ project["start_date"] or '—' }}</dd>
+          <dt>End</dt><dd>{{ project["end_date"] or '—' }}</dd>
+          <dt>Priority</dt><dd>{{ project["priority"] }}</dd>
+          <dt>Manager</dt>
+          <dd>{{ project["manager_name"] or 'Unassigned' }}
+            {% if project["manager_username"] %}
+            <span class="feed-meta">({{ project["manager_username"] }})</span>
+            {% endif %}</dd>
+          {% if budget["allocated"] is not none %}
+          <dt>Allocation</dt>
+          <dd>{{ budget["plan_title"] }} · {{ budget["allocation_name"] }}</dd>
+          <dt>Allocated</dt>
+          <dd>{{ "{:,.2f}".format(budget["allocated"] | float) }} {{ budget["currency"] }}</dd>
+          <dt>Remaining</dt>
+          <dd{% if budget["overdrawn"] %} style="color: var(--danger-ink); font-weight: 600;"{% endif %}>
+            {{ "{:,.2f}".format(budget["remaining"] | float) }} {{ budget["currency"] }}
+            {% if budget["overdrawn"] %}<span class="feed-meta">overdrawn</span>{% endif %}
+          </dd>
+          {% else %}
+          <dt>Allocation</dt><dd>No budget allocation linked</dd>
+          {% endif %}
+          <dt>Raised by</dt><dd>{{ project["created_by_name"] or '—' }}</dd>
+          <dt>Last modified</dt>
+          <dd>{{ project["updated_by_name"] or project["created_by_name"] or '—' }}
+            · {{ project["updated_at"] | audit_time }}</dd>
+        </dl>
+        {% if project["description"] %}
+        <p class="panel-note">{{ project["description"] }}</p>
+        {% endif %}
+
+        {% if can_register and moves and not project["is_archived"] %}
+        <form method="POST" class="finance-form"
+              action="{{ url_for('project.set_status', project_id=project['id']) }}">
+          {{ csrf_field() }}
+          <label for="status">Move the job</label>
+          <select id="status" name="status">
+            {% for value in moves %}
+            <option value="{{ value }}">{{ value }}</option>
+            {% endfor %}
+          </select>
+          <div class="finance-form-actions">
+            <button class="btn btn-outline" type="submit">Apply</button>
+          </div>
+        </form>
+        {% endif %}
+      </div>
+
+      <div class="dash-panel">
+        <h2>Approval</h2>
+        {% if chain %}
+        <dl class="detail-list">
+          <dt>Request</dt>
+          <dd>#{{ chain["id"] }}
+            {% if can_approve %}
+            <a class="feed-meta"
+               href="{{ url_for('approvals.detail', request_id=chain['id']) }}">
+              open the chain →
+            </a>
+            {% endif %}
+          </dd>
+          <dt>Status</dt>
+          <dd>
+            <span class="status-badge {{ 'active' if chain['status'] == 'Approved'
+                  else 'off' if chain['status'] in ('Rejected', 'Returned')
+                  else 'neutral' }}">{{ chain["status"] }}</span>
+          </dd>
+          <dt>At the desk of</dt>
+          <dd>{{ step_label.get(chain["current_approver_step"],
+                               chain["current_approver_step"]) }}</dd>
+          <dt>Raised by</dt><dd>{{ chain["created_by_name"] or '—' }}</dd>
+          <dt>Last moved</dt><dd>{{ chain["updated_at"] | audit_time }}</dd>
+        </dl>
+        {% if chain["status"] == "Returned" and can_register %}
+        <p class="panel-note">The chain sent this job back for a revision. Edit the
+          figures and save: the job is re-sent up the path it now falls in.</p>
+        {% endif %}
+        {% elif project["status"] == "Draft" %}
+        <p class="panel-note">A draft is on this desk until it is submitted. The
+          approval chain then freezes the figures, and the signature starts the
+          work and reserves the allocation.</p>
+        {% else %}
+        <p class="panel-note">No approval request is linked to this job.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    {# ------------------------------------------------------------- the team #}
+    <div class="dash-panel hr-table-panel">
+      <h2>Team</h2>
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr><th>Account</th><th>Role on the job</th><th>Assigned by</th>
+                <th>Since</th>{% if can_team %}<th></th>{% endif %}</tr>
+          </thead>
+          <tbody>
+            {% for member in members %}
+            <tr>
+              <td>
+                {{ member["member_name"] or member["username"] }}
+                <br><span class="feed-meta">{{ member["username"] }}</span>
+              </td>
+              <td>{{ member["team_role"] }}</td>
+              <td>{{ member["assigned_by_name"] or '—' }}</td>
+              <td class="nowrap">{{ member["assigned_at"] | audit_time }}</td>
+              {% if can_team %}
+              <td>
+                <form method="POST"
+                      action="{{ url_for('project.remove_project_member',
+                                         project_id=project['id'],
+                                         member_id=member['id']) }}"
+                      onsubmit="return confirm('Release this account from the project?');">
+                  {{ csrf_field() }}
+                  <button class="btn-danger" type="submit">Release</button>
+                </form>
+              </td>
+              {% endif %}
+            </tr>
+            {% else %}
+            <tr><td colspan="{{ 5 if can_team else 4 }}">No account is assigned yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% if can_team and not project["is_archived"] %}
+      <form method="POST" class="dash-form stock-search"
+            action="{{ url_for('project.add_project_member', project_id=project['id']) }}">
+        {{ csrf_field() }}
+        <label for="user_id">Account</label>
+        <select id="user_id" name="user_id" required>
+          <option value="">Choose an account</option>
+          {% for account in accounts %}
+          <option value="{{ account['id'] }}">{{ account["full_name"] }}
+            ({{ account["username"] }})</option>
+          {% endfor %}
+        </select>
+        <label for="team_role">Role on the job</label>
+        <select id="team_role" name="team_role">
+          {% for role in team_roles %}
+          <option value="{{ role }}">{{ role }}</option>
+          {% endfor %}
+        </select>
+        <button class="btn" type="submit">Assign</button>
+      </form>
+      {% endif %}
+    </div>
+
+    {# -------------------------------------------------------- milestones #}
+    <div class="dash-panel hr-table-panel">
+      <h2>Milestones</h2>
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr><th>Milestone</th><th>Due</th><th>Completed</th><th>Status</th>
+                <th>Last modified</th>{% if can_milestones %}<th></th>{% endif %}</tr>
+          </thead>
+          <tbody>
+            {% for milestone in milestones %}
+            <tr>
+              <td>
+                {{ milestone["milestone_name"] }}
+                {% if milestone["description"] %}
+                <br><span class="feed-meta">{{ milestone["description"] | truncate(80) }}</span>
+                {% endif %}
+              </td>
+              <td class="nowrap"
+                  {% if milestone['status'] != 'Completed' and milestone['due_date']
+                        and milestone['due_date'] < today %}
+                  style="color: var(--danger-ink); font-weight: 600;"
+                  {% endif %}>
+                {{ milestone["due_date"] or '—' }}
+              </td>
+              <td class="nowrap">{{ milestone["completed_date"] or '—' }}</td>
+              <td>
+                <span class="status-badge {{ 'active' if milestone['status'] == 'Completed'
+                      else 'neutral' }}">{{ milestone["status"] }}</span>
+              </td>
+              <td class="nowrap">
+                {{ milestone["updated_by_name"] or milestone["created_by_name"] or '—' }}
+                <br><span class="feed-meta">{{ milestone["updated_at"] | audit_time }}</span>
+              </td>
+              {% if can_milestones %}
+              <td>
+                <form method="POST" class="row-actions"
+                      action="{{ url_for('project.update_project_milestone',
+                                         milestone_id=milestone['id']) }}">
+                  {{ csrf_field() }}
+                  <select name="status" aria-label="Milestone status">
+                    {% for value in milestone_statuses %}
+                    <option value="{{ value }}"
+                      {% if milestone["status"] == value %}selected{% endif %}>{{ value }}</option>
+                    {% endfor %}
+                  </select>
+                  <button class="btn btn-outline" type="submit">Save</button>
+                </form>
+              </td>
+              {% endif %}
+            </tr>
+            {% else %}
+            <tr><td colspan="{{ 6 if can_milestones else 5 }}">No milestone is set on this job.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% if can_milestones and not project["is_archived"] %}
+      <form method="POST" class="dash-form stock-search"
+            action="{{ url_for('project.new_milestone', project_id=project['id']) }}">
+        {{ csrf_field() }}
+        <label for="milestone_name">Milestone</label>
+        <input id="milestone_name" name="milestone_name" maxlength="180" required
+               placeholder="e.g. Cabinets delivered to site" />
+        <label for="due_date">Due</label>
+        <input id="due_date" type="date" name="due_date" required />
+        <label for="milestone_status">Status</label>
+        <select id="milestone_status" name="status">
+          {% for value in milestone_statuses %}
+          <option value="{{ value }}" {% if value == 'Pending' %}selected{% endif %}>{{ value }}</option>
+          {% endfor %}
+        </select>
+        <button class="btn" type="submit">Add milestone</button>
+      </form>
+      {% endif %}
+    </div>
+
+    {# -------------------------------------------------------------- tasks #}
+    <div class="dash-panel hr-table-panel">
+      <h2>Tasks</h2>
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr><th>Task</th><th>Milestone</th><th>Assigned to</th><th>Due</th>
+                <th>Progress</th><th>Status</th>
+                {% if can_tasks %}<th></th>{% endif %}</tr>
+          </thead>
+          <tbody>
+            {% for task in tasks %}
+            <tr>
+              <td>
+                {{ task["task_title"] }}
+                <br><span class="feed-meta">{{ task["priority"] }} priority</span>
+              </td>
+              <td>{{ task["milestone_name"] or '—' }}</td>
+              <td>{{ task["assigned_name"] or 'Unassigned' }}</td>
+              <td class="nowrap"
+                  {% if task['status'] != 'Completed' and task['due_date']
+                        and task['due_date'] < today %}
+                  style="color: var(--danger-ink); font-weight: 600;"
+                  {% endif %}>
+                {{ task["due_date"] or '—' }}
+              </td>
+              <td class="nowrap">
+                <div class="bar-track">
+                  <div class="bar-fill" style="width: {{ task['progress'] | int }}%"></div>
+                </div>
+                <span class="feed-meta">{{ task["progress"] | int }}%</span>
+              </td>
+              <td>
+                <span class="status-badge {{ 'active' if task['status'] == 'Completed'
+                      else 'off' if task['status'] == 'Blocked' else 'neutral' }}">
+                  {{ task["status"] }}
+                </span>
+              </td>
+              {% if can_tasks %}
+              <td>
+                <form method="POST" class="row-actions"
+                      action="{{ url_for('project.update_project_task', task_id=task['id']) }}">
+                  {{ csrf_field() }}
+                  <select name="status" aria-label="Task status">
+                    {% for value in task_statuses %}
+                    <option value="{{ value }}"
+                      {% if task["status"] == value %}selected{% endif %}>{{ value }}</option>
+                    {% endfor %}
+                  </select>
+                  <input type="number" name="progress" min="0" max="100" step="1"
+                         value="{{ task['progress'] | int }}" aria-label="Progress"
+                         style="width: 5.5em;" />
+                  <button class="btn btn-outline" type="submit">Save</button>
+                </form>
+              </td>
+              {% endif %}
+            </tr>
+            {% else %}
+            <tr><td colspan="{{ 7 if can_tasks else 6 }}">No task has been raised on this job.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% if can_tasks and not project["is_archived"] %}
+      <form method="POST" class="dash-form stock-grid"
+            action="{{ url_for('project.new_task', project_id=project['id']) }}">
+        {{ csrf_field() }}
+        <div>
+          <label for="task_title">Task *</label>
+          <input id="task_title" name="task_title" maxlength="180" required
+                 placeholder="e.g. Fit the upper cabinets" />
+        </div>
+        <div>
+          <label for="task_milestone">Milestone</label>
+          <select id="task_milestone" name="milestone_id">
+            <option value="">No milestone</option>
+            {% for milestone in milestones %}
+            <option value="{{ milestone['id'] }}">{{ milestone["milestone_name"] }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="assigned_user_id">Assign to</label>
+          <select id="assigned_user_id" name="assigned_user_id">
+            <option value="">Unassigned</option>
+            {% for account in accounts %}
+            <option value="{{ account['id'] }}">{{ account["full_name"] }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="task_priority">Priority</label>
+          <select id="task_priority" name="priority">
+            {% for value in project_priorities %}
+            <option value="{{ value }}" {% if value == 'Normal' %}selected{% endif %}>{{ value }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="task_start">Start</label>
+          <input id="task_start" type="date" name="start_date" />
+        </div>
+        <div>
+          <label for="task_due">Due</label>
+          <input id="task_due" type="date" name="due_date" />
+        </div>
+        <div>
+          <label for="task_status">Status</label>
+          <select id="task_status" name="status">
+            {% for value in task_statuses %}
+            <option value="{{ value }}" {% if value == 'Not Started' %}selected{% endif %}>{{ value }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="task_progress">Progress %</label>
+          <input id="task_progress" type="number" name="progress" min="0" max="100"
+                 step="1" value="0" />
+        </div>
+        <div class="stock-notes">
+          <label for="task_description">Description</label>
+          <textarea id="task_description" name="description" rows="3"
+                    maxlength="2000"></textarea>
+        </div>
+        <div class="stock-form-actions">
+          <button class="btn" type="submit">Add task</button>
+        </div>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}

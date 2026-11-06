@@ -1,0 +1,229 @@
+
+{% extends "base.html" %}
+
+{% block title %}Auditor Performance | Audit Management{% endblock %}
+
+{% block content %}
+
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Audit Management / Performance</span>
+            <h1>Auditor Performance</h1>
+            <p>Monitor auditor assignments, workload, progress and completed audit activities.</p>
+        </div>
+
+        <div class="stock-actions">
+            <a href="{{ url_for('audit.dashboard') }}" class="btn btn-outline btn-sm">Dashboard</a>
+            <a href="{{ url_for('audit.audit_assignments') }}" class="btn btn-outline btn-sm">Assignments</a>
+            <a href="{{ url_for('audit.audit_plans') }}" class="btn btn-outline btn-sm">Audit Plans</a>
+        </div>
+    </div>
+</section>
+
+<section class="container finance-page">
+
+    {% set performance_stats = stats | default({}, true) %}
+    {% set auditor_list = auditors | default([], true) %}
+
+    <div class="hr-stats">
+        <div class="dash-panel">
+            <span class="eyebrow">Total Auditors</span>
+            <h2>{{ performance_stats.total_auditors | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Active Assignments</span>
+            <h2>{{ performance_stats.active_assignments | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Completed Audits</span>
+            <h2>{{ performance_stats.completed_audits | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Overdue Assignments</span>
+            <h2>{{ performance_stats.overdue_assignments | default(0) }}</h2>
+        </div>
+    </div>
+
+    <div class="dash-panel">
+        <div class="dash-panel-head">
+            <div>
+                <h2>Performance Filters</h2>
+                <p>Filter auditor performance by department and reporting period.</p>
+            </div>
+        </div>
+
+        <form method="GET" action="{{ url_for('audit.auditor_performance') }}">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="search">Auditor</label>
+                    <input type="text" id="search" name="search"
+                           value="{{ filters.search | default('') }}"
+                           placeholder="Search auditor name or username">
+                </div>
+
+                <div class="form-group">
+                    <label for="department">Department</label>
+                    <select id="department" name="department">
+                        <option value="">All Departments</option>
+                        {% for department in departments | default([]) %}
+                        <option value="{{ department.name }}"
+                            {% if filters.department | default('') == department.name %}selected{% endif %}>
+                            {{ department.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="status">Assignment Status</label>
+                    <select id="status" name="status">
+                        <option value="">All Statuses</option>
+                        {% for status in ['Assigned', 'In Progress', 'Completed', 'Overdue', 'Cancelled'] %}
+                        <option value="{{ status }}"
+                            {% if filters.status | default('') == status %}selected{% endif %}>
+                            {{ status }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="date_from">From Date</label>
+                    <input type="date" id="date_from" name="date_from"
+                           value="{{ filters.date_from | default('') }}">
+                </div>
+
+                <div class="form-group">
+                    <label for="date_to">To Date</label>
+                    <input type="date" id="date_to" name="date_to"
+                           value="{{ filters.date_to | default('') }}">
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Apply Filters</button>
+                <a href="{{ url_for('audit.auditor_performance') }}" class="btn btn-outline">Reset</a>
+            </div>
+        </form>
+    </div>
+
+    <div class="dash-panel hr-table-panel">
+        <div class="dash-panel-head">
+            <div>
+                <h2>Auditor Performance Overview</h2>
+                <p>Workload and assignment completion by auditor.</p>
+            </div>
+        </div>
+
+        <div class="table-scroll">
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>Auditor</th>
+                        <th>Department</th>
+                        <th>Total Assignments</th>
+                        <th>In Progress</th>
+                        <th>Completed</th>
+                        <th>Overdue</th>
+                        <th>Completion Rate</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for auditor in auditor_list %}
+                    <tr>
+                        <td>
+                            <strong>{{ auditor.full_name | default(auditor.username | default('Unknown')) }}</strong>
+                            <small>{{ auditor.username | default('') }}</small>
+                        </td>
+                        <td>{{ auditor.department | default('—') }}</td>
+                        <td>{{ auditor.total_assignments | default(0) }}</td>
+                        <td>{{ auditor.in_progress | default(0) }}</td>
+                        <td>{{ auditor.completed | default(0) }}</td>
+                        <td>{{ auditor.overdue | default(0) }}</td>
+                        <td>
+                            {% set rate = auditor.completion_rate | default(0) | float %}
+                            <strong>{{ '%.1f' | format(rate) }}%</strong>
+                            <div class="progress-track">
+                                <div class="progress-bar"
+                                     style="width: {{ [100, [0, rate] | max] | min }}%;"></div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="report-empty">
+                            No auditor performance records are available.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="dash-panel hr-table-panel">
+        <div class="dash-panel-head">
+            <div>
+                <h2>Assignment Details</h2>
+                <p>Individual audit responsibilities and deadlines.</p>
+            </div>
+        </div>
+
+        <div class="table-scroll">
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>Audit Plan</th>
+                        <th>Auditor</th>
+                        <th>Assignment Role</th>
+                        <th>Assigned Date</th>
+                        <th>Due Date</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for assignment in assignments | default([], true) %}
+                    <tr>
+                        <td>
+                            <strong>{{ assignment.plan_number | default('—') }}</strong>
+                            <small>{{ assignment.plan_title | default('') }}</small>
+                        </td>
+                        <td>{{ assignment.auditor_name | default('—') }}</td>
+                        <td>{{ assignment.assignment_role | default('Auditor') }}</td>
+                        <td>{{ assignment.assigned_at | default('—') }}</td>
+                        <td>{{ assignment.due_date | default('—') }}</td>
+                        <td>{{ assignment.status | default('Assigned') }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="report-empty">
+                            No auditor assignments found.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="dash-panel">
+        <h2>Performance Measurement Guidelines</h2>
+        <ul>
+            <li>Calculate completion rate using completed assignments divided by eligible assignments.</li>
+            <li>Determine overdue status using due dates and actual assignment status.</li>
+            <li>Do not count cancelled assignments as completed work.</li>
+            <li>Use approved assignment records as the source of workload information.</li>
+            <li>Restrict individual performance information to authorized users.</li>
+            <li>Do not treat assignment volume alone as a measure of audit quality.</li>
+        </ul>
+    </div>
+
+</section>
+
+{% endblock %}

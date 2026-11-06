@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi, bars, feed with context %}
+
+{% block title %}Marketing Reports | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+{% set totals = summary["totals"] %}
+
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">MARKETING MANAGEMENT</span>
+      <h1>Marketing Reports</h1>
+      <p>What the desk planned, what it spent, what came back and what customers
+        said.</p>
+    </div>
+    <div class="row-actions">
+      <a class="btn btn-outline" href="{{ url_for('marketing.dashboard') }}">
+        ← Marketing desk
+      </a>
+      <a class="btn" href="#" onclick="window.print(); return false;">Print</a>
+    </div>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <form method="GET" class="stock-search">
+      <label for="start">Campaigns started from</label>
+      <input id="start" type="date" name="start" value="{{ start }}" />
+      <label for="end">to</label>
+      <input id="end" type="date" name="end" value="{{ end }}" />
+      <button class="btn" type="submit">Apply</button>
+      <a class="btn btn-outline" href="{{ url_for('marketing.reports') }}">Reset</a>
+    </form>
+
+    <div class="hr-stats">
+      {{ kpi('Plans raised', totals["plan_count"], 'all statuses') }}
+      {{ kpi('Approved plan budget', "{:,.2f}".format(totals["plan_budget"] | float),
+             'ETB committed') }}
+      {{ kpi('Campaign budget', "{:,.2f}".format(totals["campaign_budget"] | float),
+             'ETB, cancellations out') }}
+      {{ kpi('Active campaigns', totals["active_campaigns"], 'running now') }}
+      {{ kpi('Leads', totals["lead_count"],
+             '{} converted'.format(totals["converted_leads"])) }}
+      {{ kpi('Follow-ups overdue', totals["overdue_leads"],
+             'past their date and still open',
+             'down' if totals["overdue_leads"] else 'flat') }}
+      {{ kpi('Feedback pending', totals["pending_feedback"], 'no answer yet',
+             'warn' if totals["pending_feedback"] else 'flat') }}
+      {{ kpi('Customer revenue', "{:,.2f}".format(totals["customer_revenue"] | float),
+             'ETB billed to {} customers'.format(totals["customer_count"])) }}
+    </div>
+
+    {% set channel_rows = [] %}
+    {% for row in channels %}
+      {% set _ = channel_rows.append({
+        'label': row["channel"], 'value': row["budget"] | float,
+        'display': '{:,.0f} ETB · {} campaigns'.format(
+          row["budget"] | float, row["campaigns"])
+      }) %}
+    {% endfor %}
+
+    {% set source_rows = [] %}
+    {% for row in pipeline %}
+      {% set _ = source_rows.append({
+        'label': row["source"], 'value': row["total"] | int,
+        'display': '{} of {} won'.format(row["converted"], row["total"])
+      }) %}
+    {% endfor %}
+
+    {% set pending_rows = [] %}
+    {% for row in feedback %}
+      {% set _ = pending_rows.append({
+        'icon': 'warn' if row["total"] != row["settled"] else 'check',
+        'tone': 'warn' if row["total"] != row["settled"] else 'ok',
+        'title': '{} · {} record{}'.format(row["feedback_type"], row["total"],
+                                           '' if row["total"] == 1 else 's'),
+        'meta': '{} settled · average rating {:.1f}'.format(
+          row["settled"], row["average_rating"] | float),
+        'time': ''
+      }) %}
+    {% endfor %}
+
+    <div class="chart-grid">
+      {{ bars('Budget by channel', channel_rows, 'campaigns carry it') }}
+      {{ bars('Leads by source', source_rows, 'converted share') }}
+      {{ feed('Feedback by type', pending_rows, 'how each kind settled') }}
+    </div>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>Campaign performance{% if start or end %} · window applied{% endif %}</h2>
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Campaign</th><th>Channel</th><th>Window</th><th>Budget</th>
+              <th>Leads from this channel</th><th>Pushes</th><th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in performance %}
+            <tr>
+              <td>{{ row["name"] }}</td>
+              <td>{{ row["channel"] or '—' }}</td>
+              <td class="nowrap">
+                {{ row["start_date"] or '—' }}<br>
+                <span class="feed-meta">to {{ row["end_date"] or '—' }}</span>
+              </td>
+              <td class="nowrap">
+                {{ "{:,.2f}".format(row["budget"] | float) }}
+                <span class="feed-meta">{{ row["currency"] }}</span>
+              </td>
+              <td>{{ row["leads"] }}</td>
+              <td>{{ row["pushes"] }}</td>
+              <td>
+                <span class="status-badge {{ 'active' if row["status"] in
+                      ('Active', 'Completed') else 'off' if row["status"] == 'Cancelled'
+                      else 'neutral' }}">{{ row["status"] }}</span>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7">No campaign falls in this window.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="panel-note">A lead counts against a channel when its source carries
+        the same name, so a showroom enquiry belongs to the showroom campaign.</p>
+    </div>
+
+    <div class="dash-panel">
+      <h2>Exports</h2>
+      <p class="panel-note">Each file carries the rows the desk can see, with the
+        filter that is on screen. The house writer quotes every cell and keeps a
+        typed value that starts with = or @ as text, so a name cannot become a
+        formula on the reader's machine. Every export writes one audit line.</p>
+      <div class="row-actions">
+        {% for kind, label in [('plans', 'Plans'), ('campaigns', 'Campaigns'),
+                               ('leads', 'Leads'), ('digital', 'Digital pushes'),
+                               ('research', 'Research'), ('feedback', 'Feedback'),
+                               ('customers', 'Customers')] %}
+        <a class="btn btn-outline" href="{{ url_for('marketing.export', kind=kind) }}">
+          {{ label }} CSV
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

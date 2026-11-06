@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container-fluid py-4">
+
+    <h3>New Maintenance Request</h3>
+
+    <p class="text-muted">
+        Submit an asset maintenance or repair request.
+    </p>
+
+    <div class="card shadow-sm p-4">
+
+        <form method="POST">
+
+            <input type="hidden"
+                   name="csrf_token"
+                   value="{{ csrf_token() }}">
+
+            <div class="mb-3">
+                <label class="form-label">Select Asset</label>
+
+                <select name="asset_id" class="form-select" required>
+                    <option value="">Select Asset</option>
+
+                    {% for asset in assets %}
+                    <option value="{{ asset.id }}">
+                        {{ asset.asset_code }} - {{ asset.name }}
+                    </option>
+                    {% endfor %}
+
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Maintenance Type</label>
+
+                <select name="maintenance_type"
+                        class="form-select"
+                        required>
+
+                    <option value="">Select Type</option>
+                    <option value="Preventive">Preventive Maintenance</option>
+                    <option value="Corrective">Corrective Maintenance</option>
+                    <option value="Emergency">Emergency Repair</option>
+                    <option value="Inspection">Technical Inspection</option>
+
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Priority</label>
+
+                <select name="priority" class="form-select" required>
+                    <option value="Low">Low</option>
+                    <option value="Normal" selected>Normal</option>
+                    <option value="High">High</option>
+                    <option value="Critical">Critical</option>
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Problem Description</label>
+
+                <textarea name="description"
+                          class="form-control"
+                          rows="4"
+                          required
+                          placeholder="Describe the problem or maintenance requirement."></textarea>
+            </div>
+
+            <button type="submit" class="btn btn-success">
+                Submit Request
+            </button>
+
+            <a href="{{ url_for('asset_management.maintenance_list') }}"
+               class="btn btn-secondary">
+                Cancel
+            </a>
+
+        </form>
+
+    </div>
+
+</div>
+
+{% endblock %}

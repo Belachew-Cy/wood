@@ -119,6 +119,52 @@
     });
   }
 
+  /* Expandable groups: the group holding the current page always opens, and
+     every other group remembers the reader's last choice. */
+  document.querySelectorAll('.dash-nav-group').forEach((group, index) => {
+    const toggle = group.querySelector('.dash-nav-toggle');
+    const list = group.querySelector('.dash-nav-list');
+    if (!toggle || !list) return;
+    const key = 'wk-nav-group:' + (group.dataset.navGroup || index);
+    let stored = null;
+    try { stored = window.localStorage.getItem(key); } catch (err) { stored = null; }
+    const hasActive = !!group.querySelector('.dash-nav-link.active');
+    // The rail wraps into a band up to 1199px. Opening every group there turns
+    // it into a page-tall wall of pills, so only the current group starts open.
+    const compact = window.matchMedia('(max-width: 1199px)').matches;
+    const open = hasActive || (stored !== null ? stored === '1' : !compact);
+    group.classList.toggle('is-collapsed', !open);
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    toggle.addEventListener('click', () => {
+      const expanded = !group.classList.toggle('is-collapsed');
+      toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      try {
+        window.localStorage.setItem(key, expanded ? '1' : '0');
+      } catch (err) { /* private mode: the rail simply starts open next time */ }
+    });
+  });
+
+  /* Saved collapse states land before the first frame; arming the transition
+     afterwards keeps groups from animating shut on page load. */
+  const railNav = document.querySelector('.dash-sidebar-nav');
+  if (railNav) {
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      railNav.classList.add('is-animated');
+    }));
+  }
+
+  /* On a long rail the current page can sit below the fold; centre it once so
+     the active module is visible without the reader hunting for it. */
+  const railScroll = document.querySelector('.dash-sidebar');
+  const activeLink = document.querySelector('.dash-sidebar .dash-nav-link.active');
+  if (railScroll && activeLink
+      && window.matchMedia('(min-width: 1101px)').matches
+      && railScroll.scrollHeight > railScroll.clientHeight + 8) {
+    const top = activeLink.getBoundingClientRect().top
+      - railScroll.getBoundingClientRect().top + railScroll.scrollTop;
+    railScroll.scrollTop = Math.max(0, top - railScroll.clientHeight / 3);
+  }
+
   /* ============================================================
      FOOTER YEAR
      ============================================================ */
@@ -146,11 +192,26 @@
 
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
-    toast.innerHTML = `
-      <span class="t-icon">${TOAST_ICONS[type] || TOAST_ICONS.info}</span>
-      <div>${title ? `<strong>${title}</strong>` : ''}<span>${message}</span></div>
-      <button class="t-close" aria-label="Dismiss">&times;</button>
-    `;
+    // A toast repeats whatever the server just said about a record - a plan
+    // title, an applicant's name - so that text goes in as text, never as
+    // markup. Only the fixed icon below is allowed to be HTML.
+    const icon = document.createElement('span');
+    icon.className = 't-icon';
+    icon.innerHTML = TOAST_ICONS[type] || TOAST_ICONS.info;
+    const body = document.createElement('div');
+    if (title) {
+      const strong = document.createElement('strong');
+      strong.textContent = title;
+      body.appendChild(strong);
+    }
+    const text = document.createElement('span');
+    text.textContent = message;
+    body.appendChild(text);
+    const close = document.createElement('button');
+    close.className = 't-close';
+    close.setAttribute('aria-label', 'Dismiss');
+    close.textContent = '\u00d7';
+    toast.append(icon, body, close);
 
     const dismiss = () => {
       toast.classList.add('hide');
@@ -466,12 +527,24 @@
       const filtered = items.filter(i =>
         i.label.toLowerCase().includes(filter.toLowerCase())
       );
-      list.innerHTML = filtered.map((item, idx) => `
-        <div class="palette-item ${idx === 0 ? 'selected' : ''}" data-href="${item.href}">
-          <span>→</span>
-          <span>${item.label}</span>
-        </div>
-      `).join('') || '<div class="palette-item">No results</div>';
+      list.textContent = '';
+      if (filtered.length === 0) {
+        const none = document.createElement('div');
+        none.className = 'palette-item';
+        none.textContent = 'No results';
+        list.appendChild(none);
+      }
+      filtered.forEach((item, idx) => {
+        const row = document.createElement('div');
+        row.className = 'palette-item' + (idx === 0 ? ' selected' : '');
+        row.dataset.href = item.href;
+        const arrow = document.createElement('span');
+        arrow.textContent = '→';
+        const label = document.createElement('span');
+        label.textContent = item.label;
+        row.append(arrow, label);
+        list.appendChild(row);
+      });
 
       list.querySelectorAll('.palette-item').forEach(el => {
         el.addEventListener('click', () => {

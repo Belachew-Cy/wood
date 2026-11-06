@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}Allocate Asset | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">ASSET MANAGEMENT</span>
+      <h1>Allocate an asset</h1>
+      <p>Hand an available unit to a department, and to one named custodian when
+        a person is answerable for it.</p>
+    </div>
+    <div class="row-actions">
+      <a class="btn btn-outline" href="{{ url_for('asset.dashboard') }}">
+        ← Asset desk
+      </a>
+      <a class="btn btn-outline" href="{{ url_for('asset.assets') }}">
+        Asset register
+      </a>
+    </div>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="dash-panel">
+      <h2>Allocation details</h2>
+
+      {% if available_assets %}
+      <form method="POST" class="dash-form stock-grid"
+            action="{{ url_for('asset.allocate') }}">
+        {{ csrf_field() }}
+
+        <div class="stock-notes">
+          <label for="asset_id">Available asset *</label>
+          <select id="asset_id" name="asset_id" required>
+            <option value="">Choose a unit</option>
+            {% for row in available_assets %}
+            <option value="{{ row['id'] }}"
+              {% if selected_asset == row['id'] %}selected{% endif %}>
+              {{ row["asset_code"] }} · {{ row["name"] }}
+              ({{ row["category_name"] or 'Uncategorised' }})
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label for="department_id">Department *</label>
+          <select id="department_id" name="department_id" required>
+            <option value="">Choose a department</option>
+            {% for row in departments %}
+            <option value="{{ row['id'] }}">{{ row["name"] }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label for="custodian_user_id">Custodian</label>
+          <select id="custodian_user_id" name="custodian_user_id">
+            <option value="">No named custodian</option>
+            {% for account in accounts %}
+            <option value="{{ account['id'] }}">
+              {{ account["full_name"] }} ({{ account["username"] }})
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label for="expected_return">Expected return</label>
+          <input id="expected_return" type="date" name="expected_return" />
+        </div>
+
+        <div class="stock-notes">
+          <label for="remarks">Remarks</label>
+          <textarea id="remarks" name="remarks" rows="3" maxlength="500"
+                    placeholder="Where it is going, what it is for, or the handover note."></textarea>
+        </div>
+
+        <div class="stock-form-actions">
+          <button class="btn" type="submit">Allocate asset</button>
+          <a class="btn btn-outline" href="{{ url_for('asset.assets') }}">Cancel</a>
+        </div>
+      </form>
+      {% else %}
+      <p class="panel-note">Every unit is already allocated, in maintenance or
+        deactivated. Return a unit to the available pool before allocating it
+        again.</p>
+      <a class="btn" href="{{ url_for('asset.assets', status='Assigned') }}">
+        See allocated units
+      </a>
+      {% endif %}
+
+      <p class="panel-note">Allocating writes one allocation row and moves the
+        asset to Assigned in the same transaction. Returning it from the asset
+        page closes that row with a date and puts the unit back on the available
+        shelf.</p>
+    </div>
+  </div>
+</section>
+{% endblock %}

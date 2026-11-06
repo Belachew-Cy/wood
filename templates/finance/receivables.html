@@ -1,0 +1,276 @@
+
+{% extends "base.html" %}
+
+{% block title %}Accounts Receivable | Finance{% endblock %}
+
+{% block content %}
+{% set receivables = receivables|default([], true) %}
+{% set summary = summary|default({}, true) %}
+{% set aging = aging|default({}, true) %}
+
+<div class="finance-receivables-page">
+
+    <header class="page-header finance-page-header">
+        <div>
+            <h1>Accounts Receivable</h1>
+            <p>Monitor customer invoices, outstanding balances and payments.</p>
+        </div>
+
+        <a href="{{ url_for('finance.dashboard') }}"
+           class="btn btn-secondary">
+            Back to Dashboard
+        </a>
+    </header>
+
+    {% if error %}
+        <div class="alert alert-danger" role="alert">
+            {{ error }}
+        </div>
+    {% endif %}
+
+    {% if success %}
+        <div class="alert alert-success" role="alert">
+            {{ success }}
+        </div>
+    {% endif %}
+
+    <!-- Receivables Summary -->
+    <section class="finance-ledger-summary">
+
+        <div class="finance-summary-card">
+            <span>Total Receivables</span>
+            <strong>
+                {{ currency_symbol|default('ETB') }}
+                {{ "%.2f"|format(summary.get('total_receivables', 0)|float) }}
+            </strong>
+        </div>
+
+        <div class="finance-summary-card">
+            <span>Outstanding Amount</span>
+            <strong>
+                {{ currency_symbol|default('ETB') }}
+                {{ "%.2f"|format(summary.get('outstanding', 0)|float) }}
+            </strong>
+        </div>
+
+        <div class="finance-summary-card">
+            <span>Overdue Amount</span>
+            <strong>
+                {{ currency_symbol|default('ETB') }}
+                {{ "%.2f"|format(summary.get('overdue', 0)|float) }}
+            </strong>
+        </div>
+
+        <div class="finance-summary-card">
+            <span>Received Payments</span>
+            <strong>
+                {{ currency_symbol|default('ETB') }}
+                {{ "%.2f"|format(summary.get('received', 0)|float) }}
+            </strong>
+        </div>
+
+    </section>
+
+    <!-- Aging Summary -->
+    <section class="finance-panel">
+        <div class="finance-panel-header">
+            <h2>Receivables Aging Analysis</h2>
+            <p>Outstanding invoice balances grouped by overdue period.</p>
+        </div>
+
+        <div class="finance-aging-grid">
+
+            <div class="finance-aging-card">
+                <span>Current</span>
+                <strong>
+                    {{ currency_symbol|default('ETB') }}
+                    {{ "%.2f"|format(aging.get('current', 0)|float) }}
+                </strong>
+            </div>
+
+            <div class="finance-aging-card">
+                <span>1–30 Days</span>
+                <strong>
+                    {{ currency_symbol|default('ETB') }}
+                    {{ "%.2f"|format(aging.get('days_1_30', 0)|float) }}
+                </strong>
+            </div>
+
+            <div class="finance-aging-card">
+                <span>31–60 Days</span>
+                <strong>
+                    {{ currency_symbol|default('ETB') }}
+                    {{ "%.2f"|format(aging.get('days_31_60', 0)|float) }}
+                </strong>
+            </div>
+
+            <div class="finance-aging-card">
+                <span>61–90 Days</span>
+                <strong>
+                    {{ currency_symbol|default('ETB') }}
+                    {{ "%.2f"|format(aging.get('days_61_90', 0)|float) }}
+                </strong>
+            </div>
+
+            <div class="finance-aging-card">
+                <span>Over 90 Days</span>
+                <strong>
+                    {{ currency_symbol|default('ETB') }}
+                    {{ "%.2f"|format(aging.get('over_90', 0)|float) }}
+                </strong>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- Filters -->
+    <section class="finance-panel">
+        <div class="finance-panel-header">
+            <h2>Search Receivables</h2>
+        </div>
+
+        <form method="GET"
+              action="{{ url_for('finance.receivables') }}"
+              class="finance-filter-form">
+
+            <div class="finance-form-grid">
+
+                <div class="form-group">
+                    <label for="search">Customer / Invoice</label>
+                    <input type="text"
+                           id="search"
+                           name="search"
+                           value="{{ search|default('') }}"
+                           placeholder="Search customer or invoice number">
+                </div>
+
+                <div class="form-group">
+                    <label for="status">Payment Status</label>
+                    <select id="status" name="status">
+                        <option value="">All Statuses</option>
+                        {% for status in ['Unpaid', 'Partially Paid', 'Paid', 'Overdue'] %}
+                            <option value="{{ status }}"
+                                {% if selected_status|default('') == status %}
+                                    selected
+                                {% endif %}>
+                                {{ status }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="start_date">Invoice From</label>
+                    <input type="date"
+                           id="start_date"
+                           name="start_date"
+                           value="{{ start_date|default('') }}">
+                </div>
+
+                <div class="form-group">
+                    <label for="end_date">Invoice To</label>
+                    <input type="date"
+                           id="end_date"
+                           name="end_date"
+                           value="{{ end_date|default('') }}">
+                </div>
+
+            </div>
+
+            <div class="finance-form-actions">
+                <a href="{{ url_for('finance.receivables') }}"
+                   class="btn btn-secondary">
+                    Reset
+                </a>
+
+                <button type="submit" class="btn btn-primary">
+                    Apply Filters
+                </button>
+            </div>
+        </form>
+    </section>
+
+    <!-- Receivables Register -->
+    <section class="finance-panel">
+        <div class="finance-panel-header">
+            <div>
+                <h2>Customer Receivables</h2>
+                <p>Invoice and payment records from the existing sales or invoicing module.</p>
+            </div>
+        </div>
+
+        <div class="finance-table-wrapper">
+            <table class="table finance-table">
+
+                <thead>
+                    <tr>
+                        <th>Invoice Number</th>
+                        <th>Customer</th>
+                        <th>Invoice Date</th>
+                        <th>Due Date</th>
+                        <th>Invoice Amount</th>
+                        <th>Paid Amount</th>
+                        <th>Outstanding</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for item in receivables %}
+                    <tr>
+                        <td>{{ item.get('invoice_number', '—') }}</td>
+
+                        <td>{{ item.get('customer_name', '—') }}</td>
+
+                        <td>{{ item.get('invoice_date', '—') }}</td>
+
+                        <td>{{ item.get('due_date', '—') }}</td>
+
+                        <td>
+                            {{ item.get('currency', 'ETB') }}
+                            {{ "%.2f"|format(item.get('invoice_amount', 0)|float) }}
+                        </td>
+
+                        <td>
+                            {{ item.get('currency', 'ETB') }}
+                            {{ "%.2f"|format(item.get('paid_amount', 0)|float) }}
+                        </td>
+
+                        <td>
+                            {{ item.get('currency', 'ETB') }}
+                            {{ "%.2f"|format(item.get('outstanding_amount', 0)|float) }}
+                        </td>
+
+                        <td>
+                            {% set status = item.get('status', 'Unknown') %}
+
+                            <span class="status-badge
+                                {% if status == 'Paid' %}
+                                    status-active
+                                {% elif status == 'Overdue' %}
+                                    status-inactive
+                                {% elif status == 'Partially Paid' %}
+                                    status-pending
+                                {% else %}
+                                    status-neutral
+                                {% endif %}">
+                                {{ status }}
+                            </span>
+                        </td>
+                    </tr>
+
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="finance-empty-state">
+                            No receivable records found.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+
+            </table>
+        </div>
+    </section>
+
+</div>
+{% endblock %}

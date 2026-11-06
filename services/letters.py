@@ -10,7 +10,7 @@ inherited from a role without that default.
 """
 
 from core.access import current_user
-from core.access import user_extra_roles
+from core.access import account_role_keys
 from core.db import get_db
 from flask import abort
 from flask import g
@@ -201,11 +201,16 @@ LETTER_PERMISSION_NOTE = {
 }
 
 
-# Nothing here is automatic. Administrators hold every action; every other
-# account is granted letter actions by name on the Letter permissions screen.
-# The module tick a role carries is the one thing an administrator grants at
-# role level, and it opens the register to read - never to change.
+# An administrator holds every action. Everyone else is granted letter actions by
+# name, either on the Letter permissions screen for one account or in the role
+# dialog for every account that carries a role. An account with no grant of either
+# kind reads the register only when its role carries the Letters module tick.
 LETTER_ROLE_BASELINE = frozenset(("letters_view",))
+
+# Every action is taken from inside the register, so a grant that names an action
+# without the right to open it would strand it: saving a role always carries this
+# along, exactly as the hiring desk carries its two read rights.
+LETTER_VIEW_BASE = frozenset(("letters_view",))
 
 
 def letter_type_label(letter_type):
@@ -229,12 +234,39 @@ def stored_letter_permissions(db, user_id):
     return True, {row["permission"] for row in rows if row["allowed"]}
 
 
+def stored_letter_role_permissions(db, role_key):
+    """(has_rows, granted) for one role's letter matrix."""
+    rows = db.execute(
+        "SELECT permission, allowed FROM letter.letter_role_permissions"
+        " WHERE role_key = ?", (role_key,)).fetchall()
+    if not rows:
+        return False, set()
+    return True, {row["permission"] for row in rows
+                  if row["allowed"] and row["permission"] in LETTER_PERMISSIONS}
+
+
+def letter_role_grants(db, role_keys):
+    """Letter actions every role this account carries grants by name."""
+    held = set()
+    for role_key in role_keys:
+        if not role_key:
+            continue
+        try:
+            has_rows, granted = stored_letter_role_permissions(db, role_key)
+        except sqlite3.Error:
+            continue
+        if has_rows:
+            held |= granted
+    return held
+
+
 def letter_permission_set(user):
     """Every letter action this account holds.
 
     An administrator holds all of them. Everyone else holds exactly what was
-    granted on the Letter permissions screen; an account with no grants yet can
-    read the register only when its role carries the Letters module tick.
+    granted on the Letter permissions screen for that one account. With no
+    per-account rows the role matrices apply: the Letters module tick alone
+    opens the register, and any action a carried role names is added to it.
     """
     if user is None:
         return frozenset()
@@ -261,6 +293,7 @@ def letter_permission_set(user):
         from core.access import effective_permissions
         held = (set(LETTER_ROLE_BASELINE)
                 if "letters" in effective_permissions(user) else set())
+        held |= letter_role_grants(db, account_role_keys(db, user))
     # A Manager, Director or CEO seat may sign ladders by itself; derived from
     # the position so the right follows the seat rather than a stored row.
     from services.workflow import position_grants_approval
@@ -671,11 +704,6 @@ def letter_current_step(letter):
     return letter["approval_step"] if "approval_step" in keys else None
 
 
-def letter_can_sign_here(user, letter, db=None):
-    step = letter_current_step(letter)
-    return bool(step) and step in letter_signable_steps(user, db)
-
-
 def approval_step_holders(db, step):
     """Active accounts that hold this rung right now, for the bell entry."""
     return [account for account in
@@ -772,7 +800,7 @@ def _letter_oversight(db, user):
         return False
     if user["role"] in LETTER_OVERSIGHT_ROLES:
         return True
-    return bool(set(user_extra_roles(db, user["id"])) & set(LETTER_OVERSIGHT_ROLES))
+    return bool(set(account_role_keys(db, user)) & set(LETTER_OVERSIGHT_ROLES))
 
 
 def letter_visibility_sql(db, user, alias="letters"):
@@ -793,14 +821,15 @@ def letter_visibility_sql(db, user, alias="letters"):
     department_id = department["id"] if department else -1
     user_id = user["id"]
     marks = ", ".join("?" for _ in categories)
-    # A letter waiting on the ladder is readable by whoever holds the rung that
-    # is open; everyone who has already signed keeps reading it afterwards.
+    # Every desk the letter's route passes through keeps reading it, so a
+    # signature request does not dead-end once the route moves past its rung.
     signable = letter_signable_steps(user, db)
-    pending_sql, pending_params = "", ()
+    route_sql, route_params = "", ()
     if signable:
-        pending_sql = (" OR ({a}.status = ? AND {a}.approval_step IN ({}))"
-                       .format(", ".join("?" for _ in signable), a=alias))
-        pending_params = (LETTER_PENDING_STATUS,) + tuple(signable)
+        route_sql = (" OR EXISTS (SELECT 1 FROM letter.letter_approval_steps AS lr"
+                     " WHERE lr.letter_id = {a}.id AND lr.step IN ({}))"
+                     .format(", ".join("?" for _ in signable), a=alias))
+        route_params = tuple(signable)
     sql = ("{a}.letter_type IN ({marks})"
            " AND ({a}.created_by = ? OR {a}.sender_user_id = ?"
            " OR {a}.recipient_user_id = ? OR {a}.sender_department_id = ?"
@@ -810,10 +839,10 @@ def letter_visibility_sql(db, user, alias="letters"):
            " AND (ld.user_id = ? OR ld.department_id = ?))"
            " OR EXISTS (SELECT 1 FROM letter.letter_approval_steps AS ls"
            " WHERE ls.letter_id = {a}.id AND ls.actor_id = ?)"
-           "{pending})").format(a=alias, marks=marks, pending=pending_sql)
+           "{route})").format(a=alias, marks=marks, route=route_sql)
     return sql, tuple(categories) + (
         user_id, user_id, user_id, department_id, department_id, user_id,
-        department_id, user_id) + pending_params
+        department_id, user_id) + route_params
 
 
 def letter_visible_to(db, letter, user):
@@ -833,11 +862,14 @@ def letter_visible_to(db, letter, user):
     if department_id in (letter["sender_department_id"],
                          letter["recipient_department_id"]):
         return True
-    if letter["status"] == LETTER_PENDING_STATUS:
-        keys = letter.keys()
-        if ("approval_step" in keys
-                and letter["approval_step"] in letter_signable_steps(user, db)):
-            return True
+    signable = letter_signable_steps(user, db)
+    if signable and db.execute(
+            "SELECT 1 FROM letter.letter_approval_steps WHERE letter_id = ?"
+            " AND step IN ({})".format(", ".join("?" for _ in signable)),
+            (letter["id"],) + tuple(signable)).fetchone() is not None:
+        # A rung of this letter's route is this account's to sign - or was,
+        # before the route moved on - so the letter stays readable to that desk.
+        return True
     if db.execute("SELECT 1 FROM letter.letter_approval_steps WHERE letter_id = ?"
                   " AND actor_id = ?",
                   (letter["id"], user_id)).fetchone() is not None:

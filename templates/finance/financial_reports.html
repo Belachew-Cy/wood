@@ -1,0 +1,337 @@
+
+{% extends "base.html" %}
+
+{% block title %}Financial Reports | Finance{% endblock %}
+
+{% block content %}
+{% set reports = reports|default({}, true) %}
+{% set trial_balance = trial_balance|default([], true) %}
+{% set income_statement = income_statement|default({}, true) %}
+{% set balance_sheet = balance_sheet|default({}, true) %}
+{% set cash_flow = cash_flow|default({}, true) %}
+
+<div class="finance-reports-page">
+
+    <header class="page-header finance-page-header">
+        <div>
+            <h1>Financial Reports</h1>
+            <p>Generate and review financial statements and accounting reports.</p>
+        </div>
+
+        <a href="{{ url_for('finance.dashboard') }}"
+           class="btn btn-secondary">
+            Back to Dashboard
+        </a>
+    </header>
+
+    {% if error %}
+        <div class="alert alert-danger" role="alert">
+            {{ error }}
+        </div>
+    {% endif %}
+
+    <!-- Report Filters -->
+    <section class="finance-panel">
+        <div class="finance-panel-header">
+            <h2>Report Parameters</h2>
+        </div>
+
+        <form method="GET"
+              action="{{ url_for('finance.financial_reports') }}"
+              class="finance-filter-form">
+
+            <div class="finance-form-grid">
+
+                <div class="form-group">
+                    <label for="report_type">Report Type</label>
+                    <select id="report_type" name="report_type">
+                        {% for report in [
+                            ('all', 'All Reports'),
+                            ('trial_balance', 'Trial Balance'),
+                            ('income_statement', 'Income Statement'),
+                            ('balance_sheet', 'Balance Sheet'),
+                            ('cash_flow', 'Cash Flow Statement')
+                        ] %}
+                            <option value="{{ report[0] }}"
+                                {% if selected_report|default('all') == report[0] %}
+                                    selected
+                                {% endif %}>
+                                {{ report[1] }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="period_id">Financial Period</label>
+                    <select id="period_id" name="period_id">
+                        <option value="">Select Period</option>
+
+                        {% for period in periods|default([], true) %}
+                            <option value="{{ period['id'] }}"
+                                {% if selected_period_id|string == period['id']|string %}
+                                    selected
+                                {% endif %}>
+                                {{ period['period_name'] }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="start_date">Start Date</label>
+                    <input type="date"
+                           id="start_date"
+                           name="start_date"
+                           value="{{ start_date|default('') }}">
+                </div>
+
+                <div class="form-group">
+                    <label for="end_date">End Date</label>
+                    <input type="date"
+                           id="end_date"
+                           name="end_date"
+                           value="{{ end_date|default('') }}">
+                </div>
+
+            </div>
+
+            <div class="finance-form-actions">
+                <a href="{{ url_for('finance.financial_reports') }}"
+                   class="btn btn-secondary">
+                    Reset
+                </a>
+
+                <button type="submit" class="btn btn-primary">
+                    Generate Reports
+                </button>
+            </div>
+        </form>
+    </section>
+
+    <!-- Financial Summary -->
+    {% if can_view_financial_reports|default(false) %}
+    <section class="finance-ledger-summary">
+
+        <div class="finance-summary-card">
+            <span>Total Revenue</span>
+            <strong>
+                {{ currency_symbol|default('ETB') }}
+                {{ "%.2f"|format(reports.get('total_revenue', 0)|float) }}
+            </strong>
+        </div>
+
+        <div class="finance-summary-card">
+            <span>Total Expenses</span>
+            <strong>
+                {{ currency_symbol|default('ETB') }}
+                {{ "%.2f"|format(reports.get('total_expenses', 0)|float) }}
+            </strong>
+        </div>
+
+        <div class="finance-summary-card">
+            <span>Net Profit / Loss</span>
+            <strong>
+                {{ currency_symbol|default('ETB') }}
+                {{ "%.2f"|format(reports.get('net_profit', 0)|float) }}
+            </strong>
+        </div>
+
+        <div class="finance-summary-card">
+            <span>Total Assets</span>
+            <strong>
+                {{ currency_symbol|default('ETB') }}
+                {{ "%.2f"|format(reports.get('total_assets', 0)|float) }}
+            </strong>
+        </div>
+
+    </section>
+    {% endif %}
+
+    <!-- Trial Balance -->
+    {% if selected_report|default('all') in ['all', 'trial_balance'] %}
+    <section class="finance-panel">
+
+        <div class="finance-panel-header">
+            <div>
+                <h2>Trial Balance</h2>
+                <p>Debit and credit balances of ledger accounts.</p>
+            </div>
+        </div>
+
+        <div class="finance-table-wrapper">
+            <table class="table finance-table">
+
+                <thead>
+                    <tr>
+                        <th>Account Code</th>
+                        <th>Account Name</th>
+                        <th>Debit</th>
+                        <th>Credit</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for item in trial_balance %}
+                    <tr>
+                        <td>{{ item.get('account_code', '—') }}</td>
+                        <td>{{ item.get('account_name', '—') }}</td>
+                        <td>
+                            {{ "%.2f"|format(item.get('debit', 0)|float) }}
+                        </td>
+                        <td>
+                            {{ "%.2f"|format(item.get('credit', 0)|float) }}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="finance-empty-state">
+                            No trial balance records available.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+
+                <tfoot>
+                    <tr>
+                        <th colspan="2">Total</th>
+                        <th>
+                            {{ "%.2f"|format(reports.get('trial_balance_debit', 0)|float) }}
+                        </th>
+                        <th>
+                            {{ "%.2f"|format(reports.get('trial_balance_credit', 0)|float) }}
+                        </th>
+                    </tr>
+                </tfoot>
+
+            </table>
+        </div>
+    </section>
+    {% endif %}
+
+    <!-- Income Statement -->
+    {% if selected_report|default('all') in ['all', 'income_statement'] %}
+    <section class="finance-panel">
+
+        <div class="finance-panel-header">
+            <h2>Income Statement</h2>
+            <p>Revenue and expenses for the selected reporting period.</p>
+        </div>
+
+        <div class="finance-report-statement">
+
+            <div class="finance-report-line">
+                <span>Total Revenue</span>
+                <strong>
+                    {{ "%.2f"|format(income_statement.get('revenue', 0)|float) }}
+                </strong>
+            </div>
+
+            <div class="finance-report-line">
+                <span>Total Expenses</span>
+                <strong>
+                    {{ "%.2f"|format(income_statement.get('expenses', 0)|float) }}
+                </strong>
+            </div>
+
+            <div class="finance-report-line finance-report-total">
+                <span>Net Profit / Loss</span>
+                <strong>
+                    {{ "%.2f"|format(income_statement.get('net_profit', 0)|float) }}
+                </strong>
+            </div>
+
+        </div>
+    </section>
+    {% endif %}
+
+    <!-- Balance Sheet -->
+    {% if selected_report|default('all') in ['all', 'balance_sheet'] %}
+    <section class="finance-panel">
+
+        <div class="finance-panel-header">
+            <h2>Balance Sheet</h2>
+            <p>Financial position as of the selected reporting date.</p>
+        </div>
+
+        <div class="finance-report-statement">
+
+            <div class="finance-report-line">
+                <span>Total Assets</span>
+                <strong>
+                    {{ "%.2f"|format(balance_sheet.get('assets', 0)|float) }}
+                </strong>
+            </div>
+
+            <div class="finance-report-line">
+                <span>Total Liabilities</span>
+                <strong>
+                    {{ "%.2f"|format(balance_sheet.get('liabilities', 0)|float) }}
+                </strong>
+            </div>
+
+            <div class="finance-report-line">
+                <span>Total Equity</span>
+                <strong>
+                    {{ "%.2f"|format(balance_sheet.get('equity', 0)|float) }}
+                </strong>
+            </div>
+
+            <div class="finance-report-line finance-report-total">
+                <span>Liabilities + Equity</span>
+                <strong>
+                    {{ "%.2f"|format(balance_sheet.get('liabilities_and_equity', 0)|float) }}
+                </strong>
+            </div>
+
+        </div>
+    </section>
+    {% endif %}
+
+    <!-- Cash Flow Statement -->
+    {% if selected_report|default('all') in ['all', 'cash_flow'] %}
+    <section class="finance-panel">
+
+        <div class="finance-panel-header">
+            <h2>Cash Flow Statement</h2>
+            <p>Cash movements from operating, investing and financing activities.</p>
+        </div>
+
+        <div class="finance-report-statement">
+
+            <div class="finance-report-line">
+                <span>Operating Activities</span>
+                <strong>
+                    {{ "%.2f"|format(cash_flow.get('operating', 0)|float) }}
+                </strong>
+            </div>
+
+            <div class="finance-report-line">
+                <span>Investing Activities</span>
+                <strong>
+                    {{ "%.2f"|format(cash_flow.get('investing', 0)|float) }}
+                </strong>
+            </div>
+
+            <div class="finance-report-line">
+                <span>Financing Activities</span>
+                <strong>
+                    {{ "%.2f"|format(cash_flow.get('financing', 0)|float) }}
+                </strong>
+            </div>
+
+            <div class="finance-report-line finance-report-total">
+                <span>Net Cash Flow</span>
+                <strong>
+                    {{ "%.2f"|format(cash_flow.get('net_cash_flow', 0)|float) }}
+                </strong>
+            </div>
+
+        </div>
+    </section>
+    {% endif %}
+
+</div>
+{% endif %}
+
+{% endblock %}

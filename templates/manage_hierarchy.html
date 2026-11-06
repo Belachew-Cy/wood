@@ -3,12 +3,102 @@
 
 {% block title %}Organization &amp; Hierarchy | Dereje Belay Wood &amp; Kitchen{% endblock %}
 
+{% block extra_css %}
+<style>
+  /* Unit tree: one nested list, indented by its own rail, in the house tokens. */
+  .org-tree { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.45rem; }
+  .org-tree .org-tree {
+    margin-top: 0.45rem;
+    margin-left: 0.9rem;
+    padding-left: 0.9rem;
+    border-left: 1px dashed var(--line);
+  }
+  .org-tree-row {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    flex-wrap: wrap;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--white);
+  }
+  .org-tree-row.muted { background: var(--ivory-2); }
+  .org-tree-type {
+    padding: 0.05rem 0.4rem;
+    border-radius: var(--radius-pill);
+    background: var(--ivory-2);
+    color: var(--muted);
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .org-tree-name { color: var(--text-strong); font-weight: 600; }
+  .org-tree-row .org-team-count { margin-left: auto; }
+  .org-tree-people { margin: 0.2rem 0 0.35rem 1.15rem; }
+  .org-tree-people summary {
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 0.74rem;
+  }
+  .org-desk-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+    gap: var(--gap);
+    margin-top: var(--space-4);
+  }
+  .org-desk-card {
+    padding: var(--space-4);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    background: var(--white);
+  }
+  .org-desk-card strong { display: block; color: var(--text-strong); }
+  .org-desk-card .cell-note { margin-top: 0.2rem; }
+</style>
+{% endblock %}
+
 {% block content %}
 {% set unassigned = employees | rejectattr('department') | list %}
 {% set name_by_id = {} %}
 {% for person in directory %}
   {% set _ = name_by_id.update({person.id: person.full_name}) %}
 {% endfor %}
+{% set department_name_by_id = {} %}
+{% for department in departments %}
+  {% set _ = department_name_by_id.update({department.id: department.name}) %}
+{% endfor %}
+
+{% macro department_branch(nodes) %}
+<ul class="org-tree">
+  {% for node in nodes %}
+  <li>
+    <div class="org-tree-row{{ '' if node.is_active else ' muted' }}">
+      <span class="org-tree-type">{{ node.unit_type }}</span>
+      <span class="org-tree-name">{{ node.name }}</span>
+      <span class="cell-note">
+        {{ node.leadership_position or 'Director' }} seat
+        {%- if node.head_name %} · head {{ node.head_name }}{% endif %}
+        {%- if not node.is_active %} · inactive{% endif %}
+      </span>
+      <span class="org-team-count" title="Active staff">{{ node.count }}</span>
+    </div>
+    {% if node.members %}
+    <details class="org-tree-people">
+      <summary>Show assigned people</summary>
+      <ul class="org-dept-members">
+        {% for member in node.members %}
+        <li>{{ member.name }}<em>{{ member.title or '—' }}</em></li>
+        {% endfor %}
+      </ul>
+    </details>
+    {% endif %}
+    {% if node.children %}{{ department_branch(node.children) }}{% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% endmacro %}
 
 <section class="dash-head">
   <div class="container">
@@ -47,7 +137,10 @@
 
     <div class="hr-stats">
       {{ kpi('Active staff', employees | length, 'Listed in the hierarchy') }}
-      {{ kpi('Departments', departments | length, 'Named teams') }}
+      {{ kpi('Departments', departments | length, 'Named teams and units') }}
+      {{ kpi('Directorates',
+             departments | selectattr('unit_type', 'equalto', 'Directorate') | list | length,
+             'Units grouped under a director') }}
       {{ kpi('Positions', positions | length, 'Titles on record') }}
       {{ kpi('Unassigned', unassigned | length,
              'Staff without a department', 'warn' if unassigned else 'flat') }}
@@ -65,6 +158,160 @@
         </a>
       </div>
       {{ org_structure(org.org_leadership_tiers, footer=False, show_usernames=True) }}
+    </div>
+
+    <div class="dash-panel hr-table-panel" id="structure">
+      <h2>Organization structure</h2>
+      <p class="perm-note">Directorates, departments and teams nested under the parent
+        unit recorded for each one. The count on the right is the active staff working
+        in that unit; a head is named on the department row.</p>
+
+      {% if org.org_department_tree %}
+        {{ department_branch(org.org_department_tree) }}
+      {% else %}
+        <p class="empty-state">No registered units yet. Add a directorate or department
+          above to draw the structure.</p>
+      {% endif %}
+
+      <p class="perm-note">A roster name that no department record owns — an employee
+        typed into the HR form without registering the department — is listed in the
+        Departments table below and can be brought into the tree by adding it as a
+        unit.</p>
+    </div>
+
+    <div class="dash-panel hr-table-panel" id="standard-structure">
+      <div class="panel-head">
+        <div>
+          <h2>Company standard structure</h2>
+          <p class="cell-note">The structure published in the company charter: a chief
+            executive over four directorates and thirteen departments, with Information
+            Technology reporting directly to the CEO. Applying it only creates what is
+            missing &mdash; existing units, positions, heads and people keep their names
+            and links.</p>
+        </div>
+        {% if can_apply_structure and not standard.ready %}
+        <form method="POST"
+              onsubmit="return confirm('Create the missing charter units and positions? Existing records are not renamed, replaced or removed.');">
+          {{ csrf_field() }}
+          <input type="hidden" name="action" value="apply_standard_structure" />
+          <button type="submit" class="btn btn-sm">
+            Apply missing units &amp; positions
+          </button>
+        </form>
+        {% elif standard.ready %}
+        <span class="status-badge active">Charter is in place</span>
+        {% endif %}
+      </div>
+
+      <div class="hr-stats">
+        {{ kpi('Charter units', standard.unit_total,
+               standard.unit_new ~ ' still to create',
+               'warn' if standard.unit_new else 'flat') }}
+        {{ kpi('Charter positions', standard.position_total,
+               standard.position_new ~ ' still to create',
+               'warn' if standard.position_new else 'flat') }}
+        {{ kpi('Reporting lines', standard.links_pending,
+               'Links still empty',
+               'warn' if standard.links_pending else 'flat') }}
+        {{ kpi('Units in place', standard.unit_total - standard.unit_new,
+               'Matched to existing records') }}
+      </div>
+
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Charter unit</th>
+              <th>Type</th>
+              <th>Sits under</th>
+              <th>Positions</th>
+              <th>State</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Chief Executive Officer</strong><span class="cell-sub">Company-wide leadership</span></td>
+              <td>Executive</td>
+              <td>&mdash;</td>
+              <td>{{ standard.leadership | length }} planned &middot;
+                {{ standard.leadership | selectattr('exists') | list | length }} present</td>
+              <td>
+                <span class="status-badge {{ 'active' if standard.leadership and standard.leadership[0].exists else 'neutral' }}">
+                  {{ 'In place' if standard.leadership and standard.leadership[0].exists else 'To create' }}
+                </span>
+              </td>
+            </tr>
+            {% for unit in standard.units %}
+            <tr>
+              <td>
+                <strong>{{ unit.name }}</strong>
+                {% if unit.matched_by and unit.existing_name != unit.name %}
+                <span class="cell-sub">Uses the existing {{ unit.existing_name }} record</span>
+                {% elif unit.existing_name %}
+                <span class="cell-sub">Existing record</span>
+                {% endif %}
+                <span class="cell-sub">{{ unit.description }}</span>
+              </td>
+              <td>{{ unit.unit_type }}</td>
+              <td>{{ unit.parent }}</td>
+              <td>{{ unit.positions | length }} planned &middot;
+                {{ unit.positions | selectattr('exists') | list | length }} present</td>
+              <td>
+                <span class="status-badge {{ 'active' if unit.existing_id else 'neutral' }}">
+                  {{ 'In place' if unit.existing_id else 'To create' }}
+                </span>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <details class="org-tree-people">
+        <summary>Positions named in the charter</summary>
+        <div class="hr-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Position</th>
+                <th>Unit</th>
+                <th>Level</th>
+                <th>Reports to</th>
+                <th>State</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for position in standard.leadership %}
+              <tr>
+                <td><strong>{{ position.title }}</strong></td>
+                <td>Company-wide</td>
+                <td>{{ position.level }} &mdash; {{ position_level_label.get(position.level, 'Staff') }}</td>
+                <td>&mdash;</td>
+                <td><span class="status-badge {{ 'active' if position.exists else 'neutral' }}">{{ 'In place' if position.exists else 'To create' }}</span></td>
+              </tr>
+              {% endfor %}
+              {% for unit in standard.units %}
+                {% for position in unit.positions %}
+                <tr>
+                  <td>{{ position.title }}</td>
+                  <td>{{ unit.name }}</td>
+                  <td>{{ position.level }} &mdash; {{ position_level_label.get(position.level, 'Staff') }}</td>
+                  <td>{{ position.reports_to or '—' }}</td>
+                  <td><span class="status-badge {{ 'active' if position.exists else 'neutral' }}">{{ 'In place' if position.exists else 'To create' }}</span></td>
+                </tr>
+                {% endfor %}
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </details>
+
+      <p class="perm-note">Applying the charter never renames, retires or deletes a
+        record, and never moves an employee or account. A unit that already exists is
+        reused, even when its name differs (for example an existing Budget department
+        answers for Budget Department); only an empty parent or reporting line is filled.
+        {% if not can_apply_structure %}An administrator publishes the charter from
+        this panel.{% endif %}</p>
     </div>
 
     <div class="dash-panel hr-table-panel" id="accounts">
@@ -195,6 +442,39 @@
               </select>
             </div>
             <div>
+              <label for="department_unit_type">Unit type</label>
+              {% set current_unit = edit_department.unit_type or 'Department' %}
+              <select id="department_unit_type" name="unit_type">
+                {% for unit in unit_types %}
+                <option value="{{ unit }}"{% if current_unit == unit %} selected{% endif %}>{{ unit }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label for="department_parent">Parent unit</label>
+              <select id="department_parent" name="parent_id">
+                <option value="">Top level (under the CEO)</option>
+                {% for unit in departments %}
+                  {% if unit.id not in blocked_parent_ids %}
+                  <option value="{{ unit.id }}"{% if edit_department.parent_id == unit.id %} selected{% endif %}>
+                    {{ unit.name }} — {{ unit.unit_type or 'Department' }}
+                  </option>
+                  {% endif %}
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label for="department_head">Department head</label>
+              <select id="department_head" name="head_employee_id">
+                <option value="">No head named</option>
+                {% for person in employees %}
+                <option value="{{ person.id }}"{% if edit_department.head_employee_id == person.id %} selected{% endif %}>
+                  {{ person.full_name }}{% if person.department %} — {{ person.department }}{% endif %}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
               <label for="department_description">Description</label>
               <input id="department_description" type="text" name="description"
                      maxlength="300" value="{{ edit_department.description or '' }}" />
@@ -231,6 +511,32 @@
               </select>
             </div>
             <div>
+              <label for="department_unit_type">Unit type</label>
+              <select id="department_unit_type" name="unit_type">
+                {% for unit in unit_types %}
+                <option value="{{ unit }}"{% if unit == 'Department' %} selected{% endif %}>{{ unit }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label for="department_parent">Parent unit</label>
+              <select id="department_parent" name="parent_id">
+                <option value="">Top level (under the CEO)</option>
+                {% for unit in departments %}
+                <option value="{{ unit.id }}">{{ unit.name }} — {{ unit.unit_type or 'Department' }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label for="department_head">Department head</label>
+              <select id="department_head" name="head_employee_id">
+                <option value="">No head named</option>
+                {% for person in employees %}
+                <option value="{{ person.id }}">{{ person.full_name }}{% if person.department %} — {{ person.department }}{% endif %}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
               <label for="department_description">Description</label>
               <input id="department_description" type="text" name="description"
                      maxlength="300" placeholder="What this team does" />
@@ -244,7 +550,67 @@
         {% endif %}
       </div>
 
-      <div class="dash-panel">
+      <div class="dash-panel" id="position-form">
+        {% if edit_position %}
+        <h2>Edit position</h2>
+        <p class="perm-note">A title or department change follows every employee and
+          account holding this position. The level sets the approval desk it answers.</p>
+
+        <form method="POST" class="dash-form">
+          {{ csrf_field() }}
+          <input type="hidden" name="action" value="edit_position" />
+          <input type="hidden" name="position_id" value="{{ edit_position.id }}" />
+
+          <div class="account-grid">
+            <div>
+              <label for="position_title">Position title *</label>
+              <input id="position_title" type="text" name="position_title"
+                     maxlength="120" required value="{{ edit_position.title }}" />
+            </div>
+            <div>
+              <label for="position_department_id">Department</label>
+              <select id="position_department_id" name="position_department_id">
+                <option value="">No department</option>
+                {% for department in departments %}
+                <option value="{{ department.id }}"{% if edit_position.department_id == department.id %} selected{% endif %}>
+                  {{ department.name }}{% if not department.is_active %} — inactive{% endif %}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label for="level">Level</label>
+              <select id="level" name="level">
+                {% for value, label in [(0, 'CEO (company-wide)'), (1, 'Executive (under CEO)'),
+                                        (2, 'Director (under Executive)'), (3, 'Manager (under Director)'),
+                                        (4, 'Staff')] %}
+                <option value="{{ value }}"{% if edit_position.level == value %} selected{% endif %}>
+                  {{ value }} &mdash; {{ label }}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label for="reports_to_position_id">Reports to position</label>
+              <select id="reports_to_position_id" name="reports_to_position_id">
+                <option value="">No reporting line</option>
+                {% for position in positions %}
+                  {% if position.id not in blocked_reports_ids %}
+                  <option value="{{ position.id }}"{% if edit_position.reports_to_position_id == position.id %} selected{% endif %}>
+                    {{ position.title }}{% if position.department_name %} ({{ position.department_name }}){% endif %}
+                  </option>
+                  {% endif %}
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+
+          <div class="finance-form-actions">
+            <button type="submit" class="btn">Save position <span class="arrow">→</span></button>
+            <a class="btn btn-outline btn-sm" href="{{ url_for('manage_hierarchy') }}#positions">Cancel</a>
+          </div>
+        </form>
+        {% else %}
         <h2>Add a position</h2>
         <p class="perm-note">Assigning a position updates the employee&rsquo;s job title and
           department.</p>
@@ -278,12 +644,22 @@
                 <option value="4" selected>4 &mdash; Staff</option>
               </select>
             </div>
+            <div>
+              <label for="reports_to_position_id">Reports to position</label>
+              <select id="reports_to_position_id" name="reports_to_position_id">
+                <option value="">No reporting line</option>
+                {% for position in positions %}
+                <option value="{{ position.id }}">{{ position.title }}{% if position.department_name %} ({{ position.department_name }}){% endif %}</option>
+                {% endfor %}
+              </select>
+            </div>
           </div>
 
           <div class="finance-form-actions">
             <button type="submit" class="btn">Add position <span class="arrow">→</span></button>
           </div>
         </form>
+        {% endif %}
       </div>
     </div>
 
@@ -296,8 +672,10 @@
           <thead>
             <tr>
               <th>Department</th>
+              <th>Unit</th>
+              <th>Parent</th>
               <th>Leadership</th>
-              <th>Description</th>
+              <th>Head</th>
               <th>Positions</th>
               <th>Active staff</th>
               <th>Accounts</th>
@@ -308,9 +686,26 @@
           <tbody>
             {% for department in departments %}
             <tr>
-              <td><strong>{{ department.name }}</strong></td>
+              <td>
+                <strong>{{ department.name }}</strong>
+                {% if department.description %}<span class="cell-sub">{{ department.description }}</span>{% endif %}
+              </td>
+              <td>{{ department.unit_type or 'Department' }}</td>
+              <td>
+                {% if department.parent_id %}
+                  {{ department_name_by_id.get(department.parent_id, '—') }}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
               <td>{{ department.leadership_position or 'Director' }}</td>
-              <td>{{ department.description or '—' }}</td>
+              <td>
+                {% if department.head_employee_id %}
+                  {{ name_by_id.get(department.head_employee_id, 'Former employee #' ~ department.head_employee_id) }}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
               <td>{{ positions | selectattr('department_id', 'equalto', department.id) | list | length }}</td>
               <td>{{ employees | selectattr('department', 'equalto', department.name) | list | length }}</td>
               <td>{{ accounts | selectattr('department_id', 'equalto', department.id) | list | length }}</td>
@@ -353,8 +748,11 @@
       {% endif %}
     </div>
 
-    <div class="dash-panel hr-table-panel">
+    <div class="dash-panel hr-table-panel" id="positions">
       <h2>Positions</h2>
+      <p class="perm-note">A position belongs to one department and can report to
+        another position. Retiring one keeps its history and stops it opening an
+        approval desk; a position still held by staff or accounts cannot be retired.</p>
 
       {% if positions %}
       <div class="hr-table-wrap">
@@ -364,8 +762,11 @@
               <th>Position</th>
               <th>Department</th>
               <th>Level</th>
+              <th>Reports to</th>
               <th>Active staff</th>
               <th>Accounts</th>
+              <th>Status</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -374,8 +775,38 @@
               <td><strong>{{ position.title }}</strong></td>
               <td>{{ position.department_name or '—' }}</td>
               <td>{{ position.level }} &mdash; {{ position_level_label.get(position.level, 'Staff') }}</td>
+              <td>
+                {% if position.reports_to_position_id %}
+                  {{ position_names.get(position.reports_to_position_id, '—') }}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
               <td>{{ employees | selectattr('position_id', 'equalto', position.id) | list | length }}</td>
               <td>{{ accounts | selectattr('position_id', 'equalto', position.id) | list | length }}</td>
+              <td>
+                <span class="status-badge {{ 'active' if position.is_active else 'neutral' }}">
+                  {{ 'Active' if position.is_active else 'Retired' }}
+                </span>
+              </td>
+              <td>
+                <div class="row-actions">
+                  <a class="btn btn-outline btn-sm"
+                     href="{{ url_for('manage_hierarchy', edit_position=position.id) }}#position-form">Edit</a>
+                  {% if 'accounts' in permissions %}
+                  <form method="POST"
+                        {% if position.is_active %}onsubmit="return confirm('Retire {{ position.title | e }}? It stops opening an approval desk but keeps its record.');"{% endif %}>
+                    {{ csrf_field() }}
+                    <input type="hidden" name="action" value="set_position_status" />
+                    <input type="hidden" name="position_id" value="{{ position.id }}" />
+                    <input type="hidden" name="active" value="{{ 0 if position.is_active else 1 }}" />
+                    <button type="submit" class="btn btn-outline btn-sm">
+                      {{ 'Retire' if position.is_active else 'Restore' }}
+                    </button>
+                  </form>
+                  {% endif %}
+                </div>
+              </td>
             </tr>
             {% endfor %}
           </tbody>
@@ -384,6 +815,71 @@
       {% else %}
       <p class="empty-state">No positions yet. Add titles so staff can be placed on the chart.</p>
       {% endif %}
+    </div>
+
+    <div class="dash-panel hr-table-panel" id="roles">
+      <div class="panel-head">
+        <div>
+          <h2>Roles, permissions and approval authority</h2>
+          <p class="cell-note">A sign-in role carries the module permissions set in
+            role management. The approval desk an account answers is read from its
+            position level when a request is routed, so a position change takes effect
+            on the next request without editing the role.</p>
+        </div>
+        <div class="row-actions">
+          {% if can_manage_roles %}
+          <a class="btn btn-outline-dark btn-sm" href="{{ url_for('admin_roles') }}">Roles &amp; access</a>
+          {% endif %}
+          {% if can_manage_policy %}
+          <a class="btn btn-outline btn-sm" href="{{ url_for('management_approval_settings') }}">Approval limits</a>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="org-desk-grid">
+        {% for level, desk in [(0, 'CEO'), (2, 'Director'), (3, 'Manager')] %}
+        {% set holders = accounts | selectattr('position_level', 'equalto', level) | selectattr('status', 'equalto', 'Active') | list %}
+        <div class="org-desk-card">
+          <span class="org-team-label">Approval desk</span>
+          <strong>{{ desk }}</strong>
+          <span class="cell-note">Position level {{ level }} &middot;
+            {{ holders | length }} active account{{ '' if holders | length == 1 else 's' }}</span>
+          <ul class="org-dept-members">
+            {% for holder in holders %}
+            <li>{{ holder.full_name }}<em>{{ holder.position_title or '—' }}</em></li>
+            {% else %}
+            <li class="org-member-empty">No account sits on this desk.</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Sign-in role</th>
+              <th>Accounts</th>
+              <th>Members</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for role, members in accounts | groupby('role') %}
+            <tr>
+              <td><strong>{{ role_names.get(role, role) }}</strong></td>
+              <td>{{ members | length }}</td>
+              <td>{{ members | map(attribute='full_name') | join(', ') }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3">No sign-in accounts yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="perm-note">Existing roles, grants and per-account overrides are left
+        exactly as they are. Retiring a position only stops it opening a desk; it never
+        deletes the accounts or the employees placed on it.</p>
     </div>
   </div>
 </section>

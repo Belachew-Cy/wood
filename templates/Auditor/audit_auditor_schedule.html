@@ -1,0 +1,218 @@
+
+{% extends "base.html" %}
+
+{% block title %}Auditor Schedule | Audit Management{% endblock %}
+
+{% block content %}
+
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Audit Management / Auditor Planning</span>
+            <h1>Auditor Schedule and Availability</h1>
+            <p>Review auditor schedules, assigned audit periods and potential scheduling conflicts.</p>
+        </div>
+
+        <div class="stock-actions">
+            <a href="{{ url_for('audit.dashboard') }}" class="btn btn-outline btn-sm">Dashboard</a>
+            <a href="{{ url_for('audit.audit_assignments') }}" class="btn btn-outline btn-sm">Assignments</a>
+            <a href="{{ url_for('audit.auditor_workload') }}" class="btn btn-outline btn-sm">Workload</a>
+        </div>
+    </div>
+</section>
+
+<section class="container finance-page">
+
+    {% set schedule_stats = stats | default({}, true) %}
+    {% set schedule_rows = schedule | default([], true) %}
+    {% set deadline_rows = upcoming_deadlines | default([], true) %}
+
+    <div class="hr-stats">
+        <div class="dash-panel">
+            <span class="eyebrow">Scheduled Auditors</span>
+            <h2>{{ schedule_stats.scheduled_auditors | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Active Assignments</span>
+            <h2>{{ schedule_stats.active_assignments | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Schedule Conflicts</span>
+            <h2>{{ schedule_stats.conflicts | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Upcoming Deadlines</span>
+            <h2>{{ schedule_stats.upcoming_deadlines | default(0) }}</h2>
+        </div>
+    </div>
+
+    <!-- SCHEDULE FILTERS -->
+
+    <div class="dash-panel">
+        <div class="dash-panel-head">
+            <div>
+                <h2>Schedule Filters</h2>
+                <p>Select an auditor and reporting period.</p>
+            </div>
+        </div>
+
+        <form method="GET" action="{{ url_for('audit.auditor_schedule') }}">
+            <div class="form-grid">
+
+                <div class="form-group">
+                    <label for="auditor_id">Auditor</label>
+                    <select name="auditor_id" id="auditor_id">
+                        <option value="">All Auditors</option>
+                        {% for auditor in auditors | default([]) %}
+                        <option value="{{ auditor.id }}"
+                            {% if filters.auditor_id | default('') | string == auditor.id | string %}selected{% endif %}>
+                            {{ auditor.full_name | default(auditor.username | default('Unknown')) }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="date_from">From Date</label>
+                    <input type="date" id="date_from" name="date_from"
+                           value="{{ filters.date_from | default('') }}">
+                </div>
+
+                <div class="form-group">
+                    <label for="date_to">To Date</label>
+                    <input type="date" id="date_to" name="date_to"
+                           value="{{ filters.date_to | default('') }}">
+                </div>
+
+                <div class="form-group">
+                    <label for="status">Assignment Status</label>
+                    <select name="status" id="status">
+                        <option value="">All Statuses</option>
+                        {% for status in ['Assigned', 'In Progress', 'Completed', 'Overdue', 'Cancelled'] %}
+                        <option value="{{ status }}"
+                            {% if filters.status | default('') == status %}selected{% endif %}>
+                            {{ status }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Apply Filters</button>
+                <a href="{{ url_for('audit.auditor_schedule') }}" class="btn btn-outline">Reset</a>
+            </div>
+        </form>
+    </div>
+
+    <!-- SCHEDULE TABLE -->
+
+    <div class="dash-panel hr-table-panel">
+        <div class="dash-panel-head">
+            <div>
+                <h2>Auditor Schedule</h2>
+                <p>Existing audit assignments arranged by scheduled period.</p>
+            </div>
+        </div>
+
+        <div class="table-scroll">
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>Auditor</th>
+                        <th>Audit Plan</th>
+                        <th>Department</th>
+                        <th>Start Date</th>
+                        <th>End Date</th>
+                        <th>Assignment Role</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for item in schedule_rows %}
+                    <tr>
+                        <td>{{ item.auditor_name | default('—') }}</td>
+                        <td>
+                            <strong>{{ item.plan_number | default('—') }}</strong>
+                            <small>{{ item.plan_title | default('') }}</small>
+                        </td>
+                        <td>{{ item.department | default('—') }}</td>
+                        <td>{{ item.start_date | default('—') }}</td>
+                        <td>{{ item.end_date | default('—') }}</td>
+                        <td>{{ item.assignment_role | default('Auditor') }}</td>
+                        <td>{{ item.status | default('Assigned') }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="report-empty">
+                            No schedule records found for the selected filters.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- UPCOMING DEADLINES -->
+
+    <div class="dash-panel hr-table-panel">
+        <div class="dash-panel-head">
+            <div>
+                <h2>Upcoming Deadlines</h2>
+                <p>Assignments requiring attention before their due dates.</p>
+            </div>
+        </div>
+
+        <div class="table-scroll">
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>Audit Plan</th>
+                        <th>Auditor</th>
+                        <th>Due Date</th>
+                        <th>Days Remaining</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for item in deadline_rows %}
+                    <tr>
+                        <td>{{ item.plan_number | default('—') }}</td>
+                        <td>{{ item.auditor_name | default('—') }}</td>
+                        <td>{{ item.due_date | default('—') }}</td>
+                        <td>{{ item.days_remaining | default('—') }}</td>
+                        <td>{{ item.status | default('Assigned') }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="report-empty">
+                            No upcoming deadlines found.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="dash-panel">
+        <h2>Scheduling Controls</h2>
+        <ul>
+            <li>Use existing assignment and audit plan dates as the scheduling source.</li>
+            <li>Check overlapping assignments before approving new assignments.</li>
+            <li>Do not treat missing availability information as confirmed availability.</li>
+            <li>Restrict schedule changes to authorized audit managers.</li>
+            <li>Log changes and retain assignment history.</li>
+        </ul>
+    </div>
+
+</section>
+
+{% endblock %}

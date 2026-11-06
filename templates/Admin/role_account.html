@@ -1,7 +1,10 @@
 {% extends "base.html" %}
 {% from "base.html" import dash_icon with context %}
+{% from "Admin/_permissions.html" import permission_manager with context %}
+{% from "Admin/_department_actions.html" import department_matrix with context %}
+{% from "Admin/_department_actions.html" import department_template with context %}
 
-{% block title %}Modules — {{ target.full_name }} | Dereje Belay Wood &amp; Kitchen{% endblock %}
+{% block title %}Permissions — {{ target.full_name }} | Dereje Belay Wood &amp; Kitchen{% endblock %}
 
 {% macro ui(name) -%}
   {%- set paths = {
@@ -12,8 +15,6 @@
 {%- endmacro %}
 
 {% block content %}
-{% set deviations = ((granted - defaults) | length) + ((defaults - granted) | length) %}
-
 <section class="dir-page">
   <div class="container">
 
@@ -25,7 +26,7 @@
 
     <header class="dir-head">
       <div class="dir-head-copy">
-        <span class="dir-eyebrow">Role Management</span>
+        <span class="dir-eyebrow">Role and Permission Management</span>
         <h1>{{ target.full_name }}</h1>
         <p class="dir-sub">{{ target.email }}{% if target.username %} · {{ target.username }}{% endif %}
           · {% if target.last_login %}last sign-in {{ target.last_login | audit_time }}{% else %}never signed in{% endif %}
@@ -35,8 +36,8 @@
           <span class="dir-pill status-{{ 'active' if target.status == 'Active' else 'disabled' }}">
             <span class="status-dot"></span>{{ target.status }}
           </span>
-          <span><span class="dir-swatch"></span><strong>{{ granted | length }}</strong>
-            of {{ modules | length }} modules open</span>
+          <span><span class="dir-swatch"></span><strong>{{ open_permissions }}</strong>
+            of {{ total_permissions }} permissions open</span>
           {% if target.role != 'admin' %}
           <span><span class="dir-swatch success"></span><strong>{{ extra_keys | length }}</strong>
             additional role{{ '' if extra_keys | length == 1 else 's' }}</span>
@@ -63,10 +64,10 @@
         <div class="dir-card-head">
           <div>
             <span class="dir-eyebrow">Access</span>
-            <h2>Module permissions</h2>
+            <h2>Permissions</h2>
           </div>
-          <span class="cell-note">{{ granted | length }} of {{ modules | length }} open ·
-            {{ 'every module' if target.role == 'admin' else role_labels.get(target.role, target.role) }}</span>
+          <span class="cell-note">{{ open_permissions }} of {{ total_permissions }} open ·
+            {{ 'every permission' if target.role == 'admin' else role_labels.get(target.role, target.role) }}</span>
         </div>
 
         {% if target.role != 'admin' %}
@@ -74,43 +75,45 @@
           {{ csrf_field() }}
           <input type="hidden" name="action" value="permissions" />
           <div class="dir-card-body">
-            <fieldset class="perm-grid">
-              <legend>Modules this account may open</legend>
-              {% for m in modules %}
-              <label class="perm-item">
-                {% if m == 'approvals' and approver_desk %}
-                <input type="hidden" name="permissions" value="approvals" />
-                {% endif %}
-                <input type="checkbox" name="permissions" value="{{ m }}"
-                       {% if m in granted %}checked{% endif %}
-                       {% if m == 'approvals' and approver_desk %}disabled{% endif %} />
-                <span>{{ module_label.get(m, m) }}</span>
-                <em class="perm-default">
-                  {% if m == 'approvals' and approver_desk %}by position
-                  {% else %}{{ 'primary role' if m in primary_defaults else 'extra role' if m in defaults else 'override' if m in granted else 'blocked' }}{% endif %}
-                </em>
-              </label>
-              {% endfor %}
-            </fieldset>
+            {{ permission_manager(catalog, 'user') }}
 
-            <p class="perm-note">Only the cells that differ from the combined role defaults
-              are stored. Clearing a module an additional role grants blocks it for this
-              account until the role or the tick is changed.</p>
+            <div class="perm-section" style="margin-top:1rem">
+              <h3>Department actions
+                <small class="cell-note">{{ dept_open }} of {{ dept_total }}
+                  open</small></h3>
+              <p class="perm-note">The ten standard actions per department. A
+                tick here is checked on the server for every request it covers;
+                a typed URL cannot get past it. Only cells that differ from the
+                combined role rights are stored against this account.</p>
+              {{ department_matrix(dept_matrix, 'userDept') }}
+            </div>
+
+            <p class="perm-note">Only ticks that differ from the combined role permissions
+              are stored. A tick opens the module behind it, so clearing the last HR
+              permission closes the HR module for this account. Recruitment rows follow
+              the hiring desk rights; set one right at a time on
+              <a href="{{ url_for('admin_hiring_permissions', user_id=target.id) }}">the
+              hiring desk screen</a>.</p>
           </div>
           <div class="dir-card-foot">
             <span class="dir-count">{{ deviations }} tick{{ '' if deviations == 1 else 's' }}
-              stored against the role defaults.</span>
+              stored against the role permissions.</span>
             <button type="submit" class="btn btn-sm">Save permissions</button>
           </div>
         </form>
         {% else %}
         <div class="dir-card-body">
-          <p class="perm-note">Administrators hold every module by definition, so there is
-            nothing to tick here. Their account, role and status are managed on User
-            Management.</p>
-          <ul class="chip-row">
-            {% for m in modules %}<li class="chip">{{ module_label.get(m, m) }}</li>{% endfor %}
-          </ul>
+          <p class="perm-note">Administrators hold every permission by definition, so
+            there is nothing to tick here. Their account, role and status are managed on
+            User Management.</p>
+          {{ permission_manager(catalog, 'admin') }}
+          <div class="perm-section" style="margin-top:1rem">
+            <h3>Department actions
+              <small class="cell-note">{{ dept_open }} of {{ dept_total }} open</small></h3>
+            <p class="perm-note">An Administrator holds every department action
+              by definition, so every cell is ticked and locked.</p>
+            {{ department_matrix(dept_matrix, 'adminUserDept') }}
+          </div>
         </div>
         {% endif %}
       </section>
@@ -132,12 +135,18 @@
             <fieldset class="perm-grid">
               <legend>Roles this account also carries</legend>
               {% for option in role_options %}
+              {% set held = option.key in extra_keys %}
               <label class="perm-item">
                 <input type="checkbox" name="extra_roles" value="{{ option.key }}"
-                       {% if option.key in extra_keys %}checked{% endif %} />
-                <span>{{ option.label }}</span>
+                       {% if held %}checked{% endif %}
+                       {% if not option.active and not held %}disabled{% endif %} />
+                <span>{{ option.label }}
+                  {% if not option.active %}<span class="dir-pill status-disabled">Inactive</span>{% endif %}
+                </span>
                 <em class="perm-default">
-                  {{ option.modules | join(', ') if option.modules else 'landing only' }}
+                  {%- if not option.active %}grants nothing · untick to remove
+                  {%- else %}{{ option.modules | join(', ') if option.modules else 'landing only' }}
+                  {%- endif %}
                 </em>
               </label>
               {% else %}
@@ -146,8 +155,9 @@
             </fieldset>
 
             <p class="perm-note">Additional roles widen what the account can open, including
-              custom roles built on Role Management. The primary role still decides the
-              dashboard the account lands on.</p>
+              custom roles built on the Role and Permission Management screen. The primary role still decides the
+              dashboard the account lands on. A deactivated role stays on the account but
+              grants nothing until it is activated again.</p>
           </div>
           <div class="dir-card-foot">
             <span class="dir-count">{{ extra_keys | length }} additional role{{ '' if extra_keys | length == 1 else 's' }}
@@ -203,4 +213,11 @@
     </div>
   </div>
 </section>
+
+{{ department_template(dept_matrix) }}
+{% endblock %}
+
+{% block scripts %}
+{% include "Admin/_permission_script.html" %}
+{% include "Admin/_department_script.html" %}
 {% endblock %}

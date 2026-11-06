@@ -1,0 +1,370 @@
+{% extends "base.html" %}
+
+{% block title %}Employee Salary Details{% endblock %}
+
+{% block content %}
+<div class="container-fluid payroll-page">
+
+    <!-- Header -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1">Employee Salary Details</h2>
+            <p class="text-muted mb-0">
+                View and manage employee salary information.
+            </p>
+        </div>
+
+        <a href="{{ url_for('payroll.employee_profiles') }}"
+           class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Employees
+        </a>
+    </div>
+
+    <!-- Employee Information -->
+    {% if employee %}
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="row g-3 align-items-center">
+
+                <div class="col-lg-8">
+                    <h4 class="mb-1">{{ employee.full_name }}</h4>
+                    <p class="text-muted mb-2">
+                        {{ employee.employee_code }}
+                    </p>
+
+                    <div class="d-flex flex-wrap gap-3">
+                        <span>
+                            <i class="fas fa-building text-muted"></i>
+                            {{ employee.department or 'Not assigned' }}
+                        </span>
+
+                        <span>
+                            <i class="fas fa-briefcase text-muted"></i>
+                            {{ employee.job_title or 'Not assigned' }}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="col-lg-4 text-lg-end">
+                    {% if employee.status == 'Active' %}
+                        <span class="badge bg-success">Active Employee</span>
+                    {% else %}
+                        <span class="badge bg-secondary">
+                            {{ employee.status or 'Inactive' }}
+                        </span>
+                    {% endif %}
+                </div>
+
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if own_records %}
+        <h4 class="mb-3">My Salary Records</h4>
+
+        <div class="card shadow-sm">
+            <div class="card-body table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>Payroll Month</th>
+                            <th>Basic Salary</th>
+                            <th>Allowances</th>
+                            <th>Deductions</th>
+                            <th>Net Salary</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for record in payslips|default([]) %}
+                        <tr>
+                            <td>{{ record.payroll_month }}</td>
+                            <td>{{ "%.2f"|format(record.basic_salary|float) }} ETB</td>
+                            <td>{{ "%.2f"|format(record.allowances|float) }} ETB</td>
+                            <td>{{ "%.2f"|format(record.deductions|float) }} ETB</td>
+                            <td>
+                                <strong>
+                                    {{ "%.2f"|format(record.net_salary|float) }} ETB
+                                </strong>
+                            </td>
+                            <td>
+                                {% if record.payment_status == 'Paid' %}
+                                    <span class="badge bg-success">Paid</span>
+                                {% else %}
+                                    <span class="badge bg-warning text-dark">
+                                        {{ record.payment_status }}
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{{ url_for('payroll.employee_payslip', payroll_id=record.id) }}"
+                                   class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-file-invoice"></i>
+                                    View Payslip
+                                </a>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center py-4">
+                                No salary records are currently available.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    {% else %}
+
+        <!-- Salary Summary -->
+        <div class="row g-3 mb-4">
+
+            <div class="col-xl-3 col-md-6">
+                <div class="card shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="text-muted small">Basic Salary</div>
+                        <h3 class="mb-0">
+                            {{ "%.2f"|format(
+                                (salary_details.basic_salary|default(0))|float
+                            ) }}
+                            <small class="fs-6">ETB</small>
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-3 col-md-6">
+                <div class="card shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="text-muted small">Total Allowances</div>
+                        <h3 class="mb-0">
+                            {{ "%.2f"|format(
+                                (salary_details.total_allowances|default(0))|float
+                            ) }}
+                            <small class="fs-6">ETB</small>
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-3 col-md-6">
+                <div class="card shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="text-muted small">Total Deductions</div>
+                        <h3 class="mb-0">
+                            {{ "%.2f"|format(
+                                (salary_details.total_deductions|default(0))|float
+                            ) }}
+                            <small class="fs-6">ETB</small>
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-3 col-md-6">
+                <div class="card shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="text-muted small">Estimated Net Salary</div>
+                        <h3 class="mb-0 text-success">
+                            {{ "%.2f"|format(
+                                (salary_details.net_salary|default(0))|float
+                            ) }}
+                            <small class="fs-6">ETB</small>
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Salary Structure -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Assigned Salary Structure</h5>
+            </div>
+
+            <div class="card-body">
+                {% if salary_details.structure %}
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="text-muted small">Structure</div>
+                        <strong>
+                            {{ salary_details.structure.structure_name }}
+                        </strong>
+                    </div>
+
+                    <div class="col-md-4">
+                        <div class="text-muted small">Salary Grade</div>
+                        <strong>
+                            {{ salary_details.structure.grade_name or '-' }}
+                        </strong>
+                    </div>
+
+                    <div class="col-md-4">
+                        <div class="text-muted small">Effective Date</div>
+                        <strong>
+                            {{ salary_details.effective_date or '-' }}
+                        </strong>
+                    </div>
+                </div>
+                {% else %}
+                <p class="text-muted mb-0">
+                    No salary structure has been assigned.
+                </p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Allowances -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Employee Allowances</h5>
+            </div>
+
+            <div class="card-body table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>Allowance</th>
+                            <th>Calculation Type</th>
+                            <th>Amount</th>
+                            <th>Effective Date</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {% for allowance in salary_details.allowances|default([]) %}
+                        <tr>
+                            <td>{{ allowance.allowance_name }}</td>
+                            <td>{{ allowance.calculation_type }}</td>
+                            <td>
+                                {{ "%.2f"|format(allowance.amount|float) }} ETB
+                            </td>
+                            <td>{{ allowance.effective_date }}</td>
+                            <td>
+                                <span class="badge bg-success">
+                                    {{ allowance.status }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted">
+                                No allowances assigned.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Deductions -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Employee Deductions</h5>
+            </div>
+
+            <div class="card-body table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>Deduction</th>
+                            <th>Calculation Type</th>
+                            <th>Amount</th>
+                            <th>Effective Date</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {% for deduction in salary_details.deductions|default([]) %}
+                        <tr>
+                            <td>{{ deduction.deduction_name }}</td>
+                            <td>{{ deduction.calculation_type }}</td>
+                            <td>
+                                {{ "%.2f"|format(deduction.amount|float) }} ETB
+                            </td>
+                            <td>{{ deduction.effective_date }}</td>
+                            <td>
+                                <span class="badge bg-success">
+                                    {{ deduction.status }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted">
+                                No deductions assigned.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Salary History -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Salary History</h5>
+            </div>
+
+            <div class="card-body table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>Previous Salary</th>
+                            <th>New Salary</th>
+                            <th>Effective Date</th>
+                            <th>Reason</th>
+                            <th>Approval Status</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {% for item in salary_details.history|default([]) %}
+                        <tr>
+                            <td>
+                                {{ "%.2f"|format(item.previous_salary|float) }}
+                                ETB
+                            </td>
+                            <td>
+                                {{ "%.2f"|format(item.new_salary|float) }}
+                                ETB
+                            </td>
+                            <td>{{ item.effective_date }}</td>
+                            <td>{{ item.reason or '-' }}</td>
+                            <td>
+                                {% if item.status == 'Approved' %}
+                                    <span class="badge bg-success">Approved</span>
+                                {% elif item.status == 'Rejected' %}
+                                    <span class="badge bg-danger">Rejected</span>
+                                {% else %}
+                                    <span class="badge bg-warning text-dark">
+                                        {{ item.status or 'Pending' }}
+                                    </span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted">
+                                No salary history available.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    {% endif %}
+
+</div>
+{% endblock %}

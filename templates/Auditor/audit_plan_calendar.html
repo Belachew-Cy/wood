@@ -1,0 +1,345 @@
+
+{% extends "base.html" %}
+
+{% block title %}Audit Plan Calendar | Audit Management{% endblock %}
+
+{% block content %}
+
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Audit Management / Planning</span>
+            <h1>Audit Plan Calendar</h1>
+            <p>
+                Monitor scheduled audits, upcoming deadlines,
+                assignments and completed audit activities.
+            </p>
+        </div>
+
+        <div class="stock-actions">
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.dashboard') }}">
+                Dashboard
+            </a>
+
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.audit_plans') }}">
+                Audit Plans
+            </a>
+
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.audit_assignments') }}">
+                Assignments
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="container finance-page">
+
+    <!-- CALENDAR SUMMARY -->
+
+    <div class="hr-stats">
+
+        <div class="dash-panel">
+            <span class="eyebrow">Scheduled Audits</span>
+            <h2>{{ stats.scheduled | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Ongoing Audits</span>
+            <h2>{{ stats.ongoing | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Upcoming Deadlines</span>
+            <h2>{{ stats.upcoming_deadlines | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Overdue Audits</span>
+            <h2>{{ stats.overdue | default(0) }}</h2>
+        </div>
+
+    </div>
+
+
+    <!-- CALENDAR NAVIGATION -->
+
+    <div class="dash-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Audit Schedule</h2>
+                <p>
+                    Review audit activities by date and scheduled period.
+                </p>
+            </div>
+
+            <span class="status-badge neutral">
+                {{ calendar_month | default('Current Schedule') }}
+            </span>
+        </div>
+
+        <form method="GET"
+              action="{{ url_for('audit.audit_plan_calendar') }}">
+
+            <div class="form-grid">
+
+                <div class="form-group">
+                    <label for="month">Month</label>
+
+                    <select name="month" id="month">
+                        {% for month_number, month_name in months | default([]) %}
+                        <option value="{{ month_number }}"
+                            {% if selected_month | default(0) == month_number %}selected{% endif %}>
+                            {{ month_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="year">Year</label>
+
+                    <input type="number"
+                           id="year"
+                           name="year"
+                           min="2000"
+                           max="2100"
+                           value="{{ selected_year | default('') }}"
+                           required>
+                </div>
+
+                <div class="form-group">
+                    <label for="department">Department</label>
+
+                    <select name="department" id="department">
+                        <option value="">All Departments</option>
+
+                        {% for department in departments | default([]) %}
+                        <option value="{{ department.name }}"
+                            {% if selected_department | default('') == department.name %}selected{% endif %}>
+                            {{ department.name }}
+                        </option>
+                        {% endfor %}
+
+                    </select>
+                </div>
+
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    View Schedule
+                </button>
+
+                <a href="{{ url_for('audit.audit_plan_calendar') }}"
+                   class="btn btn-outline">
+                    Reset
+                </a>
+            </div>
+
+        </form>
+
+    </div>
+
+
+    <!-- CALENDAR LEGEND -->
+
+    <div class="dash-panel">
+
+        <h2>Schedule Legend</h2>
+
+        <div class="stock-actions">
+            <span class="status-badge neutral">Planned</span>
+            <span class="status-badge active">In Progress</span>
+            <span class="status-badge off">Overdue</span>
+            <span class="status-badge neutral">Completed</span>
+        </div>
+
+    </div>
+
+
+    <!-- MONTH CALENDAR -->
+
+    <div class="dash-panel">
+
+        <div class="table-scroll">
+
+            <table class="report-table audit-calendar">
+
+                <thead>
+                    <tr>
+                        <th>Sunday</th>
+                        <th>Monday</th>
+                        <th>Tuesday</th>
+                        <th>Wednesday</th>
+                        <th>Thursday</th>
+                        <th>Friday</th>
+                        <th>Saturday</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for week in calendar_weeks | default([]) %}
+
+                    <tr>
+
+                        {% for day in week %}
+
+                        <td class="calendar-day">
+
+                            {% if day.date %}
+
+                                <div class="calendar-date">
+                                    {{ day.date }}
+                                </div>
+
+                                {% for event in day.events | default([]) %}
+
+                                <div class="calendar-event">
+
+                                    <strong>
+                                        {{ event.title | default('Audit Activity') }}
+                                    </strong>
+
+                                    <span>
+                                        {{ event.department | default('—') }}
+                                    </span>
+
+                                    <span class="status-badge neutral">
+                                        {{ event.status | default('Planned') }}
+                                    </span>
+
+                                    {% if event.plan_id %}
+                                    <a href="{{ url_for('audit.audit_plan_detail', plan_id=event.plan_id) }}">
+                                        View Plan
+                                    </a>
+                                    {% endif %}
+
+                                </div>
+
+                                {% endfor %}
+
+                            {% else %}
+
+                                <span class="eyebrow">—</span>
+
+                            {% endif %}
+
+                        </td>
+
+                        {% endfor %}
+
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="7" class="report-empty">
+                            No calendar schedule is available.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <!-- UPCOMING AUDITS -->
+
+    <div class="dash-panel hr-table-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Upcoming Audit Activities</h2>
+                <p>Audits scheduled for the selected reporting period.</p>
+            </div>
+        </div>
+
+        <div class="table-scroll">
+
+            <table class="report-table">
+
+                <thead>
+                    <tr>
+                        <th>Plan Reference</th>
+                        <th>Audit Title</th>
+                        <th>Department</th>
+                        <th>Start Date</th>
+                        <th>End Date</th>
+                        <th>Lead Auditor</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for plan in upcoming_audits | default([]) %}
+
+                    <tr>
+
+                        <td>{{ plan.plan_number | default(plan.id | default('—')) }}</td>
+
+                        <td>{{ plan.title | default('—') }}</td>
+
+                        <td>{{ plan.department | default('—') }}</td>
+
+                        <td>{{ plan.start_date | default('—') }}</td>
+
+                        <td>{{ plan.end_date | default('—') }}</td>
+
+                        <td>{{ plan.lead_auditor | default('—') }}</td>
+
+                        <td>{{ plan.status | default('Planned') }}</td>
+
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="7" class="report-empty">
+                            No upcoming audits are scheduled.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <!-- AUDIT SCHEDULING CONTROLS -->
+
+    <div class="dash-panel">
+
+        <h2>Audit Scheduling Controls</h2>
+
+        <ul>
+            <li>Use approved audit plans as the source of scheduled activities.</li>
+            <li>Display the correct audit start and end dates.</li>
+            <li>Identify conflicting assignments and overlapping audit schedules.</li>
+            <li>Highlight overdue audits based on the current date and approved status.</li>
+            <li>Keep calendar records synchronized with the existing audit plan records.</li>
+            <li>Only authorized users may create or change audit schedules.</li>
+            <li>Record schedule changes in the existing audit activity logs.</li>
+        </ul>
+
+    </div>
+
+</section>
+
+{% endblock %}

@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container-fluid py-4">
+
+    <h3>Pending Material Issues</h3>
+    <p class="text-muted">
+        Approved production requests awaiting warehouse issuing.
+    </p>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-body table-responsive">
+
+            <table class="table table-hover">
+
+                <thead>
+                    <tr>
+                        <th>Request Number</th>
+                        <th>Purpose</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for item in requests %}
+                    <tr>
+                        <td>{{ item.request_number }}</td>
+                        <td>{{ item.purpose }}</td>
+                        <td>{{ item.status }}</td>
+                        <td>
+                            <a class="btn btn-sm btn-success"
+                               href="{{ url_for(
+                                   'inventory.issue_material_request',
+                                   request_id=item.id
+                               ) }}">
+                                Issue Materials
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="text-center text-muted">
+                            No approved requests awaiting issue.
+                        </td>
+                    </tr>
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}

@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block title %}Asset Categories{% endblock %}
+
+{% block content %}
+
+<div class="asset-dashboard">
+
+    <div class="asset-page-header">
+        <div>
+            <h2>Asset Categories</h2>
+            <p>Organize and manage organizational asset classifications.</p>
+        </div>
+
+        <a href="{{ url_for('asset_management.create_category') }}"
+           class="asset-btn asset-btn-primary">
+            <i class="fas fa-plus"></i> Create Category
+        </a>
+    </div>
+
+    <div class="asset-panel">
+
+        <form method="GET" class="category-filter">
+
+            <input type="text"
+                   name="search"
+                   value="{{ search }}"
+                   placeholder="Search category name or code">
+
+            <select name="status">
+                <option value="">All Statuses</option>
+                <option value="Active"
+                    {% if selected_status == 'Active' %}selected{% endif %}>
+                    Active
+                </option>
+                <option value="Inactive"
+                    {% if selected_status == 'Inactive' %}selected{% endif %}>
+                    Inactive
+                </option>
+            </select>
+
+            <button class="asset-btn asset-btn-primary">
+                <i class="fas fa-search"></i> Search
+            </button>
+
+        </form>
+
+        <div class="asset-table-wrapper">
+
+            <table class="asset-table">
+
+                <thead>
+                    <tr>
+                        <th>Category Code</th>
+                        <th>Category Name</th>
+                        <th>Parent Category</th>
+                        <th>Description</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for category in categories %}
+
+                    <tr>
+                        <td><strong>{{ category.code or 'N/A' }}</strong></td>
+
+                        <td>{{ category.name }}</td>
+
+                        <td>
+                            {{ category.parent.name if category.parent else 'Main Category' }}
+                        </td>
+
+                        <td>{{ category.description or '-' }}</td>
+
+                        <td>
+                            <span class="asset-status
+                                {{ category.status|lower }}">
+                                {{ category.status }}
+                            </span>
+                        </td>
+
+                        <td>
+                            <div class="category-actions">
+
+                                <a href="{{ url_for(
+                                    'asset_management.edit_category',
+                                    category_id=category.id
+                                ) }}" class="asset-view-link">
+                                    Edit
+                                </a>
+
+                                <form method="POST"
+                                      action="{{ url_for(
+                                        'asset_management.toggle_category',
+                                        category_id=category.id
+                                      ) }}">
+
+                                    <input type="hidden"
+                                           name="csrf_token"
+                                           value="{{ csrf_token() }}">
+
+                                    <button type="submit"
+                                            class="category-toggle-btn">
+                                        {{ 'Deactivate' if category.status == 'Active' else 'Activate' }}
+                                    </button>
+
+                                </form>
+
+                            </div>
+                        </td>
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="6" class="asset-empty">
+                            No asset categories found.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}

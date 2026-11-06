@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi with context %}
+
+{% block title %}Customer Feedback | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+{% set ns = namespace(open=0, complaints=0, rated=0, total=0) %}
+{% for item in feedback_items %}
+  {% if item["status"] not in ("Resolved", "Closed") %}
+    {% set ns.open = ns.open + 1 %}
+  {% endif %}
+  {% if item["feedback_type"] == 'Complaint' %}
+    {% set ns.complaints = ns.complaints + 1 %}
+  {% endif %}
+  {% if item["rating"] %}
+    {% set ns.total = ns.total + item["rating"] | int %}
+    {% set ns.rated = ns.rated + 1 %}
+  {% endif %}
+{% endfor %}
+
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">MARKETING MANAGEMENT</span>
+      <h1>Customer Feedback</h1>
+      <p>Complaints, inquiries and compliments, with the seat that has to answer
+        each one.</p>
+    </div>
+    <div class="row-actions">
+      <a class="btn btn-outline" href="{{ url_for('marketing.dashboard') }}">
+        ← Marketing desk
+      </a>
+      {% if 'marketing_feedback' in granted_permissions %}
+      <a class="btn" href="{{ url_for('marketing.create_feedback') }}">
+        Record feedback →
+      </a>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="hr-stats">
+      {{ kpi('Records listed', feedback_items | length, 'matching this filter') }}
+      {{ kpi('Awaiting an answer', ns.open, 'not resolved or closed',
+             'warn' if ns.open else 'flat') }}
+      {{ kpi('Complaints', ns.complaints, 'of everything recorded') }}
+      {{ kpi('Average rating',
+             ("{:.1f}".format(ns.total / ns.rated) if ns.rated else '—'),
+             'of 5, rated records only') }}
+    </div>
+
+    <form method="GET" class="stock-search">
+      <label for="search">Search</label>
+      <input id="search" name="search" value="{{ search }}"
+             placeholder="Customer, contact or description" />
+      <label for="status">Status</label>
+      <select id="status" name="status">
+        <option value="">All statuses</option>
+        {% for value in feedback_statuses %}
+        <option value="{{ value }}" {% if status == value %}selected{% endif %}>
+          {{ value }}</option>
+        {% endfor %}
+      </select>
+      <button class="btn" type="submit">Search</button>
+      <a class="btn btn-outline" href="{{ url_for('marketing.feedback') }}">Reset</a>
+      {% if 'marketing_reports' in granted_permissions %}
+      <a class="btn btn-outline"
+         href="{{ url_for('marketing.export', kind='feedback', status=status, search=search) }}">
+        Export CSV
+      </a>
+      {% endif %}
+    </form>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>{% if feedback_items %}{{ feedback_items | length }} record{{ '' if feedback_items | length == 1 else 's' }}{% else %}Records{% endif %}</h2>
+      <div class="hr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Customer</th><th>Type</th><th>What was said</th><th>Rating</th>
+              <th>Owner</th><th>Status</th><th>Last modified</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in feedback_items %}
+            <tr>
+              <td>
+                {{ item["customer_name"] or 'Unnamed' }}
+                <br><span class="feed-meta">{{ item["contact"] or '' }}</span>
+              </td>
+              <td>{{ item["feedback_type"] }}</td>
+              <td class="wrap-cell">{{ item["description"] | truncate(140) }}</td>
+              <td>{{ "{} / 5".format(item["rating"]) if item["rating"] else '—' }}</td>
+              <td>{{ item["assigned_name"] or 'Unassigned' }}</td>
+              <td>
+                <span class="status-badge {{ 'active' if item["status"] in
+                      ('Resolved', 'Closed') else 'neutral' }}">{{ item["status"] }}</span>
+              </td>
+              <td class="nowrap">
+                {{ item["updated_by_name"] or item["created_by_name"] or '—' }}
+                <br><span class="feed-meta">{{ item["updated_at"] | audit_time }}</span>
+              </td>
+              <td class="row-actions">
+                {% if 'marketing_feedback' in granted_permissions %}
+                <a class="btn"
+                   href="{{ url_for('marketing.edit_feedback', feedback_id=item['id']) }}">
+                  {{ 'Answer' if item["status"] == 'Pending' else 'Edit' }}
+                </a>
+                {% else %}
+                <span class="feed-meta">—</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="8">No feedback records match this filter.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="dash-panel">
+      <h2>Closing a record</h2>
+      <p>Nothing settles silently: the status only moves to Resolved or Closed
+        once a resolution has been written, and that text is what the audit line
+        carries beside the customer's original words.</p>
+    </div>
+  </div>
+</section>
+{% endblock %}

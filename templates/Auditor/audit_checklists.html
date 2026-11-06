@@ -1,0 +1,184 @@
+
+{% extends "base.html" %}
+
+{% block title %}Audit Checklists | Audit Management{% endblock %}
+
+{% block content %}
+
+<section class="dash-head">
+    <div class="container">
+        <div>
+            <span class="eyebrow">Audit Management</span>
+            <h1>Audit Checklists</h1>
+            <p>
+                Manage standardized audit checklists, review audit requirements
+                and monitor checklist completion.
+            </p>
+        </div>
+
+        <div class="stock-actions">
+            <a class="btn btn-outline btn-sm"
+               href="{{ url_for('audit.dashboard') }}">
+                Dashboard
+            </a>
+            <a class="btn btn-sm"
+               href="{{ url_for('audit.checklist_templates') }}">
+                Refresh
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="container finance-page">
+
+    <!-- SUMMARY -->
+
+    <div class="hr-stats">
+
+        <div class="dash-panel">
+            <span class="eyebrow">Total Templates</span>
+            <h2>{{ stats.total | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Active Templates</span>
+            <h2>{{ stats.active | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Checklist Items</span>
+            <h2>{{ stats.items | default(0) }}</h2>
+        </div>
+
+        <div class="dash-panel">
+            <span class="eyebrow">Completed Results</span>
+            <h2>{{ stats.completed | default(0) }}</h2>
+        </div>
+
+    </div>
+
+
+    <!-- CHECKLIST TEMPLATE LIST -->
+
+    <div class="dash-panel hr-table-panel">
+
+        <div class="dash-panel-head">
+            <div>
+                <h2>Checklist Templates</h2>
+                <p>
+                    Standard audit procedures organized by department and audit type.
+                </p>
+            </div>
+        </div>
+
+        <div class="table-scroll">
+
+            <table class="report-table">
+
+                <thead>
+                    <tr>
+                        <th>Template Name</th>
+                        <th>Department</th>
+                        <th>Audit Type</th>
+                        <th>Items</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for checklist in checklists | default([]) %}
+
+                    <tr>
+                        <td>
+                            <strong>
+                                {{ checklist.name
+                                   | default(checklist.title
+                                   | default('Untitled Checklist')) }}
+                            </strong>
+
+                            {% if checklist.description %}
+                                <span class="feed-meta">
+                                    {{ checklist.description }}
+                                </span>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {{ checklist.department | default('All Departments') }}
+                        </td>
+
+                        <td>
+                            {{ checklist.audit_type | default('General Audit') }}
+                        </td>
+
+                        <td>
+                            {{ checklist.item_count | default(0) }}
+                        </td>
+
+                        <td>
+                            {% set status = checklist.status | default('Active') %}
+
+                            <span class="status-badge
+                                {{ 'active' if status == 'Active' else 'neutral' }}">
+                                {{ status }}
+                            </span>
+                        </td>
+
+                        <td>
+                            {{ checklist.created_at | default('—') }}
+                        </td>
+
+                        <td>
+                            <a class="btn btn-outline btn-sm"
+                               href="{{ url_for(
+                                   'audit.checklist_detail',
+                                   checklist_id=checklist.id
+                               ) }}">
+                                Open Checklist
+                            </a>
+                        </td>
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="7" class="report-empty">
+                            No checklist templates are available.
+                            Create a checklist template to establish
+                            standardized audit procedures.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <!-- CHECKLIST GUIDANCE -->
+
+    <div class="dash-panel">
+
+        <h2>Checklist Management Guidelines</h2>
+
+        <ul>
+            <li>Use approved checklist templates for consistent audit procedures.</li>
+            <li>Organize checklist items according to the relevant department.</li>
+            <li>Record evidence and observations against individual checklist items.</li>
+            <li>Keep completed checklist results available for audit review.</li>
+            <li>Restrict template management to users with the appropriate audit permissions.</li>
+        </ul>
+
+    </div>
+
+</section>
+
+{% endblock %}

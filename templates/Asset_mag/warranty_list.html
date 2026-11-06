@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container-fluid py-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+
+        <h3>Asset Warranty Management</h3>
+
+        <a href="{{ url_for(
+            'asset_management.create_asset_warranty'
+        ) }}" class="btn btn-success">
+            Register Warranty
+        </a>
+
+    </div>
+
+    <div class="card border-0 shadow-sm">
+
+        <div class="table-responsive">
+
+            <table class="table table-hover mb-0">
+
+                <thead>
+                    <tr>
+                        <th>Asset</th>
+                        <th>Provider</th>
+                        <th>Reference</th>
+                        <th>Start Date</th>
+                        <th>Expiry Date</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for warranty in warranties %}
+
+                    <tr>
+                        <td>{{ warranty.asset.name if warranty.asset else "-" }}</td>
+                        <td>{{ warranty.warranty_provider or "-" }}</td>
+                        <td>{{ warranty.warranty_reference or "-" }}</td>
+                        <td>{{ warranty.start_date }}</td>
+                        <td>{{ warranty.expiry_date }}</td>
+                        <td>{{ warranty.status }}</td>
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="6" class="text-center">
+                            No warranty records found.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

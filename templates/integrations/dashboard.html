@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi, feed with context %}
+{% from "integrations/_module_nav.html" import module_tabs with context %}
+
+{% block title %}System Integrations | Dereje Belay Wood &amp; Kitchen{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Admin</span>
+      <h1>System integrations</h1>
+      <p>The register of every external system this company talks to: its endpoint, the
+        credential it binds with, whether it answers, and what its synchronization has done.</p>
+    </div>
+    <div class="dash-stats">
+      <div class="stat"><strong>{{ stats.total or 0 }}</strong><span>Connections</span></div>
+      <div class="stat"><strong>{{ stats.active or 0 }}</strong><span>Active</span></div>
+      <div class="stat"><strong>{{ stats.scheduled or 0 }}</strong><span>Scheduled</span></div>
+      <div class="stat"><strong>{{ stats.synced or 0 }}</strong><span>Ever synchronized</span></div>
+    </div>
+    <nav class="stock-actions" aria-label="Integration actions">
+      <a class="btn btn-sm" href="{{ url_for('integrations.add') }}">Add connection</a>
+    </nav>
+    {{ module_tabs('registry') }}
+  </div>
+</section>
+
+<section class="section bg-white">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="hr-stats">
+      {{ kpi('Connections registered', stats.total or 0,
+             'Active, inactive and every type', icon='network') }}
+      {{ kpi('Active', stats.active or 0,
+             'Only an active connection synchronizes', tone='up', icon='check') }}
+      {{ kpi('Scheduled', stats.scheduled or 0,
+             'Read by the integration scheduler worker', icon='clock') }}
+      {{ kpi('Unresolved errors', open_errors,
+             'Cleared on the monitoring desk' if open_errors else 'Every run reported clean',
+             tone='down' if open_errors else 'flat', icon='warn',
+             href=url_for('integrations.monitoring') if open_errors else '') }}
+    </div>
+
+    <div class="chart-grid" style="margin-top: 1.5rem;">
+      {{ feed('Needs attention', attention, 'Before the next scheduled run') }}
+    </div>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    <div class="emp-panel">
+
+      <div class="account-card">
+        <header class="account-head">
+          <div>
+            <h3 class="account-name">Connections</h3>
+            <span class="cell-note">A credential is stored sealed: this screen says whether one
+              is present and never what it is.</span>
+          </div>
+          <div class="row-actions">
+            <label class="cell-note" for="connection-search">Filter</label>
+            <input id="connection-search" type="search" placeholder="Name, type or endpoint"
+                   aria-label="Filter connections" />
+            <a class="btn btn-sm" href="{{ url_for('integrations.add') }}">Add connection</a>
+          </div>
+        </header>
+
+        <div class="dash-table-wrap">
+          <table id="connection-table">
+            <thead>
+              <tr>
+                <th>Connection</th><th>Type</th><th>Status</th><th>Credential</th>
+                <th>Last test</th><th>Schedule</th><th>Last sync</th><th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for c in cards %}
+              {% set directory_ok = (not c.is_directory) or ('accounts' in permissions) %}
+              <tr class="{{ 'is-disabled' if c.status != 'active' }}"
+                  data-search="{{ (c.name ~ ' ' ~ c.integration_type ~ ' ' ~ c.endpoint) | lower }}">
+                <td>
+                  {% if c.is_directory and 'accounts' not in permissions %}
+                  {{ c.name }}
+                  {% else %}
+                  <a href="{{ url_for('integrations.directory_sync', connection_id=c.directory_id)
+                            if c.is_directory
+                            else url_for('integrations.edit', integration_id=c.id) }}">{{ c.name }}</a>
+                  {% endif %}
+                  {% if c.due %}<span class="status-badge neutral">due</span>{% endif %}
+                  {% if c.open_errors %}
+                  <span class="status-badge off">{{ c.open_errors }} error{{ '' if c.open_errors == 1 else 's' }}</span>
+                  {% endif %}
+                  <p class="cell-note">{{ c.endpoint or 'No endpoint set' }}
+                    {%- if c.description %} · {{ c.description }}{% endif %}</p>
+                </td>
+                <td>{{ c.integration_type }}
+                  {% if c.is_directory %}
+                  <p class="cell-note">directory profile · provisioning on its own desk</p>
+                  {% elif c.is_ad and c.ad_accounts %}
+                  <p class="cell-note">{{ c.ad_accounts }} account{{ '' if c.ad_accounts == 1 else 's' }} read</p>
+                  {% endif %}
+                </td>
+                <td>
+                  <span class="status-badge {{ 'active' if c.status == 'active' else 'off' }}">
+                    {{ c.status }}</span>
+                </td>
+                <td>
+                  <span class="status-badge {{ 'active' if c.credential_count else 'neutral' }}">
+                    {{ c.credential_count or 'none' }}</span>
+                </td>
+                <td>
+                  <span class="status-badge {{ 'active' if c.last_test == 'success'
+                                                else ('off' if c.last_test == 'failed'
+                                                else 'neutral') }}">
+                    {{ c.last_test or 'untested' }}</span>
+                  <p class="cell-note">{{ c.last_test_at | audit_time or 'never' }}</p>
+                </td>
+                <td>
+                  {{ 'Every {} min'.format(c.sync_interval) if c.sync_enabled
+                     else ('Manual' if c.can_sync else 'Not supported') }}
+                  {% if c.can_sync and c.next_run_at %}
+                  <p class="cell-note">next {{ c.next_run_at | audit_time }}</p>
+                  {% endif %}
+                </td>
+                <td class="cell-note">{{ c.last_sync_at | audit_time or 'never' }}</td>
+                <td>
+                  <div class="row-actions">
+                    {% if directory_ok %}
+                    <form method="POST"
+                          action="{{ url_for('integrations.check_connection', integration_id=c.id) }}">
+                      {{ csrf_field() }}
+                      <button class="btn btn-outline-dark btn-sm" type="submit">Test</button>
+                    </form>
+                    {% if c.can_sync %}
+                    <form method="POST" action="{{ url_for('integrations.sync', integration_id=c.id) }}">
+                      {{ csrf_field() }}
+                      <button class="btn btn-outline-dark btn-sm" type="submit">Sync now</button>
+                    </form>
+                    {% endif %}
+                    {% endif %}
+                    {% if c.is_directory and 'accounts' in permissions %}
+                    <a class="btn btn-outline-dark btn-sm"
+                       href="{{ url_for('integrations.directory_sync', connection_id=c.directory_id) }}">Directory</a>
+                    {% elif c.is_ad %}
+                    <a class="btn btn-outline-dark btn-sm"
+                       href="{{ url_for('integrations.ad_mapping', integration_id=c.id) }}">Mapping</a>
+                    {% endif %}
+                    {% if directory_ok %}
+                    <a class="btn btn-outline-dark btn-sm"
+                       href="{{ url_for('integrations.edit', integration_id=c.id) }}">Edit</a>
+                    <form method="POST" action="{{ url_for('integrations.toggle', integration_id=c.id) }}">
+                      {{ csrf_field() }}
+                      <button class="btn btn-outline-dark btn-sm" type="submit">
+                        {{ 'Stand down' if c.status == 'active' else 'Activate' }}</button>
+                    </form>
+                    <form method="POST" action="{{ url_for('integrations.delete', integration_id=c.id) }}"
+                          onsubmit="return confirm('Delete this connection? Its sealed credential, its directory accounts and its history are removed with it.');">
+                      {{ csrf_field() }}
+                      <button class="btn-danger btn-sm" type="submit">Delete</button>
+                    </form>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="8" class="cell-note">
+                  No system is registered yet. Add the connection, store its credential, test the
+                  endpoint and only then set it active.
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="account-card">
+        <header class="account-head">
+          <div>
+            <h3 class="account-name">Recent activity</h3>
+            <span class="cell-note">The same log the audit console reads, filtered to this desk.</span>
+          </div>
+          <a class="btn btn-outline-dark btn-sm" href="{{ url_for('integrations.logs') }}">
+            All activity</a>
+        </header>
+        <div class="dash-table-wrap">
+          <table>
+            <thead>
+              <tr><th>When</th><th>Account</th><th>Action</th><th>Detail</th><th>Result</th></tr>
+            </thead>
+            <tbody>
+              {% for row in activity %}
+              <tr>
+                <td class="nowrap">{{ row.occurred_at | audit_time }}</td>
+                <td>{{ row.username or 'system' }}</td>
+                <td>{{ row.action }}</td>
+                <td class="wrap-cell">{{ row.description }}</td>
+                <td>
+                  <span class="status-badge {{ 'active' if row.outcome == 'SUCCESS' else 'off' }}">
+                    {{ row.outcome | lower }}</span>
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="5" class="cell-note">Nothing has been done here yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <p class="perm-note">Adding, editing, activating, testing, synchronizing, mapping and
+          deleting are all written to the shared activity log under module
+          <strong>integrations</strong>; credential values are never written anywhere.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    var search = document.getElementById('connection-search');
+    var rows = document.querySelectorAll('#connection-table tbody tr[data-search]');
+    if (!search || !rows.length) return;
+    search.addEventListener('input', function () {
+      var term = search.value.trim().toLowerCase();
+      rows.forEach(function (row) {
+        row.hidden = !!term && row.dataset.search.indexOf(term) === -1;
+      });
+    });
+  })();
+</script>
+{% endblock %}

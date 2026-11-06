@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi with context %}
+
+{% block title %}Recruitment budget desk{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">Finance desk</span>
+      <h1>Recruitment budget</h1>
+      <p>What hiring has asked the money for, which budget line carries it and what
+        has been signed. The figures come from the post itself, so a request and its
+        register entry can never disagree.</p>
+    </div>
+    <nav class="stock-actions" aria-label="Budget actions">
+      <a class="btn btn-outline btn-sm" href="{{ url_for('approvals.dashboard') }}">
+        Approvals
+      </a>
+      {% if can_manage %}
+      <a class="btn btn-outline btn-sm" href="{{ url_for('recruitment.hr_vacancies') }}">
+        Vacancy register
+      </a>
+      {% endif %}
+      <a class="btn btn-outline btn-sm" href="{{ url_for('recruitment.hr_reports') }}">
+        Reports
+      </a>
+    </nav>
+  </div>
+</section>
+
+<section class="container finance-page">
+  <div class="hr-stats">
+    {{ kpi('Requests', totals.requests, 'in this view', 'flat', 'file') }}
+    {{ kpi('Awaiting a signature', totals.awaiting, 'pending on a chain',
+           'down' if totals.awaiting else 'flat', 'clock') }}
+    {{ kpi('Awaiting amount', totals.awaiting_amount | money, 'not committed yet',
+           'down' if totals.awaiting else 'flat', 'calculator') }}
+    {{ kpi('Signed off', totals.approved_amount | money, 'committed to a line',
+           'up', 'check') }}
+    {{ kpi('Refused', totals.rejected_amount | money, 'answered and closed',
+           'down' if totals.rejected_amount else 'flat', 'warn') }}
+  </div>
+
+  <div class="dash-panel">
+    <h2>Filter the desk</h2>
+    <form method="GET" action="{{ url_for('recruitment.finance_desk') }}" class="filter-form">
+      <select name="status" aria-label="Request status">
+        <option value="">Every hiring request</option>
+        {% for value in ('Pending', 'Approved', 'Rejected', 'Returned') %}
+        <option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>
+          {{ value }}
+        </option>
+        {% endfor %}
+      </select>
+      <button class="btn btn-sm" type="submit">Apply filters</button>
+      {% if selected_status %}
+      <a class="btn btn-outline btn-sm" href="{{ url_for('recruitment.finance_desk') }}">Clear</a>
+      {% endif %}
+    </form>
+    <p class="panel-note">Only the chains this account may read are listed: the desk
+      the route is standing at, the account that raised the request, or a signature
+      already given.</p>
+  </div>
+
+  <div class="dash-panel hr-table-panel">
+    <h2>Hiring requests</h2>
+    <div class="hr-table-wrap table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Post</th>
+            <th>Request</th>
+            <th>Raised by</th>
+            <th>Amount</th>
+            <th>Budget line</th>
+            <th>Waiting at</th>
+            <th>Status</th>
+            <th aria-label="Actions"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in requests %}
+          <tr>
+            <td class="wrap-cell">
+              <strong>{{ item.job_title }}</strong>
+              <span class="cell-note">
+                {{ item.reference }} · {{ item.department }} ·
+                {{ item.openings }} {{ 'opening' if item.openings == 1 else 'openings' }}
+                {% if item.vacancy_status %} · {{ item.vacancy_status }}{% endif %}
+              </span>
+            </td>
+            <td class="wrap-cell">
+              <a href="{{ url_for('approvals.detail', request_id=item.id) }}">
+                {{ item.title }}</a>
+              <span class="cell-note">
+                #{{ item.id }} · {{ item.created_at | friendly_date }}</span>
+            </td>
+            <td class="nowrap">{{ item.created_by_name }}</td>
+            <td class="nowrap">
+              {{ item.amount | money }}
+              <span class="cell-note">post estimate {{ item.estimated_cost | money }}</span>
+            </td>
+            <td class="wrap-cell">
+              {% if item.allocation_name %}
+              {{ item.allocation_name }}
+              <span class="cell-note">
+                {{ item.allocation_department }} ·
+                {{ item.plan_name }}{% if item.fiscal_year %} · {{ item.fiscal_year }}{% endif %}
+              </span>
+              {% else %}
+              <span class="cell-note">No line attached</span>
+              {% endif %}
+            </td>
+            <td class="nowrap">
+              {% if item.status == 'Pending' %}
+              {{ step_label.get(item.current_approver_step, item.current_approver_step) }}
+              {% elif item.status == 'Approved' %}
+              <span class="cell-note">chain complete</span>
+              {% else %}
+              <span class="cell-note">answered {{ item.updated_at | audit_time }}</span>
+              {% endif %}
+            </td>
+            <td>
+              <span class="status-badge {{ 'active' if item.status == 'Approved'
+                                            else 'off' if item.status in ('Rejected', 'Returned')
+                                            else 'neutral' }}">{{ item.status }}</span>
+            </td>
+            <td class="nowrap">
+              <a class="btn btn-outline btn-sm"
+                 href="{{ url_for('approvals.detail', request_id=item.id) }}">
+                {{ 'Sign' if item.can_sign else 'Open' }}</a>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="8" class="employee-empty">
+              No hiring request matches this filter.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="panel-note">The signature itself is given on the approvals screen, which
+      is where every chain in the company is decided and where the history of a
+      decision is written. Nothing on this page signs twice.</p>
+  </div>
+
+  {% if not can_manage %}
+  <div class="dash-panel">
+    <h2>What this seat may do</h2>
+    <p class="panel-note">A finance seat reads the money a hiring request asks for,
+      follows the chain it is standing in and signs it where the chain names this
+      desk. The post, its candidates, the examination and the panel belong to the
+      desks that raised them.</p>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,233 @@
+
+{% extends "base.html" %}
+
+{% block title %}Chart of Accounts | Finance{% endblock %}
+
+{% block content %}
+{% set accounts = accounts|default([], true) %}
+{% set parent_accounts = parent_accounts|default([], true) %}
+{% set account_types = account_types|default([
+    'Asset', 'Liability', 'Equity', 'Revenue', 'Expense'
+], true) %}
+
+<div class="finance-accounts-page">
+
+    <header class="page-header finance-page-header">
+        <div>
+            <h1>Chart of Accounts</h1>
+            <p>Manage financial accounts and account classifications.</p>
+        </div>
+
+        <div class="finance-header-actions">
+            <a href="{{ url_for('finance.dashboard') }}" class="btn btn-secondary">
+                Back to Dashboard
+            </a>
+        </div>
+    </header>
+
+    {% if error %}
+        <div class="alert alert-danger" role="alert">
+            {{ error }}
+        </div>
+    {% endif %}
+
+    {% if success %}
+        <div class="alert alert-success" role="alert">
+            {{ success }}
+        </div>
+    {% endif %}
+
+    <section class="finance-account-summary">
+        <div class="finance-summary-card">
+            <span>Total Accounts</span>
+            <strong>{{ accounts|length }}</strong>
+        </div>
+
+        <div class="finance-summary-card">
+            <span>Active Accounts</span>
+            <strong>
+                {{ accounts|selectattr('status', 'equalto', 'Active')|list|length }}
+            </strong>
+        </div>
+
+        <div class="finance-summary-card">
+            <span>Inactive Accounts</span>
+            <strong>
+                {{ accounts|selectattr('status', 'equalto', 'Inactive')|list|length }}
+            </strong>
+        </div>
+    </section>
+
+    {% if can_create_account|default(false) %}
+    <section class="finance-panel">
+        <div class="finance-panel-header">
+            <h2>Create New Account</h2>
+            <p>Add an account to the existing Finance chart of accounts.</p>
+        </div>
+
+        <form method="POST"
+              action="{{ url_for('finance.create_account') }}"
+              class="finance-account-form">
+
+            {% if csrf_token is defined %}
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            {% endif %}
+
+            <div class="finance-form-grid">
+
+                <div class="form-group">
+                    <label for="account_code">Account Code *</label>
+                    <input type="text"
+                           id="account_code"
+                           name="account_code"
+                           maxlength="30"
+                           required
+                           placeholder="Example: 1000">
+                </div>
+
+                <div class="form-group">
+                    <label for="account_name">Account Name *</label>
+                    <input type="text"
+                           id="account_name"
+                           name="account_name"
+                           maxlength="150"
+                           required
+                           placeholder="Example: Cash at Bank">
+                </div>
+
+                <div class="form-group">
+                    <label for="account_type">Account Type *</label>
+                    <select id="account_type" name="account_type" required>
+                        <option value="">Select account type</option>
+                        {% for account_type in account_types %}
+                            <option value="{{ account_type }}">
+                                {{ account_type }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="normal_balance">Normal Balance *</label>
+                    <select id="normal_balance" name="normal_balance" required>
+                        <option value="">Select balance</option>
+                        <option value="Debit">Debit</option>
+                        <option value="Credit">Credit</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="parent_account_id">Parent Account</label>
+                    <select id="parent_account_id" name="parent_account_id">
+                        <option value="">No Parent Account</option>
+                        {% for parent in parent_accounts %}
+                            <option value="{{ parent['id'] }}">
+                                {{ parent['account_code'] }} -
+                                {{ parent['account_name'] }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group finance-checkbox-group">
+                    <label>
+                        <input type="checkbox"
+                               name="is_control_account"
+                               value="1">
+                        Control Account
+                    </label>
+                </div>
+
+                <div class="form-group finance-checkbox-group">
+                    <label>
+                        <input type="checkbox"
+                               name="allow_manual_posting"
+                               value="1"
+                               checked>
+                        Allow Manual Posting
+                    </label>
+                </div>
+
+                <div class="form-group finance-form-full">
+                    <label for="description">Description</label>
+                    <textarea id="description"
+                              name="description"
+                              rows="3"
+                              maxlength="500"
+                              placeholder="Enter account description"></textarea>
+                </div>
+
+            </div>
+
+            <div class="finance-form-actions">
+                <button type="reset" class="btn btn-secondary">
+                    Clear
+                </button>
+                <button type="submit" class="btn btn-primary">
+                    Create Account
+                </button>
+            </div>
+        </form>
+    </section>
+    {% endif %}
+
+    <section class="finance-panel">
+        <div class="finance-panel-header">
+            <div>
+                <h2>Account List</h2>
+                <p>View existing accounts and their classifications.</p>
+            </div>
+        </div>
+
+        <div class="finance-table-wrapper">
+            <table class="table finance-table">
+                <thead>
+                    <tr>
+                        <th>Account Code</th>
+                        <th>Account Name</th>
+                        <th>Account Type</th>
+                        <th>Normal Balance</th>
+                        <th>Parent Account</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for account in accounts %}
+                    <tr>
+                        <td>{{ account['account_code'] }}</td>
+                        <td>
+                            <strong>{{ account['account_name'] }}</strong>
+                        </td>
+                        <td>{{ account['account_type'] }}</td>
+                        <td>{{ account['normal_balance'] }}</td>
+                        <td>
+                            {{ account.get('parent_account_name', '—') or '—' }}
+                        </td>
+                        <td>
+                            {% if account['status'] == 'Active' %}
+                                <span class="status-badge status-active">
+                                    Active
+                                </span>
+                            {% else %}
+                                <span class="status-badge status-inactive">
+                                    {{ account['status'] }}
+                                </span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="finance-empty-state">
+                            No accounts found. Create your first account
+                            if you have the required permission.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+</div>
+{% endblock %}

@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% from "base.html" import kpi, bars with context %}
+
+{% block title %}Stock valuation | Dereje Wood &amp; Kitchen Cabinet{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div class="container">
+    <div>
+      <span class="eyebrow">INVENTORY MANAGEMENT · REPORTS</span>
+      <h1>Stock valuation</h1>
+      <p>Balance times unit cost, grouped by category, with the largest
+        holdings listed first.</p>
+    </div>
+    <a class="btn btn-outline btn-sm" href="{{ url_for('inventory.reports') }}">
+      ← All reports
+    </a>
+  </div>
+</section>
+
+<section class="section bg-ivory">
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="finance-alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <form method="GET" action="{{ url_for('inventory.valuation_report') }}"
+          class="stock-search">
+      <label for="q">Search</label>
+      <input id="q" name="q" value="{{ search }}"
+             placeholder="SKU, item name or category" />
+      <label for="category">Category</label>
+      <select id="category" name="category">
+        <option value="">Every category</option>
+        {% for name in categories %}
+        <option value="{{ name }}" {% if category == name %}selected{% endif %}>
+          {{ name }}
+        </option>
+        {% endfor %}
+      </select>
+      <button class="btn btn-sm" type="submit">Apply</button>
+      <a class="btn btn-outline btn-sm" href="{{ url_for('inventory.valuation_report') }}">
+        Reset
+      </a>
+      <a class="btn btn-outline btn-sm"
+         href="{{ url_for('inventory.valuation_report_export', q=search,
+                          category=category) }}">
+        Export CSV
+      </a>
+    </form>
+
+    <div class="hr-stats">
+      {{ kpi('Items valued', totals["items"], 'matching the filter') }}
+      {{ kpi('Units', "{:,.2f}".format(totals["quantity"]), 'summed on hand') }}
+      {{ kpi('Stock value (ETB)', "{:,.2f}".format(totals["value"]),
+             'balance × unit cost') }}
+      {{ kpi('Categories', groups | length, 'with a balance') }}
+    </div>
+
+    {% set value_rows = [] %}
+    {% for group in groups %}
+      {% set _ = value_rows.append({
+        'label': group['category'] or 'Uncategorised',
+        'value': group['value'],
+        'display': '{:,.0f}'.format(group['value'])
+      }) %}
+    {% endfor %}
+    <div class="chart-grid">
+      {{ bars('Value by category', value_rows, 'ETB') }}
+    </div>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>By category</h2>
+      <div class="hr-table-wrap table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Category</th><th>Items</th><th>Units</th>
+              <th>Value (ETB)</th><th>Share</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for group in groups %}
+            <tr>
+              <td>{{ group["category"] or 'Uncategorised' }}</td>
+              <td>{{ group["items"] }}</td>
+              <td>{{ "{:,.2f}".format(group["quantity"]) }}</td>
+              <td>{{ "{:,.2f}".format(group["value"]) }}</td>
+              <td>{{ "{:.1f}".format(group["share"]) }}%</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5">Nothing valued yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="dash-panel hr-table-panel">
+      <h2>Largest holdings</h2>
+      <div class="hr-table-wrap table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>SKU</th><th>Item</th><th>Category</th><th>On hand</th>
+              <th>Unit cost</th><th>Value (ETB)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in items %}
+            <tr>
+              <td>{{ item["sku"] }}</td>
+              <td>{{ item["name"] }}</td>
+              <td>{{ item["category"] }}</td>
+              <td>{{ item["quantity"] }} {{ item["unit"] }}</td>
+              <td>{{ "{:,.2f}".format(item["unit_cost"]) }}</td>
+              <td>{{ "{:,.2f}".format(item["quantity"] * item["unit_cost"]) }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6">No item has a balance to value.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
